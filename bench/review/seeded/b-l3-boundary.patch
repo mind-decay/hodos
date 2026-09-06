@@ -1,0 +1,28 @@
+# id: b-l3-boundary
+# fixture: api
+# package: p4
+# kind: behavioral
+# item: L3
+# line: src/services/orders.js:56
+# anchor: return orders.slice(offset, offset + limit - 1);
+# trigger: limit=1 returns nothing at all, and every other limit returns one row fewer than it asked for — slice's end is exclusive already
+# what: the last row of every page is dropped
+diff --git a/src/services/orders.js b/src/services/orders.js
+index 9f955da..748bab8 100644
+--- a/src/services/orders.js
++++ b/src/services/orders.js
+@@ -44,3 +44,14 @@ export function create(input) {
+   }
+   return put({ id: `o-${all().length + 1}`, customer, total, status: 'open' });
+ }
++
++/**
++ * One page of orders, for the list endpoint's offset and limit.
++ * @param {Order[]} orders
++ * @param {number} offset
++ * @param {number} limit
++ * @returns {Order[]}
++ */
++export function page(orders, offset, limit) {
++  return orders.slice(offset, offset + limit - 1);
++}

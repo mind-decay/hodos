@@ -1,0 +1,51 @@
+
+> webapp-fixture@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 <home>/hodos-stage7-breaker
+
+ ❯ src/features/orders/model.test.ts (3 tests | 2 failed) 4ms
+     × starts on every order 3ms
+     × returns to every order on reset 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/orders/model.test.ts > the orders filter store > starts on every order
+AssertionError: expected 'open' to be 'all' // Object.is equality
+
+Expected: "all"
+Received: "open"
+
+ ❯ src/features/orders/model.test.ts:11:47
+      9| describe('the orders filter store', () => {
+     10|   it('starts on every order', () => {
+     11|     expect(useOrdersFilter.getState().status).toBe('all');
+       |                                               ^
+     12|   });
+     13|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/features/orders/model.test.ts > the orders filter store > returns to every order on reset
+AssertionError: expected 'open' to be 'all' // Object.is equality
+
+Expected: "all"
+Received: "open"
+
+ ❯ src/features/orders/model.test.ts:22:47
+     20|     useOrdersFilter.getState().setStatus('cancelled');
+     21|     useOrdersFilter.getState().reset();
+     22|     expect(useOrdersFilter.getState().status).toBe('all');
+       |                                               ^
+     23|   });
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 12 passed (14)
+   Start at  11:51:54
+   Duration  478ms (transform 89ms, setup 257ms, import 95ms, tests 115ms, environment 1.28s)
+

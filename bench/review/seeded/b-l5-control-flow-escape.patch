@@ -1,0 +1,33 @@
+# id: b-l5-control-flow-escape
+# fixture: webapp
+# package: p3
+# kind: behavioral
+# item: L5
+# line: src/features/orders/ui/useCancelOrder.ts:12
+# anchor: if (!order) return;
+# trigger: cancel is pressed while the detail query is still pending, so order is undefined — the early return skips setBusy(false) and the button stays disabled for the rest of the session
+# what: the guard belongs above the state change it is guarding
+diff --git a/src/features/orders/ui/useCancelOrder.ts b/src/features/orders/ui/useCancelOrder.ts
+new file mode 100644
+index 0000000..72c92b3
+--- /dev/null
++++ b/src/features/orders/ui/useCancelOrder.ts
+@@ -0,0 +1,18 @@
++import { useState } from 'react';
++
++import { request } from '../../../lib/http';
++import type { Order } from '../api';
++
++/** Cancels the order the detail page is showing, and reports while it runs. */
++export function useCancelOrder(order: Order | undefined) {
++  const [busy, setBusy] = useState(false);
++
++  const cancel = async () => {
++    setBusy(true);
++    if (!order) return;
++    await request(`/orders/${order.id}/cancel`, { method: 'POST' });
++    setBusy(false);
++  };
++
++  return { busy, cancel };
++}

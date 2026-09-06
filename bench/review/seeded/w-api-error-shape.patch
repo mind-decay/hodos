@@ -1,0 +1,28 @@
+# id: w-api-error-shape
+# fixture: webapp
+# package: p2
+# kind: convention
+# item: rules/api-error-propagation.md
+# line: src/features/orders/api.ts:26
+# anchor: throw new Error(`orders could not be loaded: ${(error as Error).message}`, { cause: error });
+# trigger: —
+# what: the ApiError is rewrapped as a plain Error, so code and status stop crossing the boundary and every caller sees one undifferentiated failure
+diff --git a/src/features/orders/api.ts b/src/features/orders/api.ts
+index fef2b9b..4a75898 100644
+--- a/src/features/orders/api.ts
++++ b/src/features/orders/api.ts
+@@ -19,7 +19,12 @@ export const keys = {
+   detail: (id: string) => [...keys.all, 'detail', id] as const,
+ };
+ 
+-export const listOrders = (status: string) =>
+-  request<Order[]>(`/orders?status=${encodeURIComponent(status)}`);
++export const listOrders = async (status: string) => {
++  try {
++    return await request<Order[]>(`/orders?status=${encodeURIComponent(status)}`);
++  } catch (error) {
++    throw new Error(`orders could not be loaded: ${(error as Error).message}`, { cause: error });
++  }
++};
+ 
+ export const getOrder = (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}`);

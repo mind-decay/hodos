@@ -1,0 +1,212 @@
+[
+  {
+    "id": "q01",
+    "path": "quick",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "q02",
+    "path": "quick",
+    "type": "bug",
+    "campaign": false
+  },
+  {
+    "id": "q03",
+    "path": "quick",
+    "type": "bug",
+    "campaign": false
+  },
+  {
+    "id": "q04",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "q05",
+    "path": "quick",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "q06",
+    "path": "quick",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "q07",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "q08",
+    "path": "quick",
+    "type": "bug",
+    "campaign": false
+  },
+  {
+    "id": "q09",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "q10",
+    "path": "quick",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s01",
+    "path": "quick",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s02",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s03",
+    "path": "standard",
+    "type": "bug",
+    "campaign": false
+  },
+  {
+    "id": "s04",
+    "path": "quick",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s05",
+    "path": "quick",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s06",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "s07",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s08",
+    "path": "quick",
+    "type": "bug",
+    "campaign": false
+  },
+  {
+    "id": "s09",
+    "path": "standard",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "s10",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s11",
+    "path": "standard",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "s12",
+    "path": "standard",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "d01",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d02",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d03",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d04",
+    "path": "quick",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "d05",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "d06",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d07",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d08",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "c01",
+    "path": "deep",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "c02",
+    "path": "campaign",
+    "type": "feature",
+    "campaign": true
+  },
+  {
+    "id": "c03",
+    "path": "campaign",
+    "type": "refactor",
+    "campaign": true
+  },
+  {
+    "id": "c04",
+    "path": "campaign",
+    "type": "refactor",
+    "campaign": true
+  },
+  {
+    "id": "c05",
+    "path": "deep",
+    "type": "bug",
+    "campaign": false
+  }
+]

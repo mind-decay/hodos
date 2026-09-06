@@ -1,0 +1,29 @@
+# id: detail-inline-labels
+# plan: status-label
+# task: T1
+# kind: convention
+# item: plan ## Decisions D1 · ### Interfaces
+# anchor: <dd>{{ open: 'Awaiting payment', paid: 'Paid', cancelled: 'Cancelled' }[order.data.status]}</dd>
+# what: the detail view spells the three words again instead of reading statusLabels, which is the two-places-to-change shape D1 chose A to remove
+# severity: major
+diff --git a/src/features/orders/ui/OrderDetailPage.tsx b/src/features/orders/ui/OrderDetailPage.tsx
+index d412a1f..4e02c16 100644
+--- a/src/features/orders/ui/OrderDetailPage.tsx
++++ b/src/features/orders/ui/OrderDetailPage.tsx
+@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
+ import { useParams } from 'react-router-dom';
+ 
+ import { getOrder, keys } from '../api';
+-import { statusLabels } from '../labels';
+ 
+ export function OrderDetailPage() {
+   const { id = '' } = useParams<{ id: string }>();
+@@ -16,7 +15,7 @@ export function OrderDetailPage() {
+       <h1>{order.data.customer}</h1>
+       <dl>
+         <dt>Status</dt>
+-        <dd>{statusLabels[order.data.status]}</dd>
++        <dd>{{ open: 'Awaiting payment', paid: 'Paid', cancelled: 'Cancelled' }[order.data.status]}</dd>
+         <dt>Total</dt>
+         <dd>{order.data.total.toFixed(2)}</dd>
+       </dl>

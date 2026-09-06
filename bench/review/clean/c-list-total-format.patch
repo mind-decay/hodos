@@ -1,0 +1,21 @@
+# id: c-list-total-format
+# fixture: webapp
+# package: p3
+# kind: clean
+# file: src/features/orders/ui/OrderList.test.tsx
+# what: the rendered text the list already produces gets the case it did not have; real router, no module mocked
+diff --git a/src/features/orders/ui/OrderList.test.tsx b/src/features/orders/ui/OrderList.test.tsx
+index b333f81..75550c0 100644
+--- a/src/features/orders/ui/OrderList.test.tsx
++++ b/src/features/orders/ui/OrderList.test.tsx
+@@ -29,4 +29,10 @@ describe('OrderList', () => {
+     expect(screen.getByText('No orders match this filter.')).toBeDefined();
+     expect(screen.queryByRole('list')).toBeNull();
+   });
++
++  it('renders every total with two decimals', () => {
++    renderList(orders);
++    expect(screen.getByText('12.50')).toBeDefined();
++    expect(screen.getByText('99.00')).toBeDefined();
++  });
+ });

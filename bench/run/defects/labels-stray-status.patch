@@ -1,0 +1,27 @@
+# id: labels-stray-status
+# plan: status-label-frozen-api
+# task: T1
+# kind: convention
+# item: plan ## Non-goals — a label for a status the API cannot return
+# anchor: refunded: 'Refunded',
+# what: the map carries a fourth status the API cannot return, and the local union added it without complaint — which is the check D1 gave up, demonstrated
+# severity: major
+# fixable: yes — the key and the union member come out, both in the diff
+# unfixable-beside-it: the duplicated union itself. Its fix is the import D1 forbids, so the fix pass has to leave it open and the review has something to repeat
+diff --git a/src/features/orders/labels.ts b/src/features/orders/labels.ts
+index 594d117..5ef0c73 100644
+--- a/src/features/orders/labels.ts
++++ b/src/features/orders/labels.ts
+@@ -4,10 +4,11 @@
+  * The keys are spelled out here rather than taken from `OrderStatus`, which
+  * lives in the module being split on refactor/orders-api-split.
+  */
+-export type LabelKey = 'open' | 'paid' | 'cancelled';
++export type LabelKey = 'open' | 'paid' | 'cancelled' | 'refunded';
+ 
+ export const statusLabels: Record<LabelKey, string> = {
+   open: 'Awaiting payment',
+   paid: 'Paid',
+   cancelled: 'Cancelled',
++  refunded: 'Refunded',
+ };

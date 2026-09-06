@@ -1,0 +1,4 @@
+kernel tool uses: 25
+  review-input.md: 0 read, 2 mentioned
+  review.md: 1 read, 3 mentioned
+  git diff in a kernel command: 2

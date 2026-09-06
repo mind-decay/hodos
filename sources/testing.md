@@ -1,0 +1,7 @@
+- https://github.com/goldbergyoni/javascript-testing-best-practices — test design, naming, what a test must assert, mocking boundaries — the widely adopted community reference, language-agnostic despite the name
+- https://testing-library.com/docs/guiding-principles/ — query by what the user perceives, not by implementation detail — the library's own statement of intent
+- https://vitest.dev/guide/mocking.html — mocking, spying, module and timer fakes — the runner's own documentation
+- https://nodejs.org/api/test.html — the built-in runner: subtests, hooks, mocking, coverage — the platform's own API reference
+- https://stryker-mutator.io/docs/stryker-js/introduction/ — mutation testing: a suite is proven by the mutants it kills, not by coverage — the reference implementation for JS
+- https://martinfowler.com/articles/practical-test-pyramid.html — the shape of a suite and what each layer is for — the essay the vocabulary comes from
+- https://martinfowler.com/bliki/UnitTest.html — what "unit" means when people disagree about it — same source, on the term itself

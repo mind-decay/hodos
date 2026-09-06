@@ -1,0 +1,26 @@
+# id: w-bare-fetch
+# fixture: webapp
+# package: p1
+# kind: convention
+# item: rules/network-through-request.md
+# line: src/features/orders/summary.ts:8
+# anchor: const response = await fetch(`/api/orders?status=${status}`);
+# trigger: —
+# what: a second fetch outside src/lib, so this caller sees a Response and a failure here is not an ApiError
+# checks: lint fails (no-restricted-globals)
+diff --git a/src/features/orders/summary.ts b/src/features/orders/summary.ts
+new file mode 100644
+index 0000000..ce03ffe
+--- /dev/null
++++ b/src/features/orders/summary.ts
+@@ -0,0 +1,10 @@
++import type { Order } from './api';
++
++/**
++ * The summary reads the same collection as the list, so it asks the orders
++ * endpoint directly and adds the totals in the browser.
++ */
++export async function fetchSummaryOrders(status: string): Promise<Order[]> {
++  const response = await fetch(`/api/orders?status=${status}`);
++  return (await response.json()) as Order[];
++}

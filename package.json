@@ -1,0 +1,15 @@
+{
+  "name": "hodos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A project-aware, frugal, bounded, verified development workflow for Claude Code.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/run-tests.mjs",
+    "lint": "node scripts/lint.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

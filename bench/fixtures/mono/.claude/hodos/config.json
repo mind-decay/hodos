@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "language": "en",
+  "stack": [
+    "typescript",
+    "node"
+  ],
+  "commands": {
+    "test": "npm test --workspaces",
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
+    "build": null
+  },
+  "verify": {
+    "recipes": [
+      {
+        "name": "unit",
+        "kind": "command",
+        "run": "npm test --workspaces",
+        "when": "always"
+      }
+    ]
+  },
+  "conventions": {
+    "commit": "conventional",
+    "branch": "feature/{slug}"
+  },
+  "autonomy": "ask",
+  "gates": {
+    "denyDangerousGit": false,
+    "blockCommitOnFailedReview": false,
+    "stopHookLedger": false
+  },
+  "adapters": {
+    "browser": null,
+    "docs": null,
+    "codeIndex": null,
+    "design": null,
+    "tracker": null,
+    "logs": null,
+    "db": null,
+    "ci": null
+  },
+  "campaigns": {
+    "external": []
+  },
+  "tasks": {
+    "staleDays": 14
+  },
+  "nested": [
+    "web",
+    "svc"
+  ],
+  "verifiedAt": "2026-09-04",
+  "scanSha": "HEAD"
+}

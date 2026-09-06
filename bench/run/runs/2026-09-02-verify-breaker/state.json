@@ -1,0 +1,27 @@
+{
+  "slug": "orders-summary-frozen-store",
+  "path": "standard",
+  "type": "feature",
+  "phase": "finish",
+  "campaign": null,
+  "branch": "feature/orders-summary-frozen-store",
+  "base": "46aba7e",
+  "tasks": {
+    "total": 3,
+    "done": 3,
+    "current": 3
+  },
+  "redCheckAttempts": 0,
+  "review": {
+    "iteration": 1,
+    "verdict": "ACCEPT"
+  },
+  "verify": {
+    "iteration": 2,
+    "verdict": "FAIL"
+  },
+  "lastCommit": "0b1dcea",
+  "lastEvent": "Breaker: verify — accept",
+  "createdAt": "2026-09-02T08:43:43.670Z",
+  "updatedAt": "2026-09-02T08:54:07.525Z"
+}

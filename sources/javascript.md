@@ -1,0 +1,6 @@
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference — the language and standard-library reference, per method, with browser and runtime support — the reference the ecosystem cites
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules — ESM: named and default exports, live bindings, dynamic import — same source
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise — promise semantics, `all` vs `allSettled` vs `race`, unhandled rejections — same source
+- https://developer.mozilla.org/en-US/docs/Web/API/AbortController — cancellation as the platform defines it, the shape every fetch wrapper should accept — same source
+- https://tc39.es/ecma262/ — the specification itself, for the cases where "what does it actually do" has no simpler answer — the standard
+- https://github.com/tc39/proposals — what is at which stage, so a proposal is not used as if it shipped — the committee's own list

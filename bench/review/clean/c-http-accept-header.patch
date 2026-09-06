@@ -1,0 +1,22 @@
+# id: c-http-accept-header
+# fixture: webapp
+# package: p2
+# kind: clean
+# file: src/lib/http.test.ts
+# what: the header request() already sends gets the case it did not have; the global fetch is stubbed and unstubbed, which is the boundary the rule names
+diff --git a/src/lib/http.test.ts b/src/lib/http.test.ts
+index 7b27efc..3318c1a 100644
+--- a/src/lib/http.test.ts
++++ b/src/lib/http.test.ts
+@@ -35,4 +35,11 @@ describe('request', () => {
+     expect(error).toBeInstanceOf(ApiError);
+     expect(error).toMatchObject({ code: 'network', status: 0 });
+   });
++
++  it('asks for JSON on every request', async () => {
++    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
++    vi.stubGlobal('fetch', fetchMock);
++    await request('/orders');
++    expect(fetchMock.mock.calls[0][1]).toMatchObject({ headers: { accept: 'application/json' } });
++  });
+ });

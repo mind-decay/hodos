@@ -1,0 +1,4 @@
+# The runner checks out with git's autocrlf on Windows, and a plan file that
+# arrives as CRLF stops matching a parser written against `\n`. Every file this
+# repository tracks is text with LF endings, on every platform.
+* text=auto eol=lf

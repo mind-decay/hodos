@@ -1,0 +1,30 @@
+# id: b-l4-mutating-sort
+# fixture: webapp
+# package: p1
+# kind: behavioral
+# item: L4
+# line: src/features/orders/model.ts:21
+# anchor: return orders.sort((a, b) => b.total - a.total).slice(0, count);
+# trigger: OrdersPage passes orders.data — the array TanStack Query holds in its cache — so after the summary renders, OrderList shows the cached rows in total order instead of the order the server sent
+# what: sort() mutates the caller's array; a copy is what the summary needs
+diff --git a/src/features/orders/model.ts b/src/features/orders/model.ts
+index a230d41..1ff6317 100644
+--- a/src/features/orders/model.ts
++++ b/src/features/orders/model.ts
+@@ -1,5 +1,7 @@
+ import { create } from 'zustand';
+ 
++import type { Order } from './api';
++
+ export type StatusFilter = 'all' | 'open' | 'paid' | 'cancelled';
+ 
+ interface OrdersFilter {
+@@ -13,3 +15,8 @@ export const useOrdersFilter = create<OrdersFilter>((set) => ({
+   setStatus: (status) => set({ status }),
+   reset: () => set({ status: 'all' }),
+ }));
++
++/** The `count` biggest orders, for the summary row above the list. */
++export function topByTotal(orders: Order[], count: number): Order[] {
++  return orders.sort((a, b) => b.total - a.total).slice(0, count);
++}

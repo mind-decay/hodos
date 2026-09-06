@@ -1,0 +1,5 @@
+fd78e91 fix: read the detail page's status word from statusLabels
+ddc53eb feat: status-label T1
+00a30d2 test: cover the modules with the project runner
+942061f feat: add the application modules
+9c1067c chore: scaffold the project

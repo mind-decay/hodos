@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "language": "en",
+  "stack": ["typescript", "react", "vite", "vitest"],
+  "commands": {
+    "test": "npm test",
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
+    "build": "npm run build",
+    "dev": { "cmd": "npm run dev", "url": "http://localhost:5173", "ready": "Local:" }
+  },
+  "verify": {
+    "recipes": [
+      { "name": "unit", "kind": "command", "run": "npm test", "when": "always" },
+      { "name": "ui", "kind": "browser", "routes": ["/", "/orders", "/orders/:id"], "when": "ui" }
+    ]
+  },
+  "conventions": {
+    "commit": "conventional",
+    "branch": "feature/{slug}"
+  },
+  "models": {
+    "review": "opus", "planReview": "opus",
+    "verify": "sonnet", "research": "sonnet", "initScan": "sonnet"
+  },
+  "autonomy": "ask",
+  "gates": {
+    "denyDangerousGit": false,
+    "blockCommitOnFailedReview": false,
+    "stopHookLedger": false
+  },
+  "adapters": {
+    "browser": "chrome-devtools",
+    "codeIndex": null,
+    "tracker": null,
+    "design": null
+  },
+  "campaigns": { "external": [] },
+  "tasks": { "staleDays": 14 },
+  "nested": [],
+  "verifiedAt": "2026-08-31",
+  "scanSha": "441be53547c6ca37d939d68447ba6ac31a03d540"
+}

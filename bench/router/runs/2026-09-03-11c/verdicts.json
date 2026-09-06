@@ -1,0 +1,86 @@
+[
+  {
+    "id": "q05",
+    "path": "quick",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "s07",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s09",
+    "path": "standard",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "s12",
+    "path": "deep",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "d02",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d03",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "d08",
+    "path": "deep",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "c05",
+    "path": "campaign",
+    "type": "feature",
+    "campaign": true
+  },
+  {
+    "id": "sp1",
+    "path": "standard",
+    "type": "spike",
+    "campaign": false
+  },
+  {
+    "id": "sp2",
+    "path": "standard",
+    "type": "spike",
+    "campaign": false
+  },
+  {
+    "id": "sp3",
+    "path": "standard",
+    "type": "spike",
+    "campaign": false
+  },
+  {
+    "id": "up1",
+    "path": "deep",
+    "type": "upgrade",
+    "campaign": false
+  },
+  {
+    "id": "up2",
+    "path": "standard",
+    "type": "upgrade",
+    "campaign": false
+  },
+  {
+    "id": "up3",
+    "path": "deep",
+    "type": "upgrade",
+    "campaign": false
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "question": "T3's commit changed `model.ts`'s `reset()` from `'all'` to `'open'` — outside its Files: line, against the plan's non-goal, and the sole cause of the 2 red tests. How should the fix pass handle it?",
+    "header": "model.ts",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "Revert to 'all' (Recommended)",
+        "description": "Restore the line to its base state in the fix commit. `npm test` goes green, claim 13 closes. Net diff on model.ts against base becomes zero, so D3's merge-conflict worry against the parallel branch disappears entirely — the parallel branch sees no change from us."
+      },
+      {
+        "label": "Leave it, report as open finding",
+        "description": "Honour the non-goal literally: do not touch model.ts. Claim 13 stays failing, the branch ships with a red suite it caused itself, and the finish report names it. Row 10 is still fixed."
+      },
+      {
+        "label": "Revert + add a regression test",
+        "description": "Revert the line and add a test pinning that `reset()` returns to 'all'. Closes the claim and guards it, but writes into model.test.ts — a second file the non-goal covers and the parallel branch is rewriting."
+      }
+    ]
+  },
+  {
+    "question": "Verify FAILed after both iterations. The only failing row is claim 13 — `npm test` exits 1 on `model.test.ts`'s two tests, caused by T3's out-of-scope edit to `model.ts` which you chose to leave in place. How should the task close?",
+    "header": "Breaker",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "Accept with open findings (Recommended)",
+        "description": "Task moves to finish; claim 13 goes into the report as an open finding, along with the gap that T3 edited a file the plan's non-goals excluded. Consistent with the ruling you already made. The branch ships with `npm test` red."
+      },
+      {
+        "label": "Continue manually",
+        "description": "Task stops here in manual mode. The branch stays at `0b1dcea` with all work committed, and you take it from there yourself."
+      },
+      {
+        "label": "Roll back to task 3",
+        "description": "T3's work is rebuilt from `fdb77ec` — colour and `data-status` in `OrderList.tsx` only, leaving `model.ts` untouched. The verify counter restarts. This makes the suite green, but reverses the ruling you gave earlier."
+      }
+    ]
+  }
+]

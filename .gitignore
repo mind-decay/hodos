@@ -1,0 +1,9 @@
+node_modules
+bench/fixtures/**/node_modules
+bench/fixtures/**/dist
+bench/fixtures/**/coverage
+.claude/hodos/history.jsonl
+.DS_Store
+bench/router/runs/*/copies/
+bench/router/runs/*/streams/
+bench/review/runs/*/copies/

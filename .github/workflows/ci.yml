@@ -1,0 +1,146 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Is this the build repository?
+        id: probe
+        run: |
+          if [ -f tools/export-public.mjs ]; then echo "build=yes" >> "$GITHUB_OUTPUT"
+          else echo "build=no" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Lint the engine text
+        run: node scripts/lint.mjs
+
+      - name: Check the router labels against FORMATS.md §3
+        run: node bench/router/run.mjs --check-labels
+
+      - name: Check that every fixture convention still cites a real line
+        run: node scripts/verify-citations.mjs bench/fixtures/README.md
+
+      # The step was a no-op on every runner until 0.1: it checked for the CLI
+      # and printed a notice when it was absent, which it always was. A check
+      # that has never run is not a check.
+      - name: Install the Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      # `.` in a repository that is both a plugin and a marketplace resolves to
+      # the **marketplace** manifest — measured on the runner, 2.1.197, and
+      # here on 2.1.263 (PLATFORM-NOTES check I). So the plugin manifest is
+      # named, and it is validated in the tree that ships: this repository's
+      # own CLAUDE.md draws "not loaded as project context", which --strict
+      # fails, and the export drops that file. The `export` job runs it there.
+      - name: Validate the marketplace manifest
+        run: |
+          claude --version
+          claude plugin validate --strict .
+
+      - name: Validate the plugin manifest
+        if: steps.probe.outputs.build == 'no'
+        run: claude plugin validate --strict .claude-plugin/plugin.json
+
+  # "No bash, no Python" is a design promise about the engine, and every
+  # script in it is Node. This job is the evidence: the same suite, on the one
+  # platform where a shell assumption would show.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Lint the engine text
+        run: node scripts/lint.mjs
+
+  # The published tree is a configuration of its own: decision 0102 keeps
+  # `tools/` in the build repository, and a test that swept it by name went red
+  # on the runner after the tag had already been moved. Local green in the build
+  # tree does not imply green in the tree that ships, so the build repository
+  # builds that tree here and runs its suite. In the published repository the
+  # exporter is absent and the job is a no-op that says so.
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Is this the build repository?
+        id: probe
+        run: |
+          if [ -f tools/export-public.mjs ]; then echo "build=yes" >> "$GITHUB_OUTPUT"
+          else echo "build=no" >> "$GITHUB_OUTPUT"; echo "no exporter here — this is the published tree"; fi
+
+      - name: The published tree, its own suite, and its plugin manifest
+        if: steps.probe.outputs.build == 'yes'
+        run: |
+          node tools/export-public.mjs "$RUNNER_TEMP/public"
+          cd "$RUNNER_TEMP/public"
+          npm test
+          # The tree that ships is the one where a citation into `docs/stages/`
+          # resolves to nothing, which is what `docs/README.md` promises lint
+          # catches. It is only a check if it runs there.
+          node scripts/lint.mjs
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate --strict .claude-plugin/plugin.json
+
+  fixtures:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [webapp, api, mono, kit]
+    defaults:
+      run:
+        working-directory: bench/fixtures/${{ matrix.fixture }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: bench/fixtures/${{ matrix.fixture }}/package-lock.json
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck --if-present
+
+      # A fixture is only useful if a copy of it runs. This is the acceptance
+      # criterion of Stage 2 kept honest on every push.
+      - name: A copy of this fixture runs its own tests
+        working-directory: .
+        run: |
+          copy="$(node bench/scripts/fixture-copy.mjs ${{ matrix.fixture }})"
+          test "$(git -C "$copy" log --oneline | wc -l)" -eq 3
+          cd "$copy" && npm test

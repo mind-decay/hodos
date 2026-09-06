@@ -1,0 +1,22 @@
+# id: c-post-status-201
+# fixture: api
+# package: p5
+# kind: clean
+# file: test/routes.test.js
+# what: the status the table already carries on the POST row gets the case it did not have
+diff --git a/test/routes.test.js b/test/routes.test.js
+index 9852bb7..c455ead 100644
+--- a/test/routes.test.js
++++ b/test/routes.test.js
+@@ -24,6 +24,11 @@ describe('matchRoute', () => {
+     assert.equal(matchRoute('GET', '/invoices'), null);
+   });
+ 
++  it('carries the created status on the POST row', () => {
++    const match = matchRoute('POST', '/orders');
++    assert.equal(match?.route.status, 201);
++  });
++
+   it('keeps every route reachable from the one table', () => {
+     for (const route of routes) {
+       const concrete = route.pattern.replaceAll(/:\w+/g, 'o-1');

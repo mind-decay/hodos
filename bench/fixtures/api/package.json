@@ -1,0 +1,23 @@
+{
+  "name": "api-fixture",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "hodos bench fixture: a small node:http service with deliberate conventions.",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test test/*.test.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.4.0",
+    "eslint": "10.9.1",
+    "globals": "17.11.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

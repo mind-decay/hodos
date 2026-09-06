@@ -1,0 +1,31 @@
+# id: w-test-mocking-boundary
+# fixture: webapp
+# package: p3
+# kind: convention
+# item: rules/test-mocking-boundary.md
+# line: src/features/orders/ui/OrderActions.test.tsx:6
+# anchor: vi.mock('../../../lib/http', () => ({
+# trigger: —
+# what: a project module is replaced instead of the global fetch, so the test passes while the real client's failure path is never exercised
+diff --git a/src/features/orders/ui/OrderActions.test.tsx b/src/features/orders/ui/OrderActions.test.tsx
+new file mode 100644
+index 0000000..248c489
+--- /dev/null
++++ b/src/features/orders/ui/OrderActions.test.tsx
+@@ -0,0 +1,16 @@
++import { fireEvent, render, screen, waitFor } from '@testing-library/react';
++import { describe, expect, it, vi } from 'vitest';
++
++import { OrderActions } from './OrderActions';
++
++vi.mock('../../../lib/http', () => ({
++  request: vi.fn().mockRejectedValue(new Error('the server said no')),
++}));
++
++describe('OrderActions', () => {
++  it('shows what went wrong when the call fails', async () => {
++    render(<OrderActions orderId="o-1" />);
++    fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
++    await waitFor(() => expect(screen.getByText('the server said no')).toBeDefined());
++  });
++});

@@ -1,0 +1,44 @@
+{
+  "runAt": "2026-09-01",
+  "dispatches": 6,
+  "cost": 4.06,
+  "seconds": 994,
+  "perPackage": [
+    {
+      "id": "p1",
+      "turns": 2,
+      "seconds": 148,
+      "cost": 0.6220647499999999
+    },
+    {
+      "id": "p2",
+      "turns": 2,
+      "seconds": 157,
+      "cost": 0.6632655
+    },
+    {
+      "id": "p3",
+      "turns": 2,
+      "seconds": 185,
+      "cost": 0.75333375
+    },
+    {
+      "id": "p4",
+      "turns": 2,
+      "seconds": 137,
+      "cost": 0.59852175
+    },
+    {
+      "id": "p5",
+      "turns": 2,
+      "seconds": 180,
+      "cost": 0.71082025
+    },
+    {
+      "id": "p6",
+      "turns": 2,
+      "seconds": 187,
+      "cost": 0.71566225
+    }
+  ]
+}

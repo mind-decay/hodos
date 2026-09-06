@@ -1,0 +1,15 @@
+{
+  "name": "hodos",
+  "description": "The hodos development workflow for Claude Code: project-aware rules, bounded review and verify loops, evidence-based completion.",
+  "owner": {
+    "name": "mind-decay",
+    "url": "https://github.com/mind-decay"
+  },
+  "plugins": [
+    {
+      "name": "hodos",
+      "source": "./",
+      "description": "A project-aware, frugal, bounded, verified development workflow for Claude Code."
+    }
+  ]
+}

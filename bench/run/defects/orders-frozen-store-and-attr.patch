@@ -1,0 +1,33 @@
+# id: orders-frozen-store-and-attr
+# plan: orders-summary-frozen-store
+# task: T3
+# kind: verify
+# item: plan ### T3 acceptance (data-status) · plan ## Verify plan unit line (the test command is green)
+# anchor: <li key={order.id} data-status={order.status}> · reset: () => set({ status: 'all' })
+# what: two claims break at once. The row loses the data attribute T3 names, which the fix pass can close inside the task. And the filter store's reset returns 'open' instead of 'all', which turns the project's test command red — and model.ts is frozen by the plan's Non-goals and D3, so closing that one is the developer's call at the gap gate, not the kernel's
+# severity: major
+# reaches: two Verify FAIL lines and the breaker, when the developer keeps the freeze
+diff --git a/src/features/orders/model.ts b/src/features/orders/model.ts
+index a230d41..c9ea168 100644
+--- a/src/features/orders/model.ts
++++ b/src/features/orders/model.ts
+@@ -11,5 +11,5 @@ interface OrdersFilter {
+ export const useOrdersFilter = create<OrdersFilter>((set) => ({
+   status: 'all',
+   setStatus: (status) => set({ status }),
+-  reset: () => set({ status: 'all' }),
++  reset: () => set({ status: 'open' }),
+ }));
+diff --git a/src/features/orders/ui/OrderList.tsx b/src/features/orders/ui/OrderList.tsx
+index 822455e..de429a6 100644
+--- a/src/features/orders/ui/OrderList.tsx
++++ b/src/features/orders/ui/OrderList.tsx
+@@ -21,7 +21,7 @@ export function OrderList({ orders }: OrderListProps) {
+   return (
+     <ul aria-label="orders">
+       {orders.map((order) => (
+-        <li key={order.id} data-status={order.status}>
++        <li key={order.id}>
+           <Link to={`/orders/${order.id}`}>{order.customer}</Link>
+           <span style={{ color: statusColour[order.status] }}>{order.status}</span>
+           <span>{order.total.toFixed(2)}</span>

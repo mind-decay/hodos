@@ -1,0 +1,27 @@
+{
+  "slug": "status-label",
+  "path": "quick",
+  "type": "feature",
+  "phase": "verify",
+  "campaign": null,
+  "branch": "feature/status-label",
+  "base": "54906db",
+  "tasks": {
+    "total": 1,
+    "done": 1,
+    "current": 1
+  },
+  "redCheckAttempts": 0,
+  "review": {
+    "iteration": 2,
+    "verdict": "ACCEPT"
+  },
+  "verify": {
+    "iteration": 0,
+    "verdict": null
+  },
+  "lastCommit": "2efa1aa",
+  "lastEvent": "Review 2: ACCEPT (0/0/1)",
+  "createdAt": "2026-09-01T15:00:28.075Z",
+  "updatedAt": "2026-09-01T15:07:11.395Z"
+}

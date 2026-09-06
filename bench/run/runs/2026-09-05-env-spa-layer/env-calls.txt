@@ -1,0 +1,53 @@
+CALL Bash: node <repo>/scripts/env.mjs up
+
+OUT: {
+  "profile": "local",
+  "gitRoot": "/private/tmp/hodos-11b2-spa",
+  "projectRoot": "/private/tmp/hodos-11b2-spa",
+  "layers": [
+    {
+      "name": "spa",
+      "cwd": "/private/tmp/hodos-11b2-spa",
+      "state": "raised",
+      "raisedByHodos": true,
+      "checks": [
+        {
+          "kind": "ready",
+          "target": "Local:",
+          "ok": true,
+          "detail": "the ready line was printed"
+        }
+      ],
+      "access": null,
+      "url": "http://localhost:5173"
+    }
+  ],
+  "url": "http://localhost:5173",
+  "failed": null,
+  "blocked": null
+}
+
+CALL Agent: Verify the task orders-summary, iteration 1.
+Plan: /private/tmp/hodos-11b2-spa/.claude/hodos/tasks/orders-summary/plan.md
+Config: /private/tmp/hodos-11b2-spa/.claude/hodos/config.json
+Recipes that match: unit, ui
+Adapter: <repo>/adapters/browser/chrome-devtools.md
+Evidence: /private/tmp/hodos-11b2-spa/.claude/hodos/tasks/orders-summary/evidence/
+Base URL: http://localhost:5173
+Environment: local
+Write /private/tmp/hodos-11b2-spa/.claude/hodos/tasks/orders-summary/verify.md and return the verdict line.
+
+CALL Bash: node <repo>/scripts/ledger.mjs add "Verify 1: PASS 15 claims, 0 skipped" && node <repo>/scripts/env.mjs down
+
+OUT: Verify 1: PASS 15 claims, 0 skipped
+{
+  "profile": "local",
+  "projectRoot": "/private/tmp/hodos-11b2-spa",
+  "layers": [
+    {
+      "name": "spa",
+      "state": "stopped",
+      "detail": "pid 29949"
+    }
+  ]
+}

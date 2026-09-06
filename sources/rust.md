@@ -1,0 +1,7 @@
+- https://rust-lang.github.io/api-guidelines/checklist.html — the API guidelines as one checklist: naming, interoperability, what a public type must implement, what may never leak — the language project's own list, and the fastest read of the six
+- https://rust-lang.github.io/api-guidelines/ — the same guidelines with the reasoning behind each item, for the case where the checklist line is the answer and not the argument — same source
+- https://doc.rust-lang.org/book/ch09-00-error-handling.html — the error chapter: `Result` against `panic!`, `?`, and when a library may abort at all — the book, which is where a project's error shape is settled or lost
+- https://rust-lang.github.io/rust-clippy/master/index.html — every clippy lint with its group and its default level, searchable — the index that turns a candidate rule into a lint the CI already runs (`references/rules.md` question 3)
+- https://doc.rust-lang.org/cargo/ — workspaces, features, profiles, and what a dependency version actually resolves to — the cargo book, and the only source for a manifest fact
+- https://docs.rs/tokio/latest/tokio/ — the runtime's own reference: what may block, what must be `Send`, cancellation, and which of its parts a feature flag turns off — the crate's own documentation, pinned by the lockfile's version rather than by `latest` when a rule cites it
+- https://doc.rust-lang.org/book/ch11-00-testing.html — where a test lives, what `#[cfg(test)]` and `tests/` each mean, and what a test asserts — the book, and the page a test-first plan is written against

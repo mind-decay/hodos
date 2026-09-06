@@ -1,0 +1,16 @@
+=== M1  /tmp/hodos-11b2-fail ===
+  bash   node <repo>/scripts/env.mjs up 2>&1
+  agent  hodos:hodos-preparer  (Raise infra layer)
+  bash   node <repo>/scripts/env.mjs probe 2>&1
+  bash   node <repo>/scripts/env.mjs --help 2>&1 | head -40
+  ask    The verify environment cannot come up: layer `infra` fails at an image pull (`pull access 
+  bash   node <repo>/scripts/env.mjs down 2>&1; echo "=== STATE ==="; cat .cla
+
+=== M2  /tmp/hodos-11b2-access ===
+  bash   node <repo>/scripts/env.mjs up 2>&1
+  bash   node <repo>/scripts/env.mjs --help 2>&1 | head -60
+  bash   grep -n 'blocked\|skipped\|grantedAt\|only\|--layer\|argv' <repo>/scr
+  ask    Layer `hosts` is blocked pending access it has never been granted. How should the verify e
+  agent  hodos:hodos-verifier  (Verify orders-summary iter 1)
+  bash   node <repo>/scripts/env.mjs down 2>&1
+  ask    Delete `.claude/hodos/tasks/orders-summary/`?

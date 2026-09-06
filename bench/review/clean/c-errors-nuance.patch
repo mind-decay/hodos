@@ -1,0 +1,19 @@
+# id: c-errors-nuance
+# fixture: webapp
+# package: p6
+# kind: clean
+# file: src/lib/errors.ts
+# what: the reason the fallback exists, written where the fallback is; the code is unchanged
+diff --git a/src/lib/errors.ts b/src/lib/errors.ts
+index f034fa7..02ce1b1 100644
+--- a/src/lib/errors.ts
++++ b/src/lib/errors.ts
+@@ -18,6 +18,8 @@ export class ApiError extends Error {
+     const body = (await response.json().catch(() => null)) as
+       | { error?: { code?: string; message?: string } }
+       | null;
++    // A response that is not JSON — a proxy's HTML error page, say — leaves the
++    // message as the status text, so markup never reaches the user as an error.
+     return new ApiError(
+       body?.error?.code ?? 'unknown',
+       response.status,

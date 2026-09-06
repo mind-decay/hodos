@@ -1,0 +1,75 @@
+# id: b-l9-time-locale
+# fixture: api
+# package: p5
+# kind: behavioral
+# item: L9
+# line: src/services/orders.js:47
+# anchor: return put({ id: `o-${all().length + 1}`, customer, total, status: 'open', createdAt: new Date().toLocaleDateString() });
+# trigger: the seeds are ISO and the stamp is the host's locale — on a ru-RU or en-GB machine a new order is stored as 01.09.2026, and ?since=2026-01-01 compares the two as strings, so every order created today is dropped from the filtered list
+# what: a locale-formatted date stored in a field that is compared as ISO
+diff --git a/src/routes.js b/src/routes.js
+index b7c1256..021354a 100644
+--- a/src/routes.js
++++ b/src/routes.js
+@@ -11,7 +11,7 @@ import { create, get, list } from './services/orders.js';
+  * @type {Route[]}
+  */
+ export const routes = [
+-  { method: 'GET', pattern: '/orders', status: 200, handler: (ctx) => list(ctx.query.get('status')) },
++  { method: 'GET', pattern: '/orders', status: 200, handler: (ctx) => list(ctx.query.get('status'), ctx.query.get('since') ?? undefined) },
+   { method: 'GET', pattern: '/orders/:id', status: 200, handler: (ctx) => get(ctx.params.id) },
+   { method: 'POST', pattern: '/orders', status: 201, handler: (ctx) => create(ctx.body) },
+ ];
+diff --git a/src/services/orders.js b/src/services/orders.js
+index 9f955da..e678876 100644
+--- a/src/services/orders.js
++++ b/src/services/orders.js
+@@ -7,14 +7,16 @@ const STATUSES = ['open', 'paid', 'cancelled'];
+ 
+ /**
+  * @param {string | null} status
++ * @param {string} [since]
+  * @returns {Order[]}
+  */
+-export function list(status) {
+-  if (status === null || status === 'all') return all();
++export function list(status, since) {
++  const dated = since === undefined ? all() : all().filter((order) => order.createdAt >= since);
++  if (status === null || status === 'all') return dated;
+   if (!STATUSES.includes(status)) {
+     throw new AppError('invalid_status', 400, `status must be one of ${STATUSES.join(', ')}`);
+   }
+-  return all().filter((order) => order.status === status);
++  return dated.filter((order) => order.status === status);
+ }
+ 
+ /**
+@@ -42,5 +44,5 @@ export function create(input) {
+   if (typeof total !== 'number' || !Number.isFinite(total) || total < 0) {
+     throw new AppError('invalid_total', 400, 'total must be a number that is not negative');
+   }
+-  return put({ id: `o-${all().length + 1}`, customer, total, status: 'open' });
++  return put({ id: `o-${all().length + 1}`, customer, total, status: 'open', createdAt: new Date().toLocaleDateString() });
+ }
+diff --git a/src/store/orders.js b/src/store/orders.js
+index 9371ed3..3a7c62c 100644
+--- a/src/store/orders.js
++++ b/src/store/orders.js
+@@ -1,13 +1,13 @@
+-/** @typedef {{ id: string, customer: string, total: number, status: 'open' | 'paid' | 'cancelled' }} Order */
++/** @typedef {{ id: string, customer: string, total: number, status: 'open' | 'paid' | 'cancelled', createdAt: string }} Order */
+ 
+ /** @type {Map<string, Order>} */
+ const orders = new Map();
+ 
+ /** @type {Order[]} */
+ const seed = [
+-  { id: 'o-1', customer: 'Ada', total: 12.5, status: 'open' },
+-  { id: 'o-2', customer: 'Grace', total: 99, status: 'paid' },
+-  { id: 'o-3', customer: 'Katherine', total: 4, status: 'cancelled' },
++  { id: 'o-1', customer: 'Ada', total: 12.5, status: 'open', createdAt: '2026-01-05' },
++  { id: 'o-2', customer: 'Grace', total: 99, status: 'paid', createdAt: '2026-02-11' },
++  { id: 'o-3', customer: 'Katherine', total: 4, status: 'cancelled', createdAt: '2026-03-30' },
+ ];
+ 
+ export function reset() {

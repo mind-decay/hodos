@@ -1,0 +1,21 @@
+# id: c-list-all-status
+# fixture: api
+# package: p4
+# kind: clean
+# file: test/services.test.js
+# what: the branch list() already has for the literal "all" gets the case it did not have
+diff --git a/test/services.test.js b/test/services.test.js
+index e6c010b..5a9ce25 100644
+--- a/test/services.test.js
++++ b/test/services.test.js
+@@ -16,6 +16,10 @@ describe('the orders service', () => {
+     assert.equal(list(null).length, 3);
+   });
+ 
++  it('treats the literal all as no filter at all', () => {
++    assert.equal(list('all').length, 3);
++  });
++
+   it('filters by status', () => {
+     assert.deepEqual(
+       list('paid').map((order) => order.id),

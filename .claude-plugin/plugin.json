@@ -1,0 +1,11 @@
+{
+  "name": "hodos",
+  "version": "0.1.0",
+  "description": "A project-aware development workflow: learn the project once, then drive every task through research, plan, execute, review, verify, finish with bounded loops and evidence. Requires Claude Code >=2.1.232 and Node >=18 on PATH — every hook and every skill runs node.",
+  "author": {
+    "name": "mind-decay",
+    "url": "https://github.com/mind-decay"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/mind-decay/hodos"
+}

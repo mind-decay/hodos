@@ -1,0 +1,30 @@
+# id: w-barrel-bypass
+# fixture: webapp
+# package: p2
+# kind: convention
+# item: rules/feature-barrel-imports.md
+# line: src/features/home/ui/HomePage.tsx:3
+# anchor: import { useOrdersFilter } from '../../orders/model';
+# trigger: —
+# what: home reaches into orders/model instead of importing the feature, so the barrel stops being the surface the feature can change behind
+diff --git a/src/features/home/ui/HomePage.tsx b/src/features/home/ui/HomePage.tsx
+index aeed4e0..f9dae4a 100644
+--- a/src/features/home/ui/HomePage.tsx
++++ b/src/features/home/ui/HomePage.tsx
+@@ -1,12 +1,16 @@
+ import { Link } from 'react-router-dom';
+ 
++import { useOrdersFilter } from '../../orders/model';
++
+ export function HomePage() {
++  const status = useOrdersFilter((state) => state.status);
+   return (
+     <section>
+       <h1>Warehouse</h1>
+       <p>
+         <Link to="/orders">Open the order list</Link>
+       </p>
++      <p>Filter in effect: {status}</p>
+     </section>
+   );
+ }

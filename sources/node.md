@@ -1,0 +1,7 @@
+- https://nodejs.org/api/documentation.html#stability-index — the stability index: which APIs are experimental and may move under a project — the platform's own reference
+- https://nodejs.org/en/about/previous-releases — the release lines and their end-of-life dates, so an engines floor is a fact — same source
+- https://github.com/goldbergyoni/nodebestpractices — project structure, error handling, security and production practices, each with its source — the widely adopted community reference
+- https://nodejs.org/api/errors.html — the error classes and codes the runtime throws, and what `cause` is for — the platform's own reference
+- https://nodejs.org/api/esm.html — ESM resolution, `exports` maps, and the CJS interop rules — same source
+- https://nodejs.org/api/async_context.html — `AsyncLocalStorage` for request context instead of threading it by hand — same source
+- https://nodejs.org/api/test.html — the built-in test runner and its watch, coverage and mocking surface — same source

@@ -1,0 +1,27 @@
+{
+  "slug": "orders-summary",
+  "path": "standard",
+  "type": "feature",
+  "phase": "done",
+  "campaign": null,
+  "branch": "feature/orders-summary",
+  "base": "1f8d581",
+  "tasks": {
+    "total": 3,
+    "done": 3,
+    "current": 3
+  },
+  "redCheckAttempts": 0,
+  "review": {
+    "iteration": 1,
+    "verdict": "ACCEPT"
+  },
+  "verify": {
+    "iteration": 1,
+    "verdict": "PASS"
+  },
+  "lastCommit": "c5ac479",
+  "lastEvent": "Finish: report delivered",
+  "createdAt": "2026-09-02T11:22:25.010Z",
+  "updatedAt": "2026-09-02T11:24:00.817Z"
+}

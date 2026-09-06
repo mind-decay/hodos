@@ -1,0 +1,49 @@
+# id: a-plain-error
+# fixture: api
+# package: p4
+# kind: convention
+# item: src/errors.js — every failure is an AppError
+# line: src/services/orders.js:15
+# anchor: throw new Error(`min must be a number, got ${min}`);
+# trigger: —
+# what: a plain Error reaches fail(), which reports it as 500 internal — the client is told the server broke when the client's own query was wrong
+diff --git a/src/routes.js b/src/routes.js
+index b7c1256..d467fcf 100644
+--- a/src/routes.js
++++ b/src/routes.js
+@@ -11,7 +11,7 @@ import { create, get, list } from './services/orders.js';
+  * @type {Route[]}
+  */
+ export const routes = [
+-  { method: 'GET', pattern: '/orders', status: 200, handler: (ctx) => list(ctx.query.get('status')) },
++  { method: 'GET', pattern: '/orders', status: 200, handler: (ctx) => list(ctx.query.get('status'), ctx.query.get('min') ?? undefined) },
+   { method: 'GET', pattern: '/orders/:id', status: 200, handler: (ctx) => get(ctx.params.id) },
+   { method: 'POST', pattern: '/orders', status: 201, handler: (ctx) => create(ctx.body) },
+ ];
+diff --git a/src/services/orders.js b/src/services/orders.js
+index 9f955da..48f6cb6 100644
+--- a/src/services/orders.js
++++ b/src/services/orders.js
+@@ -7,14 +7,19 @@ const STATUSES = ['open', 'paid', 'cancelled'];
+ 
+ /**
+  * @param {string | null} status
++ * @param {string} [min]
+  * @returns {Order[]}
+  */
+-export function list(status) {
+-  if (status === null || status === 'all') return all();
++export function list(status, min) {
++  if (min !== undefined && Number.isNaN(Number(min))) {
++    throw new Error(`min must be a number, got ${min}`);
++  }
++  const scoped = min === undefined ? all() : all().filter((order) => order.total >= Number(min));
++  if (status === null || status === 'all') return scoped;
+   if (!STATUSES.includes(status)) {
+     throw new AppError('invalid_status', 400, `status must be one of ${STATUSES.join(', ')}`);
+   }
+-  return all().filter((order) => order.status === status);
++  return scoped.filter((order) => order.status === status);
+ }
+ 
+ /**

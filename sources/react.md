@@ -1,0 +1,8 @@
+- https://react.dev/learn/you-might-not-need-an-effect — the effect-misuse catalogue: derived state, event logic, and resetting state on prop change — the framework's own documentation
+- https://react.dev/learn/keeping-components-pure — render purity and what may not happen during render — same source
+- https://react.dev/reference/rules — the rules of React as a single list, including the hook rules — same source
+- https://react.dev/learn/choosing-the-state-structure — state shape: avoid contradictory, redundant and duplicated state — same source
+- https://react.dev/learn/sharing-state-between-components — lifting state and where it belongs — same source
+- https://react.dev/reference/react/useMemo — when memoization pays and when it does not — same source
+- https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults — the defaults that surprise: staleTime, refetch triggers, cache lifetime — the library's own documentation
+- https://tanstack.com/query/latest/docs/framework/react/guides/query-keys — query keys as the cache's identity, and what an invalidation matches — same source

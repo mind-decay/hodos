@@ -1,0 +1,25 @@
+{
+  "name": "mono-fixture",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "hodos bench fixture: a two-workspace monorepo for nested config and root-map lookup.",
+  "workspaces": ["web", "svc"],
+  "scripts": {
+    "test": "npm test --workspaces",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.4.0",
+    "eslint": "10.9.1",
+    "globals": "17.11.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

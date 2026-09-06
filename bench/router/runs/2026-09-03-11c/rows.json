@@ -1,0 +1,954 @@
+[
+  {
+    "id": "q05",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "answer must name `src/features/orders/ui/OrderDetailPage.tsx`, `src/features/orders/ui/OrderList.tsx`, `src/features/orders/api.ts`",
+        "value": "3",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "nothing added; answer is knowledge",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "`Order` shape at `src/features/orders/api.ts:5` unread-only, unchanged",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "no change",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "none",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "no change lands at all",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done = the module named, with lines",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "none",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "s07",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "`src/features/orders/api.ts` (edit), `src/features/orders/api.test.ts` (new — no test beside `api.ts` today), `package.json`, `package-lock.json`",
+        "value": "4",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "schemas sit in `src/features/orders/api.ts`; nothing new imported from outside that directory",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "`Order`/`OrderStatus`/`listOrders`/`getOrder` signatures unchanged, but a malformed payload becomes a new throw at the boundary, and `ui/OrdersPage.tsx` + `ui/OrderDetailPage.tsx` render error state off `ApiError` by name (`src/lib/errors.ts`)",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "zod absent from `package.json` deps and from `package-lock.json` (`\"node_modules/zod\"` = 0 hits)",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape; `model.ts` store holds a filter string only",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repo, one branch, one review",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done is statable: `listOrders`/`getOrder` reject a malformed payload, test proves it",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "`/api` 404s by design, tests stub `fetch` — nothing to wait on",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "s09",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "answer must name `src/features/orders/api.ts`, `model.ts`, `index.ts`, `ui/OrdersPage.tsx`, `ui/OrderList.tsx`, `ui/OrderList.test.tsx`, `src/lib/http.ts`",
+        "value": "7",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "answer names no new directory; `src/features/orders` stays as is",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "subject *is* the `/orders` response shape — `listOrders` returns `Order[]` at `api.ts:22-23`, consumed by name in `OrdersPage.tsx:10` and `OrderList.tsx:6`",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`package.json` carries `@tanstack/react-query 5.102.8` — `useInfiniteQuery` already present",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape; zustand store `model.ts:11` is in-memory",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repository, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done = answer delivered with `path:line` sources",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "hypothetical (`if`), answer needs nothing external",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "s12",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "src/components/Badge.tsx (`` `badge badge--${tone}` ``), src/components/Stack.tsx (`\"stack\"`), Badge.test.tsx, Stack.test.tsx, package.json, package-lock.json",
+        "value": "5",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "no new directory; clsx is a package import, nothing new imported across directories",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "emitted class strings and exported props stay identical; src/index.ts untouched",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`grep clsx|classnames package.json package-lock.json` → no hits; clsx must be added",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape in repo",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one package, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "work is listable: two components",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "not stated",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "none",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "d02",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "`src/features/orders/api.ts` (cancel request fn), a mutation hook + its test, `src/features/orders/ui/OrderDetailPage.tsx` and/or `OrderList.tsx` + test beside it, `src/features/orders/index.ts` if the surface widens",
+        "value": "6",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "the cancel UI/hook sits inside `src/features/orders/`, imported only from within that directory",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "the request itself is unsettled — `POST /orders/:id/cancel`, `PATCH /orders/:id {status}`, `DELETE /orders/:id` all fit `request()` at `src/lib/http.ts:9`; `api.ts` names no write route today",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`package.json` — `@tanstack/react-query` 5.102.8 already carries `useMutation` and optimistic updates",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape; server state only, cache is TanStack Query",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one feature directory, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "\"done\" is nameable and the work is listable",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "no backend exists here by design — `/api` 404s on purpose, behavior proven with `fetch` stubbed; the endpoint is a choice this task makes, not one it waits on",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "d03",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "`src/store/orders.js` (Map→SQLite), `src/services/orders.js` (id gen is `o-${all().length + 1}`, breaks once rows persist), `test/services.test.js` + `test/server.test.js` (both `beforeEach(reset)`), `package.json` + `package-lock.json`, new store test",
+        "value": "6",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "new files land inside the existing `src/store/`; nothing outside it gains a new import — `src/services/orders.js` keeps importing `../store/orders.js`",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "HTTP routes unchanged (`src/routes.js`), but the change introduces a persisted schema — an orders table — where none exists",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`package.json` devDeps: eslint, typescript, @types/node, globals. No sqlite driver. `engines: \">=20.19\"` is below the `node:sqlite` floor (22.5), so the builtin is not reachable without an engines bump",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no stored data exists today (seed rebuilt in-process at `src/store/orders.js:18`), but the table DDL + seeding is a persisted shape the change introduces",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one package, one repo, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done is statable and the work is listable: orders read/written through SQLite, existing suites green, rows survive a restart",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "d08",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "src/theme/* (new: tokens + provider + their tests), src/components/Badge.tsx:12, src/components/Badge.test.tsx, src/index.ts, src/index.test.ts",
+        "value": "8",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "src/theme is new; Badge and the barrel (src/index.ts) import it from outside that directory",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "Badge.tsx:12 emits `badge badge--${tone}` — a consumer stylesheet targets those names; token-driven colours remove them. A required ThemeProvider also narrows the existing call surface",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "package.json has no styling dependency; CSS custom properties + plain TS need none",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape anywhere in src/",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one package, one branch, one review",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "scope fully enumerated: 2 components, only Badge carries colour",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing; single owner",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "no design adapter configured (`adapters.design: null`); palette derivable from existing tones neutral/success/danger",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "c05",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "audit has not run; candidates are all 8 source/UI files under `src/` (`App.tsx`, `main.tsx`, `home/ui/HomePage.tsx`, `orders/ui/{OrdersPage,OrderList,OrderDetailPage}.tsx`) + a test beside each + `index.html`; no inventory exists",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "a shared a11y surface (skip link, focus manager, test helper) may be needed; nothing inventoried to say",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "`src/features/orders/api.ts` carries network shapes, untouched by markup; routes `/`, `/orders`, `/orders/:id` unchanged",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`package-lock.json` grep for `axe|jsx-a11y|pa11y|lighthouse` → only `saxes` (false match). No a11y checker present; whether verification uses one is undecided",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no migrations dir, no persisted shape; `orders/model.ts` is an in-memory zustand store",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "scope uninventoried — cannot say whether fixes land as one reviewable branch until the audit runs",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "\"make it accessible\" over a scope nobody has inventoried — the literal fog example. Description says so: \"Nobody has audited it, so the size is unknown\"",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "nothing named",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "sp1",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "new windowing hook + its test in `src/features/orders/ui/`, a long fixture list, `src/features/orders/ui/OrderList.tsx:13` (the `.map` that would be replaced)",
+        "value": "4",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "hook sits in `src/features/orders/ui/` beside its only caller `OrderList.tsx`; `src/lib/` is for what every feature shares and one list hook is not that yet",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "`Order` type and the query-key factory live in `src/features/orders/api.ts`; a rendering experiment touches neither",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "hand-rolled is the ask; `package.json` carries no `react-window`/`@tanstack/react-virtual` and would gain none",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape or stored format in this repository",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repository, one branch; a spike lands no merge at all",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "goal is nameable and the work is listable: hook, long fixture, measure, compare against today's `.map`",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "\"we keep arguing\" is a disagreement, not work split across owners",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "nothing outside this repository gates it",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "sp2",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "throwaway harness + two prototype stores + manifest/lockfile: bench/*.mjs (new ×3), package.json, package-lock.json",
+        "value": "5",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "bench/ is new; nothing outside it imports it — prototypes sit behind the same 3-function surface as `src/store/orders.js` (`all`/`byId`/`put`) and the harness drives them directly",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "`src/store/orders.js:1` — orders live in a `Map`, no persisted schema exists; the spike has to define an orders table shape to measure it. Routes `src/routes.js:14-16` unchanged",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`package.json` carries only eslint/tsc/@types/node; no `pg`, no `better-sqlite3`. `engines: node >=20.19`, so `node:sqlite` (builtin from 22.5) is not guaranteed either",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no stored data today — `src/store/orders.js:14` reseeds a `Map` on `reset()`",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one throwaway harness, one repo, no package created/removed/split",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done is stateable — a number per store at volume V, and a decision; work is listable (harness, seed, run, record). V itself is one input, not an uninventoried scope",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "description says \"the volume we expect\" — the figure is the developer's to state, not pending elsewhere",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "sp3",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "src/components/Badge.tsx, src/components/Stack.tsx, their two tests beside them, package.json + lockfile (clsx absent)",
+        "value": "6",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "nothing new; edits sit inside src/components",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "props unchanged; emitted class string `badge badge--<tone>` preserved by the trial",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "package.json has no clsx, no lockfile in repo",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no persisted shape",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repo, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "scope inventoried: 2 components, 1 template-string site; done = a recommendation",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says no",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "decision is yours, produced by this work",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "up1",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "package.json, package-lock.json, src/App.tsx, src/main.tsx, src/features/home/ui/HomePage.tsx, src/features/orders/ui/OrderList.tsx, src/features/orders/ui/OrderList.test.tsx, src/features/orders/ui/OrderDetailPage.tsx",
+        "value": "8",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "no directory or package added; the swap edits existing files only",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "routes `/`, `/orders`, `/orders/:id` declared as `<Routes>/<Route element>` in src/App.tsx:8-12 under `<BrowserRouter>` at src/main.tsx:18 — whether v8 keeps that declaration API is not established by anything read here",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`react-router` is in package-lock.json:2372 transitively, but not in package.json dependencies; `react-router-dom` leaves the manifest",
+        "value": "yes",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no migrations directory, no persisted shape; router only",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repo, one package, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done is nameable and the work is listable: 6 import sites + manifest + lockfile",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "react-router 8.3.1 is published",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "up2",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "`package.json`, `package-lock.json`, `eslint.config.js` are certain; beyond that, whichever of the 11 JS files under `src/`+`test/` eslint 11's new defaults flag — not knowable without running the new version",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "no file or directory added; the change edits existing ones",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "`src/routes.js`, `src/http/respond.js`, `src/services/orders.js` exports unchanged by a version bump; the eslint config is internal tooling, not a surface anything imports by name",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "`eslint` 10.9.1 and `@eslint/js` 10.0.1 both already in `devDependencies` — version change, not addition",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no migrations dir, no persisted shape; `src/store/orders.js` is in-memory",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repo, one package, one branch",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done is statable and the work list is one command away: `npm run lint` clean on eslint 11 with `npm test` green",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says nothing",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "nothing unready blocks it",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  },
+  {
+    "id": "up3",
+    "rows": [
+      {
+        "key": "files",
+        "row": "files touched (estimate)",
+        "evidence": "package.json:devDependencies + package-lock.json:19 (certain); then tsconfig.base.json, web/src/basket.ts, svc/src/index.d.ts as the surfaced errors land. Whole repo is 8 candidate files, so the set is bounded",
+        "value": "5",
+        "hasEvidence": true
+      },
+      {
+        "key": "newModule",
+        "row": "new module",
+        "evidence": "nothing added; no new directory or package",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "contract",
+        "row": "contract / schema / route change",
+        "evidence": "svc/src/index.d.ts is the surface web imports by name (`applyTax` at web/src/basket.ts:1). Whether TS 6 forces a change to it is not knowable without installing it — that is the whole content of \"fix what it surfaces\"",
+        "value": "unknown",
+        "hasEvidence": true
+      },
+      {
+        "key": "dependency",
+        "row": "new dependency",
+        "evidence": "typescript 5.9.3 already in root devDependencies and package-lock.json:19",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "migration",
+        "row": "data migration",
+        "evidence": "no migrations directory, no persisted format in svc or web",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "units",
+        "row": "needs more than one mergeable unit",
+        "evidence": "one repo, two workspaces released together, no package created/removed/split",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "fog",
+        "row": "fog",
+        "evidence": "done is a command with a result: `npm run typecheck && npm test && npm run lint` green on TS 6. Scope inventoried — 5 source files total",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "developers",
+        "row": "more than one developer",
+        "evidence": "description says one",
+        "value": "no",
+        "hasEvidence": true
+      },
+      {
+        "key": "wait",
+        "row": "external wait",
+        "evidence": "TS 6 stable is published; nothing pending",
+        "value": "no",
+        "hasEvidence": true
+      }
+    ]
+  }
+]

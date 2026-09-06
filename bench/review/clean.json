@@ -1,0 +1,10 @@
+{
+  "files": [
+    { "package": "p1", "fixture": "webapp", "file": "src/features/orders/api.ts", "patch": "clean/c-keys-summary.patch" },
+    { "package": "p2", "fixture": "webapp", "file": "src/lib/http.test.ts", "patch": "clean/c-http-accept-header.patch" },
+    { "package": "p3", "fixture": "webapp", "file": "src/features/orders/ui/OrderList.test.tsx", "patch": "clean/c-list-total-format.patch" },
+    { "package": "p4", "fixture": "api", "file": "test/services.test.js", "patch": "clean/c-list-all-status.patch" },
+    { "package": "p5", "fixture": "api", "file": "test/routes.test.js", "patch": "clean/c-post-status-201.patch" },
+    { "package": "p6", "fixture": "webapp", "file": "src/lib/errors.ts", "patch": "clean/c-errors-nuance.patch" }
+  ]
+}

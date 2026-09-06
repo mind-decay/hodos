@@ -1,0 +1,6 @@
+- https://learn.microsoft.com/en-us/dotnet/standard/design-guidelines/ — the framework design guidelines: naming, members, types, extensibility, exceptions — the platform owner's own guidance
+- https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions — the C# conventions the tooling and the ecosystem assume — same source
+- https://learn.microsoft.com/en-us/dotnet/standard/exceptions/best-practices-for-exceptions — when to throw, what to catch, and what never to swallow — same source
+- https://learn.microsoft.com/en-us/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap — the async contract: naming, cancellation, progress — same source
+- https://learn.microsoft.com/en-us/aspnet/core/fundamentals/best-practices — ASP.NET Core: blocking calls, hot paths, and the failure modes under load — same source
+- https://learn.microsoft.com/en-us/dotnet/core/deploying/ — deployment models and the trimming and AOT constraints they impose — same source

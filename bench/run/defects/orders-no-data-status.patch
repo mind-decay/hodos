@@ -1,0 +1,21 @@
+# id: orders-no-data-status
+# plan: orders-summary
+# task: T3
+# kind: verify
+# item: plan ### T3 acceptance — every list item carries data-status with the order's status
+# anchor: <li key={order.id} data-status={order.status}>
+# what: the row drops the data attribute T3's acceptance clause names. The three unit suites stay green, typecheck and lint stay green, and the review that already accepted this diff saw nothing — the claim is a browser claim, and only the verifier runs it
+# severity: major
+diff --git a/src/features/orders/ui/OrderList.tsx b/src/features/orders/ui/OrderList.tsx
+index 822455e..de429a6 100644
+--- a/src/features/orders/ui/OrderList.tsx
++++ b/src/features/orders/ui/OrderList.tsx
+@@ -21,7 +21,7 @@ export function OrderList({ orders }: OrderListProps) {
+   return (
+     <ul aria-label="orders">
+       {orders.map((order) => (
+-        <li key={order.id} data-status={order.status}>
++        <li key={order.id}>
+           <Link to={`/orders/${order.id}`}>{order.customer}</Link>
+           <span style={{ color: statusColour[order.status] }}>{order.status}</span>
+           <span>{order.total.toFixed(2)}</span>

@@ -1,0 +1,24 @@
+# id: a-route-not-in-table
+# fixture: api
+# package: p4
+# kind: convention
+# item: src/routes.js — the route table
+# line: src/server.js:32
+# anchor: ok(res, { status: 'ok' });
+# trigger: —
+# what: a reachable route that the table does not carry, so the one file that answers "what does this API do" stops answering it
+diff --git a/src/server.js b/src/server.js
+index a80b00f..6edbd75 100644
+--- a/src/server.js
++++ b/src/server.js
+@@ -28,6 +28,10 @@ async function readBody(req) {
+ export function createApp() {
+   return createServer((req, res) => {
+     const url = new URL(req.url ?? '/', 'http://localhost');
++    if (url.pathname === '/health') {
++      ok(res, { status: 'ok' });
++      return;
++    }
+     const match = matchRoute(req.method ?? 'GET', url.pathname);
+     Promise.resolve()
+       .then(async () => {

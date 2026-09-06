@@ -1,0 +1,4 @@
+{
+  "commands": { "test": "node --test src/*.test.js", "typecheck": null, "lint": null },
+  "verify": { "recipes": [{ "name": "unit", "kind": "command", "run": "node --test src/*.test.js", "when": "always" }] }
+}

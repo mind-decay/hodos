@@ -1,0 +1,6 @@
+kernel tool uses: 36
+  review-input.md: 0 read, 0 mentioned
+  review.md: 0 read, 0 mentioned
+  dispatches: 2
+    hodos:hodos-verifier x2
+  git diff in a kernel command: 2

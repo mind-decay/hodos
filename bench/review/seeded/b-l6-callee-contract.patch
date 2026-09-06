@@ -1,0 +1,23 @@
+# id: b-l6-callee-contract
+# fixture: webapp
+# package: p6
+# kind: behavioral
+# item: L6
+# line: src/features/orders/api.ts:22
+# anchor: export const listOrders = (status: string, limit = 25) =>
+# trigger: any status with more than 25 orders — the new per-status hook gets the bounded list it wanted, and OrdersPage.tsx:10, which passes no limit and is not in this diff, silently renders a page of the collection where it rendered all of it
+# what: the bound the per-status hook needs is put on the shared listOrders as a default argument, so every existing caller changes behaviour without changing a line
+diff --git a/src/features/orders/api.ts b/src/features/orders/api.ts
+index fef2b9b..604cfce 100644
+--- a/src/features/orders/api.ts
++++ b/src/features/orders/api.ts
+@@ -19,7 +19,7 @@ export const keys = {
+   detail: (id: string) => [...keys.all, 'detail', id] as const,
+ };
+ 
+-export const listOrders = (status: string) =>
+-  request<Order[]>(`/orders?status=${encodeURIComponent(status)}`);
++export const listOrders = (status: string, limit = 25) =>
++  request<Order[]>(`/orders?status=${encodeURIComponent(status)}&limit=${limit}`);
+ 
+ export const getOrder = (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}`);

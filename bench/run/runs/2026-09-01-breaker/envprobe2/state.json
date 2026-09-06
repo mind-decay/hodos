@@ -1,0 +1,27 @@
+{
+  "slug": "status-label-frozen-lint",
+  "path": "quick",
+  "type": "feature",
+  "phase": "fix",
+  "campaign": null,
+  "branch": "feature/status-label-frozen-lint",
+  "base": "67bb734",
+  "tasks": {
+    "total": 1,
+    "done": 1,
+    "current": 1
+  },
+  "redCheckAttempts": 0,
+  "review": {
+    "iteration": 2,
+    "verdict": "NEEDS_WORK"
+  },
+  "verify": {
+    "iteration": 0,
+    "verdict": null
+  },
+  "lastCommit": "62c3d70",
+  "lastEvent": "Review 2: NEEDS_WORK (0/1/0)",
+  "createdAt": "2026-09-01T15:20:15.841Z",
+  "updatedAt": "2026-09-01T15:26:43.551Z"
+}

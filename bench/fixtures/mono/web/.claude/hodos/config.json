@@ -1,0 +1,4 @@
+{
+  "commands": { "test": "npm test", "typecheck": "npm run typecheck", "lint": null },
+  "verify": { "recipes": [{ "name": "unit", "kind": "command", "run": "npm test", "when": "always" }] }
+}

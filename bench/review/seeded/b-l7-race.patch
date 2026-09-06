@@ -1,0 +1,30 @@
+# id: b-l7-race
+# fixture: webapp
+# package: p6
+# kind: behavioral
+# item: L7
+# line: src/features/orders/ui/useOrdersByStatus.ts:11
+# anchor: listOrders(status).then(setOrders);
+# trigger: the filter is changed from all to paid while the first request is in flight — the slower all response resolves last and the list shows every order under the paid filter until the next change
+# what: the effect never cancels the request it replaces
+diff --git a/src/features/orders/ui/useOrdersByStatus.ts b/src/features/orders/ui/useOrdersByStatus.ts
+new file mode 100644
+index 0000000..3b2adea
+--- /dev/null
++++ b/src/features/orders/ui/useOrdersByStatus.ts
+@@ -0,0 +1,15 @@
++import { useEffect, useState } from 'react';
++
++import { listOrders } from '../api';
++import type { Order } from '../api';
++
++/** The orders for one status, refetched whenever the filter changes. */
++export function useOrdersByStatus(status: string): Order[] {
++  const [orders, setOrders] = useState<Order[]>([]);
++
++  useEffect(() => {
++    listOrders(status).then(setOrders);
++  }, [status]);
++
++  return orders;
++}

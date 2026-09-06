@@ -1,0 +1,24 @@
+# id: b-l2-type-contract
+# fixture: webapp
+# package: p2
+# kind: behavioral
+# item: L2
+# line: src/features/orders/ui/useStatusParam.ts:8
+# anchor: return (params.get('status') ?? 'all') as StatusFilter;
+# trigger: /orders?status=archived — the cast makes any query string a StatusFilter, the select matches no option, and the value is sent on to the API, which answers 400 invalid_status
+# what: a cast where a check belongs; the four values are known and can be tested against
+diff --git a/src/features/orders/ui/useStatusParam.ts b/src/features/orders/ui/useStatusParam.ts
+new file mode 100644
+index 0000000..409558e
+--- /dev/null
++++ b/src/features/orders/ui/useStatusParam.ts
+@@ -0,0 +1,9 @@
++import { useSearchParams } from 'react-router-dom';
++
++import type { StatusFilter } from '../model';
++
++/** The status the URL asks for, so a filtered list can be linked to. */
++export function useStatusParam(): StatusFilter {
++  const [params] = useSearchParams();
++  return (params.get('status') ?? 'all') as StatusFilter;
++}

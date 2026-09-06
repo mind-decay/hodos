@@ -1,0 +1,40 @@
+
+ RUN  v4.1.11 <home>/hodos-stage7-breaker
+
+ ❯ src/features/orders/summary.test.ts (3 tests | 1 failed) 4ms
+     × counts the orders, adds the totals, and counts each status 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/orders/summary.test.ts > summarizeOrders > counts the orders, adds the totals, and counts each status
+AssertionError: expected { count: 3, total: 61.5, …(1) } to deeply equal { count: 3, total: 99.9, …(1) }
+
+- Expected
++ Received
+
+@@ -3,7 +3,7 @@
+      "cancelled": 1,
+      "open": 1,
+      "paid": 1,
+    },
+    "count": 3,
+-   "total": 99.9,
++   "total": 61.5,
+  }
+
+ ❯ src/features/orders/summary.test.ts:14:37
+     12| describe('summarizeOrders', () => {
+     13|   it('counts the orders, adds the totals, and counts each status', () …
+     14|     expect(summarizeOrders(orders)).toEqual({
+       |                                     ^
+     15|       count: 3,
+     16|       total: 99.9,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  11:48:14
+   Duration  568ms (transform 14ms, setup 60ms, import 7ms, tests 4ms, environment 421ms)
+

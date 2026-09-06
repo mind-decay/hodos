@@ -1,0 +1,44 @@
+# id: w-error-role-alert
+# fixture: webapp
+# package: p3
+# kind: convention
+# item: rules/error-role-alert.md
+# line: src/features/orders/ui/OrderActions.tsx:26
+# anchor: {error && <p>{error}</p>}
+# trigger: —
+# what: the failure message renders in a plain paragraph, so a screen reader announces nothing when the action fails
+diff --git a/src/features/orders/ui/OrderActions.tsx b/src/features/orders/ui/OrderActions.tsx
+new file mode 100644
+index 0000000..c5b798b
+--- /dev/null
++++ b/src/features/orders/ui/OrderActions.tsx
+@@ -0,0 +1,29 @@
++import { useState } from 'react';
++
++import { request } from '../../../lib/http';
++
++export interface OrderActionsProps {
++  orderId: string;
++}
++
++export function OrderActions({ orderId }: OrderActionsProps) {
++  const [error, setError] = useState<string | null>(null);
++
++  const markPaid = async () => {
++    try {
++      await request(`/orders/${orderId}/paid`, { method: 'POST' });
++      setError(null);
++    } catch (cause) {
++      setError((cause as Error).message);
++    }
++  };
++
++  return (
++    <div>
++      <button type="button" onClick={markPaid}>
++        Mark paid
++      </button>
++      {error && <p>{error}</p>}
++    </div>
++  );
++}

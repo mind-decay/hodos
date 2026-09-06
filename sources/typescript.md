@@ -1,0 +1,6 @@
+- https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html — the do's and don'ts list: `any`, wrapper object types, overloads, callback parameters — the language's own handbook
+- https://www.typescriptlang.org/tsconfig/ — every compiler option with its effect, `strict` and what it turns on — same source
+- https://www.typescriptlang.org/docs/handbook/2/narrowing.html — narrowing, discriminated unions, exhaustiveness with `never` — same source
+- https://www.typescriptlang.org/docs/handbook/2/everyday-types.html — the type vocabulary a codebase is written in — same source
+- https://www.typescriptlang.org/docs/handbook/utility-types.html — the built-in transforms, so a project does not hand-roll `Partial` again — same source
+- https://github.com/microsoft/TypeScript/wiki/Performance — what makes a project slow to typecheck, with the measurements — the compiler team's own notes

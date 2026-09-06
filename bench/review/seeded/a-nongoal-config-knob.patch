@@ -1,0 +1,29 @@
+# id: a-nongoal-config-knob
+# fixture: api
+# package: p5
+# kind: convention
+# item: plan ## Non-goals
+# line: src/server.js:8
+# anchor: const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*';
+# trigger: —
+# what: an environment knob and a CORS header nobody asked for, on a task whose Non-goals name both
+diff --git a/src/server.js b/src/server.js
+index a80b00f..98b52e3 100644
+--- a/src/server.js
++++ b/src/server.js
+@@ -5,6 +5,7 @@ import { fail, ok } from './http/respond.js';
+ import { matchRoute } from './routes.js';
+ 
+ const MAX_BODY = 64 * 1024;
++const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*';
+ 
+ /**
+  * @param {import('node:http').IncomingMessage} req
+@@ -28,6 +29,7 @@ async function readBody(req) {
+ export function createApp() {
+   return createServer((req, res) => {
+     const url = new URL(req.url ?? '/', 'http://localhost');
++    res.setHeader('access-control-allow-origin', CORS_ORIGIN);
+     const match = matchRoute(req.method ?? 'GET', url.pathname);
+     Promise.resolve()
+       .then(async () => {

@@ -1,0 +1,33 @@
+# id: a-service-imports-http
+# fixture: api
+# package: p5
+# kind: convention
+# item: eslint.config.js — routes → services → store, one way
+# line: src/services/orders.js:2
+# anchor: import { ok } from '../http/respond.js';
+# trigger: —
+# what: the service reaches up into the HTTP layer, so a handler can no longer be tested without a response object
+# checks: lint fails (no-restricted-imports)
+diff --git a/src/services/orders.js b/src/services/orders.js
+index 9f955da..c56c224 100644
+--- a/src/services/orders.js
++++ b/src/services/orders.js
+@@ -1,4 +1,5 @@
+ import { AppError } from '../errors.js';
++import { ok } from '../http/respond.js';
+ import { all, byId, put } from '../store/orders.js';
+ 
+ /** @typedef {import('../store/orders.js').Order} Order */
+@@ -44,3 +45,12 @@ export function create(input) {
+   }
+   return put({ id: `o-${all().length + 1}`, customer, total, status: 'open' });
+ }
++
++/**
++ * Creates an order and writes it, for a caller that already holds the response.
++ * @param {import('node:http').ServerResponse} res
++ * @param {unknown} input
++ */
++export function createInto(res, input) {
++  ok(res, create(input), 201);
++}

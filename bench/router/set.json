@@ -1,0 +1,872 @@
+{
+  "version": 1,
+  "note": "Router bench cases (COMPONENTS.md §7). Each case carries the nine checklist rows of FORMATS.md §3 that produce its path, so a label is derived rather than chosen (decision 0025); rows 2 and 3 are filled by the tests decision 0068 gives them. run.mjs --check-labels re-derives all of them. Every description is written against the fixture as it stands: the work it names is work the fixture does not already ship, and every file count is one these fixtures can produce (Stage 11a, T1). Row 1 counts what FORMATS.md §3 and route.md §3 both state in the same words: every file the change creates or edits, the test beside each source file, the manifest and lockfile when it adds a dependency, and the declaration or barrel its public surface passes through, with that list open rather than closed (Stage 11a, T8; the two homes were made to agree after review 1). It is an estimate, and cases whose fix is not identified answer unknown rather than guess. On the three questions row 1 counts the files the answer must name to be complete — the ones a reader would have to open — which is the only size a question has (decision 0070, bounded after review 1). Stage 11c added sp1-sp3 and up1-up3 for the two types decision 0081 adds; every package a case names is one the fixture's manifest already carries, which is the upgrade type's own test.",
+  "thresholds": {
+    "path": 0.85,
+    "type": 0.9,
+    "campaign": 0.9
+  },
+  "cases": [
+    {
+      "id": "q01",
+      "fixture": "webapp",
+      "description": "Show the number of orders currently listed next to the status filter on the orders page.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q02",
+      "fixture": "webapp",
+      "description": "A call to request() that passes its own headers loses the accept: application/json header the client is supposed to send on every request.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "bug",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q03",
+      "fixture": "api",
+      "description": "GET /orders?status= (an empty value) answers 400 invalid_status instead of listing every order.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "bug",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q04",
+      "fixture": "kit",
+      "description": "Add a 'warning' tone to Badge, beside neutral, success and danger.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q05",
+      "fixture": "webapp",
+      "description": "Which module decides the order of the fields shown for one order, the page or the list component?",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "question",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q06",
+      "fixture": "api",
+      "description": "Where is the 404 body for an unknown route produced, and what sets its code?",
+      "checklist": {
+        "files": 3,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "question",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q07",
+      "fixture": "mono",
+      "description": "Rename applyTax's second parameter from band to taxBand in svc, its declaration file included.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q08",
+      "fixture": "webapp",
+      "description": "When a refetch of the order list fails, the orders page shows the error and the previous list at the same time.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "bug",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q09",
+      "fixture": "kit",
+      "description": "Pull the badge class-name expression into a small helper inside Badge.tsx.",
+      "checklist": {
+        "files": 1,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "q10",
+      "fixture": "api",
+      "description": "Log the method and path of every request to stdout.",
+      "checklist": {
+        "files": 2,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "quick",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s01",
+      "fixture": "webapp",
+      "description": "Add an order summary widget above the order list: counts and total per status.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s02",
+      "fixture": "api",
+      "description": "Add PATCH /orders/:id so a client can move an order between the three statuses.",
+      "checklist": {
+        "files": 4,
+        "newModule": "no",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s03",
+      "fixture": "webapp",
+      "description": "Sometimes, after opening an order and going back, the list shows rows from the previously selected status. It is not reproducible on demand.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "bug",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s04",
+      "fixture": "kit",
+      "description": "Give Stack a direction prop, row or column, and build both components' class names through one shared builder.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s05",
+      "fixture": "mono",
+      "description": "Apply a per-line discount before tax in the basket, with the discount rules exported from svc.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s06",
+      "fixture": "api",
+      "description": "Move the request body reader out of server.js into its own module under src/http.",
+      "checklist": {
+        "files": 3,
+        "newModule": "yes",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s07",
+      "fixture": "webapp",
+      "description": "Parse the orders response with zod inside the orders api module, so a malformed payload fails at the boundary.",
+      "checklist": {
+        "files": 4,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "yes",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s08",
+      "fixture": "api",
+      "description": "Clients report occasional 500s from POST /orders under load. Nothing is logged, so which request fails is not known.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "bug",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s09",
+      "fixture": "webapp",
+      "description": "If the orders endpoint moved to cursor pagination, what in the app would have to change?",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "question",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s10",
+      "fixture": "mono",
+      "description": "Add a roundTo option to applyTax and thread it through the basket total.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s11",
+      "fixture": "webapp",
+      "description": "Move the http client's base URL out of the module constant into a config module.",
+      "checklist": {
+        "files": 4,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "s12",
+      "fixture": "kit",
+      "description": "Build the class names with clsx instead of template strings.",
+      "checklist": {
+        "files": 4,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "yes",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d01",
+      "fixture": "api",
+      "description": "Add pagination to GET /orders: a paging module under src/paging, a cursor parameter, and a paged envelope in place of the bare array.",
+      "checklist": {
+        "files": 5,
+        "newModule": "yes",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d02",
+      "fixture": "webapp",
+      "description": "Cancel an order optimistically, rolling back when the server refuses. Which endpoint carries the cancellation is not settled.",
+      "checklist": {
+        "files": 4,
+        "newModule": "no",
+        "contract": "unknown",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d03",
+      "fixture": "api",
+      "description": "Keep orders in SQLite instead of the in-memory store.",
+      "checklist": {
+        "files": 6,
+        "newModule": "yes",
+        "contract": "yes",
+        "dependency": "yes",
+        "migration": "yes",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d04",
+      "fixture": "mono",
+      "description": "Give applyTax and basketTotal a shared TaxBand union instead of the bare string band type, until no `band: string` is left in either package.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d05",
+      "fixture": "webapp",
+      "description": "Move every useQuery call out of the page components into feature hooks, until no component under ui/ calls useQuery directly.",
+      "checklist": {
+        "files": 5,
+        "newModule": "yes",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "refactor",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d06",
+      "fixture": "webapp",
+      "description": "Show and hide the order actions by the signed-in user's role.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "unknown",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d07",
+      "fixture": "api",
+      "description": "Accept an Idempotency-Key header on POST /orders and answer a repeat with the first result and 200 instead of 201.",
+      "checklist": {
+        "files": 4,
+        "newModule": "yes",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "d08",
+      "fixture": "kit",
+      "description": "Add a theming layer so every component reads its colours from tokens instead of class names.",
+      "checklist": {
+        "files": 7,
+        "newModule": "yes",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "feature",
+        "campaign": false
+      }
+    },
+    {
+      "id": "c01",
+      "fixture": "mono",
+      "description": "Split svc into two packages, tax and pricing, and move web onto both.",
+      "checklist": {
+        "files": 8,
+        "newModule": "yes",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "yes",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "campaign",
+        "type": "refactor",
+        "campaign": true
+      }
+    },
+    {
+      "id": "c02",
+      "fixture": "webapp",
+      "description": "Build the customer portal: sign-in, order history and returns.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "yes",
+        "contract": "unknown",
+        "dependency": "no",
+        "migration": "no",
+        "units": "yes",
+        "fog": "yes",
+        "developers": "yes",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "campaign",
+        "type": "feature",
+        "campaign": true
+      }
+    },
+    {
+      "id": "c03",
+      "fixture": "kit",
+      "description": "Move the order status vocabulary into kit and consume it from both the api and the webapp.",
+      "checklist": {
+        "files": 8,
+        "newModule": "yes",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "yes",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "campaign",
+        "type": "refactor",
+        "campaign": true
+      }
+    },
+    {
+      "id": "c04",
+      "fixture": "webapp",
+      "description": "Replace the orders REST calls with the GraphQL gateway once the backend team ships it.",
+      "checklist": {
+        "files": 8,
+        "newModule": "no",
+        "contract": "yes",
+        "dependency": "no",
+        "migration": "no",
+        "units": "yes",
+        "fog": "no",
+        "developers": "no",
+        "wait": "yes"
+      },
+      "expect": {
+        "path": "campaign",
+        "type": "refactor",
+        "campaign": true
+      }
+    },
+    {
+      "id": "c05",
+      "fixture": "webapp",
+      "description": "Make the application meet WCAG AA. Nobody has audited it, so the size is unknown.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "yes",
+        "fog": "yes",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "campaign",
+        "type": "bug",
+        "campaign": true
+      }
+    },
+    {
+      "id": "sp1",
+      "fixture": "webapp",
+      "description": "We keep arguing about whether the order list should be virtualized. Timebox a day on a hand-rolled windowing hook against a long fixture list and tell us whether it is worth doing at all.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "spike",
+        "campaign": false
+      }
+    },
+    {
+      "id": "sp2",
+      "fixture": "api",
+      "description": "Before we commit to SQLite or Postgres for orders, find out which one the volume we expect actually needs. We want a number to decide on, not an opinion.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "unknown",
+        "contract": "unknown",
+        "dependency": "unknown",
+        "migration": "unknown",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "spike",
+        "campaign": false
+      }
+    },
+    {
+      "id": "sp3",
+      "fixture": "kit",
+      "description": "Try clsx in two components and tell us whether replacing every template string across the kit is worth the churn.",
+      "checklist": {
+        "files": 3,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "yes",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "spike",
+        "campaign": false
+      }
+    },
+    {
+      "id": "up1",
+      "fixture": "webapp",
+      "description": "Move react-router-dom from 7.18.3 to 8 and deal with whatever the route definitions need.",
+      "checklist": {
+        "files": 5,
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "upgrade",
+        "campaign": false
+      }
+    },
+    {
+      "id": "up2",
+      "fixture": "api",
+      "description": "Take eslint from 10.9.1 to 11 and fix what its new defaults flag.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "no",
+        "contract": "no",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "standard",
+        "type": "upgrade",
+        "campaign": false
+      }
+    },
+    {
+      "id": "up3",
+      "fixture": "mono",
+      "description": "Take typescript from 5.9.3 to 6 at the monorepo root and fix what it surfaces in svc and web.",
+      "checklist": {
+        "files": "unknown",
+        "newModule": "no",
+        "contract": "unknown",
+        "dependency": "no",
+        "migration": "no",
+        "units": "no",
+        "fog": "no",
+        "developers": "no",
+        "wait": "no"
+      },
+      "expect": {
+        "path": "deep",
+        "type": "upgrade",
+        "campaign": false
+      }
+    }
+  ]
+}

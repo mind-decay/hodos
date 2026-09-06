@@ -1,0 +1,15 @@
+
+ RUN  v4.1.11 /private/tmp/claude-501/-repo/2395ad1c-3fd1-4f26-a2b0-73f42f97c6bc/scratchpad/t8
+
+ ✓ src/features/orders/summary.test.ts > summarizeOrders > counts the orders, adds the totals, and counts each status 1ms
+ ✓ src/features/orders/summary.test.ts > summarizeOrders > summarizes an empty list as zeros rather than as nothing 0ms
+ ✓ src/features/orders/summary.test.ts > summarizeOrders > adds 0.1 and 0.2 to 0.3 at cent precision 0ms
+ ✓ src/features/orders/ui/OrdersPage.test.tsx > OrdersPage summary line > states the count and the total of the resolved list 30ms
+ ✓ src/features/orders/ui/OrdersPage.test.tsx > OrdersPage summary line > states zeros when the filter matches nothing 5ms
+ ✓ src/features/orders/ui/OrdersPage.test.tsx > OrdersPage summary line > renders no summary while the query is pending 1ms
+
+ Test Files  2 passed (2)
+      Tests  6 passed (6)
+   Start at  01:24:59
+   Duration  396ms (transform 34ms, setup 78ms, import 41ms, tests 39ms, environment 434ms)
+

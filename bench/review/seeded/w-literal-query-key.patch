@@ -1,0 +1,36 @@
+# id: w-literal-query-key
+# fixture: webapp
+# package: p1
+# kind: convention
+# item: rules/query-key-factory.md
+# line: src/features/orders/ui/OrdersSummary.tsx:11
+# anchor: queryKey: ['orders', 'summary', status],
+# trigger: —
+# what: the summary writes its own key array instead of reading it off the feature's factory, so an invalidation of the factory's keys misses this entry
+diff --git a/src/features/orders/ui/OrdersSummary.tsx b/src/features/orders/ui/OrdersSummary.tsx
+new file mode 100644
+index 0000000..e04626b
+--- /dev/null
++++ b/src/features/orders/ui/OrdersSummary.tsx
+@@ -0,0 +1,21 @@
++import { useQuery } from '@tanstack/react-query';
++
++import { listOrders } from '../api';
++
++export interface OrdersSummaryProps {
++  status: string;
++}
++
++export function OrdersSummary({ status }: OrdersSummaryProps) {
++  const orders = useQuery({
++    queryKey: ['orders', 'summary', status],
++    queryFn: () => listOrders(status),
++  });
++  if (!orders.data) return null;
++  const total = orders.data.reduce((sum, order) => sum + order.total, 0);
++  return (
++    <p aria-label="orders summary">
++      {orders.data.length} orders · {total.toFixed(2)}
++    </p>
++  );
++}

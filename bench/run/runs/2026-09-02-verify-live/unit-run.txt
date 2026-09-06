@@ -1,0 +1,13 @@
+
+> webapp-fixture@0.1.0 test
+> vitest run --run
+
+
+ RUN  v4.1.11 /private/tmp/claude-501/-repo/2395ad1c-3fd1-4f26-a2b0-73f42f97c6bc/scratchpad/t8
+
+
+ Test Files  5 passed (5)
+      Tests  14 passed (14)
+   Start at  01:24:54
+   Duration  684ms (transform 118ms, setup 431ms, import 140ms, tests 116ms, environment 2.06s)
+

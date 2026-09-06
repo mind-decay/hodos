@@ -1,0 +1,21 @@
+# id: broken-eslint-config
+# fixture: webapp
+# kind: environment
+# what: eslint.config.js imports ./eslint-house-rules.js, which is not in the repository, so `npm run lint` cannot run at all
+# applies: before the branch base, so the breakage predates the task and is outside every diff the review reads
+diff --git a/eslint.config.js b/eslint.config.js
+index 2c7d395..fb30c24 100644
+--- a/eslint.config.js
++++ b/eslint.config.js
+@@ -2,7 +2,11 @@ import js from '@eslint/js';
+ import globals from 'globals';
+ import tseslint from 'typescript-eslint';
+ 
++// The house rules were split out of this file and the split is half-done.
++import house from './eslint-house-rules.js';
++
+ export default tseslint.config(
++  ...house,
+   { ignores: ['dist', 'coverage'] },
+   js.configs.recommended,
+   ...tseslint.configs.recommended,

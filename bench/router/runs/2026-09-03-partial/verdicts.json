@@ -1,0 +1,92 @@
+[
+  {
+    "id": "q05",
+    "path": "quick",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "q06",
+    "path": "quick",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "q07",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "q09",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "s05",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s06",
+    "path": "standard",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "s09",
+    "path": "standard",
+    "type": "question",
+    "campaign": false
+  },
+  {
+    "id": "s10",
+    "path": "standard",
+    "type": "feature",
+    "campaign": false
+  },
+  {
+    "id": "s11",
+    "path": "quick",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "s12",
+    "path": "deep",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "d04",
+    "path": "deep",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "d05",
+    "path": "deep",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "c01",
+    "path": "deep",
+    "type": "refactor",
+    "campaign": false
+  },
+  {
+    "id": "c03",
+    "path": "campaign",
+    "type": "refactor",
+    "campaign": true
+  },
+  {
+    "id": "c04",
+    "path": "campaign",
+    "type": "feature",
+    "campaign": true
+  }
+]
