@@ -1,0 +1,20 @@
+diff --git a/.claude/hodos/config.json b/.claude/hodos/config.json
+index f05a960..446c10a 100644
+--- a/.claude/hodos/config.json
++++ b/.claude/hodos/config.json
+@@ -34,14 +34,7 @@
+           "/orders",
+           "/orders/:id"
+         ],
+-        "when": "ui",
+-        "checks": [
+-          {
+-            "route": "/",
+-            "evaluate": "() => { const nav = document.querySelector('nav[aria-label=\"Sections\"]'); const links = [...nav.querySelectorAll('a')]; return JSON.stringify({ navLabel: nav.getAttribute('aria-label'), count: links.length, texts: links.map(a => a.textContent), hrefs: links.map(a => a.getAttribute('href')) }); }",
+-            "expect": "{\"navLabel\":\"Sections\",\"count\":2,\"texts\":[\"Orders\",\"Handover\"],\"hrefs\":[\"/orders\",\"/shift\"]}"
+-          }
+-        ]
++        "when": "ui"
+       }
+     ]
+   },

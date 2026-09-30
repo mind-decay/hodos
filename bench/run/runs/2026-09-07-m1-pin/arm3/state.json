@@ -1,0 +1,27 @@
+{
+  "slug": "home-site-name",
+  "path": "quick",
+  "type": "feature",
+  "phase": "fix",
+  "campaign": null,
+  "branch": "feature/home-site-name",
+  "base": "61ac245",
+  "tasks": {
+    "total": 1,
+    "done": 1,
+    "current": 1
+  },
+  "redCheckAttempts": 0,
+  "review": {
+    "iteration": 1,
+    "verdict": "ACCEPT"
+  },
+  "verify": {
+    "iteration": 2,
+    "verdict": "FAIL"
+  },
+  "lastCommit": "4a0c0ef",
+  "lastEvent": "Verify 2: FAIL 13 claims, 3 skipped",
+  "createdAt": "2026-09-07T18:12:55.233Z",
+  "updatedAt": "2026-09-07T18:51:47.807Z"
+}

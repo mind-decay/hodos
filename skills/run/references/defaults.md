@@ -18,7 +18,7 @@ A bug fix takes the same route to the root cause, because that is also the small
 
 ## The catalogue
 
-The seventeen shapes a model produces unprompted, each as the target form.
+The eighteen shapes a model produces unprompted, each as the target form.
 
 | # | The target form |
 |---|---|
@@ -33,12 +33,13 @@ The seventeen shapes a model produces unprompted, each as the target form.
 | 9 | A comment carries a business nuance the code cannot; the code carries the rest |
 | 10 | An error is handled per an invariant `### Invariants & failure modes` names, or it propagates |
 | 11 | Types are inferred or declared, and a green test is proved by mutation |
-| 12 | The project's own utility is used; the precedent search is what finds it |
-| 13 | What `## Non-goals` excludes is not built — no shim, flag, or config nobody asked for |
-| 14 | A name states the role; a function does one thing |
-| 15 | A dependency is a decision, and ten lines are usually cheaper |
-| 16 | Dead code dies in this pass |
-| 17 | A deliberate cut with a known ceiling is a `hodos:` marker; a `TODO` is a `Gap:` for the chat |
+| 12 | A test the diff removes or switches off is named in the plan or restored; the suite reports green either way |
+| 13 | The project's own utility is used; the precedent search is what finds it |
+| 14 | What `## Non-goals` excludes is not built — no shim, flag, or config nobody asked for |
+| 15 | A name states the role; a function does one thing |
+| 16 | A dependency is a decision, and ten lines are usually cheaper |
+| 17 | Dead code dies in this pass |
+| 18 | A deliberate cut with a known ceiling is a `hodos:` marker; a `TODO` is a `Gap:` for the chat |
 
 ## Red flags
 
@@ -77,9 +78,11 @@ Both halves are mandatory. The marker is for work that is **complete and correct
 
 ## Admission and retirement
 
-`DESIGN.md §7.2` states the criterion once — *what LLMs do without being told* — and nothing said how a row gets in or out (decision **0086**). The seventeen above are **grandfathered**: they are the author's reading of that criterion, carried on that footing and not on evidence per row, which is what a source column beside them would have manufactured.
+`DESIGN.md §7.2` states the criterion once — *what LLMs do without being told* — and nothing said how a row gets in or out (decision **0086**). Rows 1–11 and 13–18 are **grandfathered**: they are the author's reading of that criterion, carried on that footing and not on evidence per row, which is what a source column beside them would have manufactured.
 
-An eighteenth row is admitted on one cited instance of the shape it refuses: a review package in `bench/review/`, a finding from the pilot, or a `hodos-reviewer` finding in `history.jsonl`, cited where it sits. The row is written as the target form, never as the shape it replaces.
+A further row is admitted on one cited instance of the shape it refuses: a review package in `bench/review/`, a finding from the pilot, or a `hodos-reviewer` finding in `history.jsonl`, cited where it sits. The row is written as the target form, never as the shape it replaces.
+
+**Row 12** is the first admitted that way, and its instance is `bench/review/seeded/t-deleted-list-assertion.patch` — a diff that deletes the assertion pinning a link and leaves the suite green — caught cold by the reviewer in `bench/review/runs/2026-09-08-12a-baseline/p3-review.md`, which is why decision **0121** bought this row and not the computed section it put beside it.
 
 A row is nominated for **retirement** when no finding cites it across a task set — the shape `finish` already uses for a rule that never fires. A model that stopped producing a shape unprompted is the reason the list must be able to shrink: every row of it is a claim about a model, and models change.
 

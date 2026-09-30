@@ -6,7 +6,7 @@
 
 **Reads.** `.claude/hodos/tasks/<slug>/plan.md` — `## Tasks` for the task under work, `## Design` for the field it touches, `## Non-goals` for what it must not grow into. `state.json` for `tasks.current`, `redCheckAttempts` and `base`. `config.commands`, `config.conventions.commit`. The project's `.claude/rules/*.md` for the precedents the code follows.
 
-**Writes.** One commit per task on the task's branch, plus one for the simplify pass when it cut something. The ledger lines below, each through `ledger.mjs`. `hodos:` markers in the code where the pass declined a cut.
+**Writes.** One commit per task on the task's branch, plus one for the simplify pass when it cut something. The ledger lines below, each through `ledger.mjs`. `hodos:` markers in the code where the pass declined a cut. An `Acceptance:` clause in `plan.md`, rewritten where a `Gap:` resolution contradicts it, the old one kept below (decision **0176**).
 
 **Entered at** `state.tasks.current`, never at task 1: a task whose `done` line is in the ledger has its commit in git.
 
@@ -17,7 +17,7 @@ For task `<n>`, in the plan's order:
 1. `ledger.mjs add "Task <n>: started"`.
 2. Read the task's `Files:` and `Acceptance:` lines, and the design fields they touch. The acceptance criterion is the specification; the summary line is its title.
 3. The red phase (§3).
-4. Implement the smallest change that turns the check green, in the modules `### Modules` names, following the precedents `### Precedent` cites and the rules whose `paths:` match the files.
+4. Implement the smallest change that turns the check green, in the modules `### Modules` names, following the precedents `### Precedent` cites and the rules whose `paths:` match the files. A comment or document the change writes carries the fact itself, which is the plan's decision in a sentence, and never a path under `.claude/hodos/tasks/`: no other checkout has that directory (decision **0172**).
 5. Run the task's check — `config.commands.test`, scoped to this task's test where the runner allows it. Run `config.commands.typecheck` too when a type, a signature, or a public export changed.
 6. Red → §4. Green → §5.
 7. Commit (§6), then `ledger.mjs add "Task <n>: done" --sha <sha>`, with `--tests <reason>` when the task is exempt.
@@ -51,6 +51,8 @@ A green test is a claim; mutation is the proof. For each test written in step 3:
 3. Restore the line. Run again. Green.
 
 A test that stays green against the broken line pins nothing: it is the test that is wrong, and it is rewritten before the commit. One line per test — the line the criterion names — not every line the diff touched.
+
+Then record what ran: `ledger.mjs add "Task <n>: mutation" --tests <k>`, where `<k>` is the number of tests this task wrote and mutated — `0` for a task the plan exempted, which wrote none. The transcript is not a record: a resumed session cannot read it, and the reviewer compares this count against the test declarations your diff adds (decision 0122).
 
 ## 6. The commit
 

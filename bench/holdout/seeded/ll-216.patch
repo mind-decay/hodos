@@ -1,0 +1,28 @@
+# id: ll-216
+# fixture: snippets
+# package: h4
+# kind: behavioral
+# item: L5
+# line: jobs/processor.py:11
+# anchor: except:          # 捕获所有异常，防止单个任务失败影响整个 worker
+# trigger: 应识别 L5（控制流逃逸 / Control Flow Escape）：裸 `except:` 捕获所有异常，包括 `KeyboardInterrupt`（Ctrl+C 产生）、`SystemExit`（sys.exit() 产生）和 `GeneratorExit` 等系统级信号。当用户按 Ctrl+C 时，Python 抛出 `KeyboardInterrupt`，但 `except: pass` 静默吞掉了它，程序继续运行，这正是无法退出的根因。Trace 必须展示：Ctrl+C → Python 注入 KeyboardInterrupt → while 循环内 except: 捕获 → pass 丢弃 → 循环继续 → 程序挂起。L5 的核心：控制流的正常退出路径（中断信号）被意外拦截，违反了信号应当传播的契约。修复：改用 `except Exception:` 仅捕获普通异常；或对
+# what: logic-lens case #216 (zh-python-bare-except-swallows-L5), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/jobs/processor.py b/jobs/processor.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/jobs/processor.py
+@@ -0,0 +1,12 @@
++# jobs/processor.py
++import queue
++
++def run_worker(job_queue: queue.Queue):
++    """持续处理任务队列。"""
++    while True:
++        try:
++            job = job_queue.get(timeout=1)
++            execute_job(job)
++            job_queue.task_done()
++        except:          # 捕获所有异常，防止单个任务失败影响整个 worker
++            pass         # 忽略错误，继续处理下一个任务

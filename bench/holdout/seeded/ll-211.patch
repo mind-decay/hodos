@@ -1,0 +1,28 @@
+# id: ll-211
+# fixture: snippets
+# package: h3
+# kind: behavioral
+# item: L2
+# line: billing/tax.py:6
+# anchor: if discount_amount == 0.1:       # check for exactly 10-cent discount
+# trigger: Should identify L2 (Type Contract Breach) or L3 (Boundary Blindspot): the `discount_amount == 0.1` comparison is unreliable due to IEEE 754 floating-point representation. `1.0 * (1 - 0.1)` yields approximately `0.9`, so `price - discounted` = `1.0 - 0.9` = `0.09999999999999998`, not exactly `0.1`. The `== 0.1` check is False even though mathematically the discount is exactly 10 cents, so the funct
+# what: logic-lens case #211 (python-float-equality-L2), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/billing/tax.py b/billing/tax.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/billing/tax.py
+@@ -0,0 +1,12 @@
++# billing/tax.py
++def apply_discount(price: float, discount_rate: float) -> float:
++    """Apply discount. If the discount is exactly $0.10, waive tax."""
++    discounted = price * (1 - discount_rate)
++    discount_amount = price - discounted
++    if discount_amount == 0.1:       # check for exactly 10-cent discount
++        return discounted            # tax waiver
++    return discounted * 1.08        # 8% tax
++
++# Called as:
++result = apply_discount(1.0, 0.1)   # 10% off $1.00 => $0.10 discount
++print(result)                        # Expected: 0.9 (tax-free). Actual?

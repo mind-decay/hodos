@@ -1,0 +1,24 @@
+# id: ui-sweeps-shift
+# fixture: webapp
+# kind: setup
+# what: the `ui` recipe sweeps /shift as well, so a browser arm reaches the page
+# how: one route added to verify.recipes[ui].routes
+# applies: before the base commit. This is the arm's own setup and not the
+#   task's work, so it must not appear in base..HEAD. Stage 11d-3's M3
+#   registered the route with a commit on top of HEAD instead, and the run
+#   correctly reported a config edit made after the review closed — a true
+#   statement about the harness and a false one about anything the fixture
+#   meant to say (decision 0128's arm, `bench/run/runs/2026-09-07-m3-severity`).
+diff --git a/.claude/hodos/config.json b/.claude/hodos/config.json
+index f9249ac..2c40283 100644
+--- a/.claude/hodos/config.json
++++ b/.claude/hodos/config.json
+@@ -12,7 +12,7 @@
+   "verify": {
+     "recipes": [
+       { "name": "unit", "kind": "command", "run": "npm test", "when": "always" },
+-      { "name": "ui", "kind": "browser", "routes": ["/", "/orders", "/orders/:id"], "when": "ui" }
++      { "name": "ui", "kind": "browser", "routes": ["/", "/orders", "/orders/:id", "/shift"], "when": "ui" }
+     ]
+   },
+   "conventions": {

@@ -1,0 +1,16 @@
+kernel tool uses: 21
+  review-input.md: 0 read, 0 mentioned
+  review.md: 0 read, 0 mentioned
+  dispatches: 1
+    hodos:hodos-verifier x1
+  browser operations: 64
+    of them in the kernel: 0
+    emulate x3
+    evaluate_script x10
+    list_console_messages x11
+    list_network_requests x8
+    list_pages x1
+    navigate_page x12
+    take_screenshot x7
+    take_snapshot x12
+  git diff in a kernel command: 1

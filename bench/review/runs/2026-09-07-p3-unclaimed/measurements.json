@@ -1,0 +1,15 @@
+{
+  "runAt": "2026-09-07",
+  "only": [
+    "p3"
+  ],
+  "dispatches": 1,
+  "cost": 0.86887,
+  "seconds": 230,
+  "turns": [
+    {
+      "id": "p3",
+      "turns": 2
+    }
+  ]
+}

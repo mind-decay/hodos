@@ -1,0 +1,8 @@
+49c49
+< Acceptance: the badge reads "Refund requested" for a refund whose state is `requested`; it reads "Refund approved" for one whose state is `approved`; it renders nothing when `useRefund` answers `{ refund: null }`.
+---
+> Acceptance: the badge reads "Refund requested" for a refund whose state is `requested`; it reads "Refund approved" for one whose state is `approved`; it reads "Refund declined" for one whose state is `declined`; it renders nothing when `useRefund` answers `{ refund: null }`.
+56c56
+< - ui: /orders/:id — the badge for a requested refund, the badge for an approved one, and the page for an order with no refund (recipe `ui`)
+---
+> - ui: /orders/:id — the badge for a requested refund, an approved one and a declined one, and the page for an order with no refund (recipe `ui`)

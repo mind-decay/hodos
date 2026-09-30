@@ -1,0 +1,33 @@
+# id: ll-210
+# fixture: snippets
+# package: h3
+# kind: behavioral
+# item: L2
+# line: api/client.ts:11
+# anchor: return data as User;  // type assertion
+# trigger: Should identify L2 (Type Contract Breach): the `as User` type assertion is compile-time only — it performs no runtime validation. When the API returns `{ error: 'not found' }` for a missing user, `data` at runtime has no `email` field, but TypeScript accepts it because the assertion overrides type checking. In `displayUser`, `user.email` is `undefined`, and `.toUpperCase()` throws `TypeError: Cann
+# what: logic-lens case #210 (ts-type-assertion-bypass-L2), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/api/client.ts b/api/client.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/api/client.ts
+@@ -0,0 +1,17 @@
++// api/client.ts
++interface User {
++  id: number;
++  name: string;
++  email: string;
++}
++
++async function fetchUser(id: number): Promise<User> {
++  const response = await fetch(`/api/users/${id}`);
++  const data = await response.json();
++  return data as User;  // type assertion
++}
++
++async function displayUser(id: number): Promise<void> {
++  const user = await fetchUser(id);
++  console.log(user.email.toUpperCase());
++}

@@ -1,0 +1,132 @@
+$ node scripts/env.mjs probe <copy>
+{
+  "profile": "local",
+  "gitRoot": "<copy>",
+  "projectRoot": "<copy>",
+  "layers": [
+    {
+      "name": "seed-overdue",
+      "cwd": "<copy>",
+      "state": "down",
+      "raisedByHodos": false,
+      "checks": [
+        {
+          "kind": "cmd",
+          "target": "node seed.mjs count",
+          "ok": false,
+          "detail": "0 overdue orders"
+        }
+      ],
+      "access": null,
+      "url": null
+    }
+  ],
+  "url": null
+}
+exit 1
+
+$ node scripts/env.mjs up <copy>
+{
+  "profile": "local",
+  "gitRoot": "<copy>",
+  "projectRoot": "<copy>",
+  "layers": [
+    {
+      "name": "seed-overdue",
+      "cwd": "<copy>",
+      "state": "raised",
+      "raisedByHodos": true,
+      "checks": [
+        {
+          "kind": "cmd",
+          "target": "node seed.mjs count",
+          "ok": true,
+          "detail": "3 overdue orders"
+        }
+      ],
+      "access": null,
+      "url": null
+    }
+  ],
+  "url": null,
+  "failed": null,
+  "blocked": null
+}
+exit 0
+
+$ node seed.mjs count   # in the copy
+3 overdue orders
+exit 0
+
+$ node scripts/env.mjs up <copy>   # again
+{
+  "profile": "local",
+  "gitRoot": "<copy>",
+  "projectRoot": "<copy>",
+  "layers": [
+    {
+      "name": "seed-overdue",
+      "cwd": "<copy>",
+      "state": "up",
+      "raisedByHodos": true,
+      "checks": [
+        {
+          "kind": "cmd",
+          "target": "node seed.mjs count",
+          "ok": true,
+          "detail": "3 overdue orders"
+        }
+      ],
+      "access": null,
+      "url": null
+    }
+  ],
+  "url": null,
+  "failed": null,
+  "blocked": null
+}
+exit 0
+
+$ node scripts/env.mjs down <copy>
+{
+  "profile": "local",
+  "projectRoot": "<copy>",
+  "layers": [
+    {
+      "name": "seed-overdue",
+      "state": "stopped",
+      "detail": "node seed.mjs reset"
+    }
+  ]
+}
+exit 0
+
+$ node scripts/env.mjs probe <copy>
+{
+  "profile": "local",
+  "gitRoot": "<copy>",
+  "projectRoot": "<copy>",
+  "layers": [
+    {
+      "name": "seed-overdue",
+      "cwd": "<copy>",
+      "state": "down",
+      "raisedByHodos": false,
+      "checks": [
+        {
+          "kind": "cmd",
+          "target": "node seed.mjs count",
+          "ok": false,
+          "detail": "0 overdue orders"
+        }
+      ],
+      "access": null,
+      "url": null
+    }
+  ],
+  "url": null
+}
+exit 1
+
+$ ls -a <copy> | grep '\.seed'
+(nothing)

@@ -6,14 +6,14 @@ hodos is a Claude Code plugin that installs a complete development workflow into
 
 The developer is the driver of ideas and decisions. hodos is the driver of the *process*: it asks the right questions, refuses to guess where the plan is silent, reviews with fresh eyes, verifies by running, and cleans up after itself.
 
-**Status: 0.1.0.** Every phase is built and measured against four fixture projects. It has never been run against a real codebase — that is the pilot, and the numbers below say which claims have evidence and which are still hypotheses.
+**Status: 0.2.0.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
 
 | | hodos |
 |---|---|
 | **Project-aware** | `init` derives rules from the codebase's own precedents and from authoritative stack sources, filtered by a behavior-shaping test. |
 | **Frugal** | Three skill descriptions in the model's listing; the diff never enters the orchestrator's context; one reviewer; model tiering. |
 | **Bounded** | Two review iterations, two verify iterations, then a breaker that hands the decision to the human. |
-| **Verified** | "Done" requires fresh execution evidence against the project's own verify recipe — tests, typecheck, lint, browser, HTTP, accessibility, viewport. |
+| **Verified** | "Done" requires fresh execution evidence from the project's own commands and verify recipe — tests, typecheck, lint, browser, HTTP, accessibility, viewport. |
 | **Human-gated** | The agent never decides what the plan didn't settle. A gap goes to the chat, not to a silent ruling. |
 
 Audience: professional developers shipping business software.
@@ -55,7 +55,7 @@ A scan and an interview. You approve every write, one row at a time. What lands:
 /hodos:task add a totals row to the orders summary
 ```
 
-The router puts the request on a path — `quick`, `standard`, `deep`, or `campaign` — from nine checklist rows, each with evidence, and shows you the verdict before it acts. Then research, then the design grilling, then a plan you approve. Nothing is written to the repository in this session.
+The router puts the request on a path — `quick`, `standard`, `deep`, or `campaign` — from nine checklist rows, each with evidence, and shows you the verdict before it acts. Then research, then the design grilling, then a plan you approve. Nothing is written to the repository in this session. The exception is a change no program reads, such as a comment, documentation or a message text. That change takes the `inert` shape: you confirm it with the verdict, and the edit, its two commands, one commit and one fresh review all run here, with no second session.
 
 **3. Execute it.**
 
@@ -90,9 +90,27 @@ Two numbers are measured, both against this repository's own fixtures and both i
 - **A review dispatch:** six task-shaped packages reviewed by `opus` cost **$4.39**, about **$0.73 each**, at two turns per dispatch (`bench/review/runs/2026-09-06/`).
 - **A routing verdict:** fourteen headless router sessions cost **$6.89**, about **$0.49 each**, at 7.6 turns and 3.3 evidence calls on average (`bench/router/runs/2026-09-03-11c/`).
 
-**The number that matters most is not measured yet:** what a whole task costs with hodos against the same task without it. The targets are `quick` ≤ 1.3× and `standard` ≤ 2× bare Claude Code, and they are *hypotheses to be corrected by the pilot*, not results. `scripts/usage.mjs` sums a task's token usage from its own transcripts and `/hodos:status --cost` reads it, so the multiplier is measured per task rather than estimated once. Token counts only — the price of a token is not in the transcript, and one bad number discredits the rest of the report.
+**What a whole task costs, against the same work without hodos**, was measured on the pilot. The figures are tokens from each session's transcripts, subagents included (`docs/PILOT.md §12–§13`):
 
-**What the benches gate, and where one is red.** The reviewer finds 19 of 19 seeded defects at 93.2% precision, against gates of 80% and 85%. The router puts 95.1% of descriptions on the right type and 97.6% on the right campaign flag, against gates of 90%; its **path** accuracy is **82.9% against a gate of ≥85% — not met**, disclosed rather than lowered. A seeded recall number says the loop works end to end; it says nothing about a defect nobody seeded. `docs/BENCH.md` states what each number does not prove.
+| Set | hodos ÷ bare | Model |
+|---|---:|---|
+| `quick`, three tasks per arm, different tasks | **17.42×** | `claude-opus-5` |
+| `standard`, the same task in both arms (D2–D5) | **3.49×** | `claude-opus-5-5` |
+| `deep`, one task (D1) | **5.28×** | `claude-opus-5-5` |
+| the `inert` shape, three same-task pairs | **4.39×**, the median | `claude-opus-5-5` |
+
+This multiplier is a price, not a target. The design's starting thresholds missed on every set, and they were withdrawn rather than reset (`DESIGN.md §11`).
+- **`quick`.** Its figure is hodos's fixed overhead (route, plan, review, verify) set against one-file edits whose bare arms cost 0.66–1.57M.
+- **`inert`.** A change no program reads now takes the `inert` shape instead, with one session, one reviewer and no verifier.
+
+**What the price bought** (`PILOT.md §12`).
+- Review filed majors on five of the ten hodos runs that ran it, and each was fixed before merge.
+- Verify failed five: two on the run's own plan text rather than the product, and two sent to the breaker.
+- Against that, a blind rubric could not tell the two arms' code apart (`§10`).
+
+**Your own tasks.** `scripts/usage.mjs` sums a task's tokens from its own transcripts, and `/hodos:status --cost` reads them, so each project reads what its own tasks cost. The multiplier also needs a bare run of the same task, which a project does not make. The figures are token counts only: the price of a token is not in the transcript, and one bad number discredits the rest of the report.
+
+**What the benches gate, and where one is red.** The reviewer finds 19 of 19 seeded defects at 93.2% precision, against gates of 80% and 85%. The router puts 95.1% of descriptions on the right type and 97.6% on the right campaign flag, against gates of 90%; its **path** accuracy is **82.9% against a gate of ≥85% — not met**, disclosed rather than lowered. A seeded recall number says the loop works end to end, and says nothing about a defect nobody seeded. Those defects are measured separately. On logic-lens's cases the reviewer found **29/30**, and on the pilot's own reviewed packages **2/4**, naming the other two in its Spec section only (`docs/PILOT.md §11`). `docs/BENCH.md` states what each number does not prove.
 
 ## Beside the first-party tools
 

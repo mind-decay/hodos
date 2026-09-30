@@ -11,6 +11,19 @@
 // the item, never off the prose: a bench that judges a finding's wording scores
 // the reader's taste, and a disagreement then has no arbiter.
 //
+// Two kinds are scored elsewhere, each because a Standards row cannot hold
+// them. A derivation defect (decision 0092) is not a row at all — the reviewer
+// names it in the Spec section's Unclaimed word. A `test-floor` defect
+// (decision 0121) is a **deletion**, so there is no added line for an anchor to
+// be and no five-line window to measure against, and at the baseline no section
+// of the review was assigned to it either. Both therefore carry `names`, the
+// tokens the text has to contain, and the thing itself is what a token is.
+//
+// Neither is in a gated denominator, and decision **0117** settled that they
+// stay out: the four gates were bought on twelve convention and seven
+// behavioral defects, a new class entering would move a threshold with no
+// decision behind it, and at n=2 or n=1 a single miss reads as 50% or 0%.
+//
 // The anchor is a line of source, not a number. Two patches in one package
 // shift each other's lines, so the number in the patch is the patch's own and
 // invoke.mjs resolves the text in the copy it built; that resolved line is what
@@ -26,7 +39,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 const THRESHOLDS = { recall: 0.8, convention: 0.8, behavioral: 0.8, precision: 0.85 };
 const TOLERANCE = 5; // lines between a finding and the anchor it is reporting
-const MINIMUMS = { seeded: 18, convention: 12, behavioral: 6, codes: 6, clean: 6 };
+const MINIMUMS = { seeded: 18, convention: 12, behavioral: 6, codes: 6, clean: 6, spec: 1, testFloor: 1 };
+const KINDS = ['convention', 'behavioral', 'spec', 'test-floor'];
 
 const USAGE = `Usage: node bench/review/run.mjs --check-key | --verdicts <file>
 
@@ -137,6 +151,7 @@ export function loadDefects(setDir) {
         trigger: meta.trigger,
         what: meta.what,
         anchor: meta.anchor,
+        names: String(meta.names ?? '').split(',').map((t) => t.trim()).filter(Boolean),
         file,
         line: Number(line),
         ranges: hunkRanges(text),
@@ -152,11 +167,31 @@ export function score({ defects: all, clean, packages }) {
   // A run of one package is measured on that package. Counting the defects
   // nobody dispatched against would make every --only run fail by arithmetic.
   const covered = new Set(packages.map((p) => p.id));
-  const defects = all.filter((d) => covered.has(d.package));
+  const inRun = all.filter((d) => covered.has(d.package));
+  // Two populations, because they are read from two sections of one file.
+  const defects = inRun.filter((d) => d.kind !== 'spec' && d.kind !== 'test-floor');
+  const specDefects = inRun.filter((d) => d.kind === 'spec');
+  const floorDefects = inRun.filter((d) => d.kind === 'test-floor');
+  const unclaimedOf = new Map(packages.map((p) => [p.id, String(p.spec?.unclaimed ?? '')]));
   const cleanFiles = new Set(clean.map((c) => `${c.package}:${c.file}`));
+  // A clean file a seeded patch also edits is clean everywhere **except** on
+  // the lines that patch changed: `clean.json` says its files are "changed
+  // correctly", and that stops being true only there. Keyed on the file it
+  // exempted the whole file and silently cost one of six clean files (review 1,
+  // major 3); keyed on the hunk the set is still six. Found by Stage 12a's
+  // baseline, which scored the reviewer's correct catch of
+  // `t-deleted-list-assertion` as a false positive.
+  const seededHunks = new Map();
+  for (const d of inRun) {
+    const key = `${d.package}:${d.file}`;
+    seededHunks.set(key, [...(seededHunks.get(key) ?? []), ...(d.ranges?.[d.file] ?? [])]);
+  }
+  const seededHere = (pkgId, file, line) =>
+    inRange(seededHunks.get(`${pkgId}:${file}`) ?? [], line);
 
   const anchors = new Map(packages.map((p) => [p.id, p.anchors ?? {}]));
   const found = new Set();
+  const matches = [];
   const miscategorised = [];
   const claimed = new Set();
 
@@ -181,6 +216,7 @@ export function score({ defects: all, clean, packages }) {
         if (exact ? distance !== 0 : distance > TOLERANCE) continue;
         found.add(defect.id);
         claimed.add(key);
+        matches.push({ defect: defect.id, item: finding.item, line: finding.line });
         // Recall measures finding, not labelling: a defect reported at its line
         // is found even where the reviewer files it under the other axis, and
         // the disagreement is a measurement of its own.
@@ -225,7 +261,7 @@ export function score({ defects: all, clean, packages }) {
       else if (!itemed) invalidFindings.push({ ...finding, package: pkg.id, reason: 'no item' });
       else if (behavioral && severe && !triggered) {
         invalidFindings.push({ ...finding, package: pkg.id, reason: 'no trigger' });
-      } else if (cleanFiles.has(`${pkg.id}:${finding.file}`)) {
+      } else if (cleanFiles.has(`${pkg.id}:${finding.file}`) && !seededHere(pkg.id, finding.file, finding.line)) {
         falsePositiveFindings.push({ ...finding, package: pkg.id });
       }
     }
@@ -239,8 +275,47 @@ export function score({ defects: all, clean, packages }) {
   };
   const wrong = invalidFindings.length + falsePositiveFindings.length;
 
+  // A spec defect is found when the Unclaimed word carries every token its
+  // answer key names. The tokens are the thing itself — the member, the path,
+  // the clause — so this matches on a name and never on the wording around it.
+  const specFound = specDefects.filter((d) => {
+    const text = unclaimedOf.get(d.package) ?? '';
+    return d.names.length > 0 && d.names.every((token) => text.includes(token));
+  });
+  const specIds = new Set(specFound.map((d) => d.id));
+
+  // A test-floor defect has no section of its own, because at the baseline the
+  // reviewer has no instruction to file it under (decision 0121). The net is the
+  // three places one could land — a Standards row, a Spec word, the Coverage
+  // line — and it is fixed here **before** the baseline runs, because the
+  // measurement the mechanism is bought on and the one it is scored by
+  // afterwards compare only if the net does not move between them.
+  const floorTextOf = (pkgId) => {
+    const p = packages.find((x) => x.id === pkgId);
+    if (!p) return '';
+    const rows = (p.findings ?? []).map((f) => [f.location, f.item, f.finding, f.fix].join(' '));
+    const spec = Object.values(p.spec ?? {}).filter(Boolean);
+    return [...rows, ...spec, p.coverage ?? ''].join(' ');
+  };
+  const floorFound = floorDefects.filter((d) => {
+    const text = floorTextOf(d.package);
+    return d.names.length > 0 && d.names.every((token) => text.includes(token));
+  });
+  const floorIds = new Set(floorFound.map((d) => d.id));
+
   return {
     packages: [...covered].sort(),
+    spec: {
+      total: specDefects.length,
+      found: specFound.length,
+      rate: specDefects.length === 0 ? 1 : specFound.length / specDefects.length,
+      entries: packages.filter((p) => String(p.spec?.unclaimed ?? '').trim() !== '').length,
+    },
+    testFloor: {
+      total: floorDefects.length,
+      found: floorFound.length,
+      rate: floorDefects.length === 0 ? 1 : floorFound.length / floorDefects.length,
+    },
     recall: {
       overall: { total: defects.length, found: found.size, rate: rate(found.size, defects.length) },
       convention: kindRecall('convention'),
@@ -253,15 +328,24 @@ export function score({ defects: all, clean, packages }) {
       absences,
       value: total === 0 ? 1 : (total - wrong) / total,
     },
-    missed: defects.filter((d) => !found.has(d.id)).map((d) => d.id),
+    missed: [
+      ...defects.filter((d) => !found.has(d.id)),
+      ...specDefects.filter((d) => !specIds.has(d.id)),
+      ...floorDefects.filter((d) => !floorIds.has(d.id)),
+    ].map((d) => d.id),
     miscategorised,
+    matches,
     invalidFindings,
     falsePositiveFindings,
   };
 }
 
-/** Every way a patch can disagree with itself, or the set with its contract. */
-export function checkKey(setDir) {
+/**
+ * Every way a patch can disagree with itself, or the set with its contract.
+ * `minimums: null` checks the patches and skips the set's size contract: the
+ * hold-out set (decision 0154) has no convention class and no gate to size.
+ */
+export function checkKey(setDir, { minimums = MINIMUMS } = {}) {
   const defects = loadDefects(setDir);
   const problems = [];
   const say = (id, text) => problems.push(`${id}: ${text}`);
@@ -270,11 +354,30 @@ export function checkKey(setDir) {
     for (const key of ['package', 'fixture', 'kind', 'item', 'file', 'what']) {
       if (!d[key]) say(d.id, `the header has no ${key}`);
     }
-    if (d.kind !== 'convention' && d.kind !== 'behavioral') say(d.id, `kind ${d.kind} is not convention or behavioral`);
-    else if (kindOfItem(d.item) !== d.kind) say(d.id, `item "${d.item}" reads as ${kindOfItem(d.item)}, not ${d.kind}`);
+    if (!KINDS.includes(d.kind)) say(d.id, `kind ${d.kind} is not one of ${KINDS.join(', ')}`);
+    else if (d.kind === 'spec') {
+      // The Spec section has no severity column and no item vocabulary: the
+      // word itself is the item, and the tokens are what makes the row
+      // checkable without reading the reviewer's prose for intent.
+      if (d.item !== 'Unclaimed') say(d.id, `a spec defect's item is Unclaimed, not "${d.item}"`);
+      if (d.names.length === 0) say(d.id, 'a spec defect names the tokens its Unclaimed row must carry: names: <token>[, <token>]');
+    } else if (d.kind === 'test-floor') {
+      // A deletion adds no line, so there is nothing for an anchor to be and
+      // nothing for a five-line window to be measured against: this kind is
+      // matched on its tokens, like `spec`, and for the same reason.
+      if (d.item !== 'Removed test') say(d.id, `a test-floor defect's item is Removed test, not "${d.item}"`);
+      if (d.names.length === 0) say(d.id, 'a test-floor defect names the tokens a review has to carry: names: <token>[, <token>]');
+    } else if (kindOfItem(d.item) !== d.kind) say(d.id, `item "${d.item}" reads as ${kindOfItem(d.item)}, not ${d.kind}`);
     const hasTrigger = Boolean(d.trigger) && d.trigger !== '—';
     if (d.kind === 'behavioral' && !hasTrigger) say(d.id, 'a behavioral defect states its trigger');
-    if (d.kind === 'convention' && hasTrigger) say(d.id, 'a convention defect carries the trigger —, its location is its instance');
+    if (d.kind !== 'behavioral' && hasTrigger) say(d.id, `a ${d.kind} defect carries the trigger —, its location is its instance`);
+    // A `test-floor` patch has no line and no anchor to check, but `d.file` is
+    // what the clean-file narrowing at `score` keys on, so the patch must still
+    // be shown to change the file its `# line:` names.
+    if (d.kind === 'test-floor') {
+      if (!d.ranges[d.file]) say(d.id, `the patch does not change ${d.file}`);
+      continue;
+    }
     if (!Number.isInteger(d.line)) say(d.id, `line "${d.line}" is not a line`);
     else if (!d.ranges[d.file]) say(d.id, `the patch does not change ${d.file}`);
     else if (!inRange(d.ranges[d.file], d.line)) say(d.id, `line ${d.line} is outside every hunk this patch changes`);
@@ -315,22 +418,28 @@ export function checkKey(setDir) {
 
   const convention = defects.filter((d) => d.kind === 'convention').length;
   const behavioral = defects.filter((d) => d.kind === 'behavioral').length;
+  const spec = defects.filter((d) => d.kind === 'spec').length;
+  const testFloor = defects.filter((d) => d.kind === 'test-floor').length;
   const codes = new Set(defects.filter((d) => d.kind === 'behavioral').map((d) => d.item.split(/\s+/)[0]));
-  if (defects.length < MINIMUMS.seeded) problems.push(`the set holds ${defects.length} patches, fewer than ${MINIMUMS.seeded}`);
-  if (convention < MINIMUMS.convention) problems.push(`${convention} convention defects, fewer than ${MINIMUMS.convention}`);
-  if (behavioral < MINIMUMS.behavioral) problems.push(`${behavioral} behavioral defects, fewer than ${MINIMUMS.behavioral}`);
-  if (codes.size < MINIMUMS.codes) problems.push(`${codes.size} distinct L codes, fewer than ${MINIMUMS.codes}`);
-  if (clean.length < MINIMUMS.clean) problems.push(`${clean.length} clean files, fewer than ${MINIMUMS.clean}`);
+  if (minimums !== null) {
+    if (defects.length < minimums.seeded) problems.push(`the set holds ${defects.length} patches, fewer than ${minimums.seeded}`);
+    if (convention < minimums.convention) problems.push(`${convention} convention defects, fewer than ${minimums.convention}`);
+    if (behavioral < minimums.behavioral) problems.push(`${behavioral} behavioral defects, fewer than ${minimums.behavioral}`);
+    if (spec < minimums.spec) problems.push(`${spec} spec defects, fewer than ${minimums.spec}`);
+    if (testFloor < minimums.testFloor) problems.push(`${testFloor} test-floor defects, fewer than ${minimums.testFloor}`);
+    if (codes.size < minimums.codes) problems.push(`${codes.size} distinct L codes, fewer than ${minimums.codes}`);
+    if (clean.length < minimums.clean) problems.push(`${clean.length} clean files, fewer than ${minimums.clean}`);
+  }
 
   return {
     problems,
-    shape: `${defects.length} seeded · ${convention} convention · ${behavioral} behavioral · ${codes.size} distinct L codes · ${clean.length} clean files · ${packages.length} packages`,
+    shape: `${defects.length} seeded · ${convention} convention · ${behavioral} behavioral · ${spec} spec · ${testFloor} test-floor · ${codes.size} distinct L codes · ${clean.length} clean files · ${packages.length} packages`,
   };
 }
 
 const pct = (value) => `${(value * 100).toFixed(1)}%`;
 
-function report(result) {
+export function report(result) {
   const rows = [
     ['recall, overall', result.recall.overall, THRESHOLDS.recall],
     ['recall, convention', result.recall.convention, THRESHOLDS.convention],
@@ -346,6 +455,16 @@ function report(result) {
   lines.push(
     `| precision | ${p.findings - p.invalid - p.falsePositives}/${p.findings} | ${pct(p.value)} | ${pct(THRESHOLDS.precision)} | ${p.value >= THRESHOLDS.precision ? 'PASS' : 'FAIL'} |`,
   );
+  if (result.spec.total > 0) {
+    lines.push(
+      `| recall, spec | ${result.spec.found}/${result.spec.total} | ${pct(result.spec.rate)} | — | measurement |`,
+    );
+  }
+  if (result.testFloor.total > 0) {
+    lines.push(
+      `| recall, test-floor | ${result.testFloor.found}/${result.testFloor.total} | ${pct(result.testFloor.rate)} | — | measurement |`,
+    );
+  }
   return lines.join('\n');
 }
 
@@ -383,6 +502,21 @@ export function buildReport(result, measured) {
       wrong: result.precision.invalid + result.precision.falsePositives,
     }),
   ];
+  if (result.spec.total > 0) {
+    metrics.push(measurement('recall, spec', {
+      value: result.spec.rate,
+      found: result.spec.found,
+      total: result.spec.total,
+      entries: result.spec.entries,
+    }));
+  }
+  if (result.testFloor.total > 0) {
+    metrics.push(measurement('recall, test-floor', {
+      value: result.testFloor.rate,
+      found: result.testFloor.found,
+      total: result.testFloor.total,
+    }));
+  }
   if (measured) {
     if (typeof measured.dispatches === 'number') {
       metrics.push(measurement('dispatches', { value: measured.dispatches, unit: 'dispatches' }));

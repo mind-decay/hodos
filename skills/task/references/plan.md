@@ -15,7 +15,7 @@ Map the design as a tree. The **frontier** is every decision whose prerequisites
 Each round:
 
 1. Compute the frontier.
-2. Ask it in one message, numbered, each question with a **recommended answer** and the one line that makes it right. A question without a recommendation asks the developer to do the design.
+2. Ask it through `AskUserQuestion`, up to four questions per call, each with the **recommended answer** as its first option marked *(Recommended)* and the one line that makes it right. A frontier of more than four is consecutive calls in the same turn; an answer the options do not hold arrives through *Other* (decision **0178**). A question without a recommendation asks the developer to do the design.
 3. Facts in the frontier are not asked — they are dispatched (`references/research.md`) while the developer answers the decisions.
 4. Wait. Then recompute: an answer settles prerequisites and opens the next layer.
 
@@ -41,8 +41,16 @@ Acceptance: renders totals from a fixed fixture; loading and error states visibl
 ```
 
 - **Files** — what it opens, tests included. A task with no files named is a task nobody sized.
-- **Acceptance** — written before any code and checkable by someone who did not write it: a command, an observable state, a fixture. "Works" is not an acceptance criterion; neither is "is clean".
+- **Acceptance** — written before any code and checkable by someone who did not write it: a command, an observable state, a fixture. "Works" is not an acceptance criterion; neither is "is clean". A clause that compares a number — *no regression*, *not slower*, *within* — names its statistic and its tolerance now, before the numbers exist: `p95 of the list route over seven runs ≤ the base's p95 + 15 %`. A bare *no regression against the base* fails on a difference inside the base's own run-to-run noise (decision **0177**).
 - **Order** — a task depends only on tasks above it.
+
+**The claim set is derived, not remembered** (decision **0092**). An `Acceptance:` clause is what the verifier runs, so the clauses are read off the plan's own contract rather than off what the task felt like claiming. Three rules, applied to each task before its clause is written:
+
+1. **The contract field yields claims by clause kind.** `### Invariants & failure modes` is the input: every **postcondition** in it is one claim; every **invariant** is one property — a claim that holds over inputs rather than for one of them; every **precondition** is one negative claim, naming the call that violates it and what happens instead. A field with no clause of a kind yields no claim of it, and a field that yields none at all is a design section that says nothing about behavior.
+2. **Every member of a typed state the tasks touch is a claim.** A union, an enum, a discriminated status: one claim per member, whichever member the feature was designed around. A state that is **not** a type — three booleans, a nullable string standing for four cases — cannot be enumerated by anyone reading the code, so the plan enumerates it by hand and says so in one line: `States: idle | loading | error | empty — not a type; enumerated by hand.` That line is what the review checks the claims against.
+3. **A task that adds a branch claims its failure path.** The `catch`, the `else`, the early return, the timeout: the path taken when the thing the branch guards against actually happens. A branch whose failure path no claim names is the path that ships unexercised.
+
+The rules produce claims, never tasks. A derived claim no recipe covers is §5's problem and is written there.
 
 **Blast radius, before the file lists are written.** `config.adapters.codeIndex` names an adapter → one `codeIndex.blastRadius` per symbol the tasks change. It answers in two lists and they sort differently: every `must_touch` path belongs in the `Files:` of the task that changes that symbol, and every `may_touch` path belongs there too or in `## Non-goals` with the reason it is out (decision **0091**). `null` → `Skip: codeIndex unavailable`, and the file lists rest on the research answers and Grep. A result of nothing is read as nothing only after a Grep agrees: the index covers one project root, a sibling workspace of a monorepo is outside it, and a page carrying a cursor is not the whole answer.
 
@@ -89,6 +97,14 @@ Map every acceptance claim to a recipe from `config.verify.recipes` by name:
 - unit: T1, T2 tests (recipe `unit`)
 - ui: /orders — loading, totals, error (recipe `ui`)
 ```
+
+A claim that rests on a **data state** names the layer that provides it (decision **0099**):
+
+```
+- ui: /orders with three overdue orders — the badge and the empty state (recipe `ui`, layer `seed-overdue`)
+```
+
+The layer is one of `config.verify.layers`, raised by `env.mjs up` before the verifier is dispatched, and a seed is a layer like any other: `up` seeds, `check` proves the state, `stop` resets it. A claim that needs a state no layer provides is a missing layer — say so, it is an `init` finding, the way a missing recipe is.
 
 A claim no recipe covers is either a missing recipe — say so, it is an `init` finding — or a claim nobody can check, which is a task whose acceptance criterion needs rewriting. `perf` recipes run only when the plan declares them here.
 
@@ -139,11 +155,11 @@ Fold each gap: a gap is a change to the plan, or a line saying why the plan is r
 
 ## Completion
 
-The frontier is empty, the ten design fields are non-empty, every task has files and an acceptance criterion, every acceptance claim maps to a recipe, `## Open questions` is empty, and `lint.mjs --project` exits 0 on the plan. Approval itself is the kernel's step 8.
+The frontier is empty, the ten design fields are non-empty, every task has files and an acceptance criterion **derived by the three rules of §3**, every acceptance claim maps to a recipe and — where it rests on a data state — to a layer, `## Open questions` is empty, and `lint.mjs --project` exits 0 on the plan. Approval itself is the kernel's step 8.
 
 ## Anti-pattern
 
-A plan with "TBD". A task whose acceptance criterion is "works". An exemption reason invented outside the four. Asking one question, waiting, asking the next — a round is the whole frontier. Answering a frontier question yourself because the recommendation is obvious: the recommendation is what you contribute, the choice is what the developer contributes.
+A plan with "TBD". A task whose acceptance criterion is "works". A claim set that is the happy path: the union's other two members, the `catch` and the precondition were in the design section, and the clause that omits them is what the verifier will not run. An exemption reason invented outside the four. Asking one question, waiting, asking the next — a round is the whole frontier. Answering a frontier question yourself because the recommendation is obvious: the recommendation is what you contribute, the choice is what the developer contributes.
 
 ## Bound
 

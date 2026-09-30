@@ -1,0 +1,19 @@
+{
+  "runAt": "2026-09-29T21:44:52.355Z",
+  "dispatches": 2,
+  "cost": 2.0950192,
+  "turns": [
+    {
+      "id": "h1",
+      "turns": 2,
+      "seconds": 226,
+      "cost": 0.7253404
+    },
+    {
+      "id": "pilot-outline",
+      "turns": 2,
+      "seconds": 400,
+      "cost": 1.3696788
+    }
+  ]
+}

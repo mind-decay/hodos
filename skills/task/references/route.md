@@ -31,6 +31,8 @@ A description asking "why does X happen" that ends in a fix is a `bug`, not a `q
 
 **A shape, not a type.** A `refactor` is **mechanical** when row 1 is above the `quick` limit *and* every touched file takes the same edit — one transformation statable as a single rule. It is not a path and not a type: the verdict rules are unchanged and rule 3 still sends it to `deep` on width. Write `Shape: mechanical` under the verdict in `brief.md` and name the transformation in one sentence; `execute` reads it and builds a codemod instead of forty hand edits.
 
+A `quick` verdict of type `feature` or `refactor` is **inert** when every line the change edits is text no program reads to decide anything: a comment, documentation, a message only a human reads, or whitespace (`FORMATS.md §3`, decision **0183**). A message a test or a caller matches by content is behaviour. The evidence is the read of the lines the change edits, plus, for a message, a Grep for its text in the tests and the callers, and both fit in the five calls. A shape the budget did not reach is not claimed, because the burden of proof is on the lighter path. Write `Shape: inert` under the verdict in `brief.md`, as for `mechanical`. The shape sends the task to `references/inert.md`: one session, one reviewer, no verifier.
+
 ## 3. The nine rows
 
 Fill every row of `FORMATS.md §3`. Each carries evidence — what you looked at — or the literal `unknown`. `unknown` is an honest answer with a cost: rules 2 and 4 below read it as weight, so the checklist you could not fill routes heavier, which is the point.
@@ -82,7 +84,7 @@ An `unknown` row 1 is not a count above rule 3's limit: rule 4 is what reaches i
 
 ## 5. Print, then ask
 
-Print the checklist and the verdict before asking anything. The developer confirms against what you saw, not against a conclusion:
+Print the checklist and the verdict before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:
 
 ```
 | Row | Evidence | Value |
@@ -97,12 +99,14 @@ Campaign: no — rows 6–9
 
 Then `AskUserQuestion`: the proposed path and type as the first option, each real alternative as its own option with the one line that would make it right ("deep, if the summary endpoint is a new contract rather than a query on the existing one"). The developer's override is recorded in `brief.md` as `Confirmed by user: overrode to <path>`.
 
+**An inert verdict is one stop for two things.** Print `Shape: inert — <which lines, and why no program reads them>` under the verdict, then the short plan, in the same text above the question: the files, the edit, and the commit subject. The question's first option confirms all three together. `quick` with the full kernel is always one of the alternatives. This single answer is both the router verdict and the plan approval of `DESIGN.md §4.4`. `references/inert.md` is read after the answer, on entering step 2i, and not before the question.
+
 ## 6. Open the task
 
 Every verdict but `campaign`, which opens no task — §8.
 
 1. Slug: kebab-case ASCII, ≤40 characters, from the ticket key when there is one, otherwise from the intent. `ledger.mjs init` normalizes it and appends `-2` on collision, then prints the slug it used — that printed slug is the one every later step passes.
-2. `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs init <slug> --path <path> --type <type>`, plus `--campaign <campaign>/<node>` when the argument was a node.
+2. `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs init <slug> --path <path> --type <type>`, plus `--shape <inert|mechanical>` when the confirmed verdict carries one, and `--campaign <campaign>/<node>` when the argument was a node.
 3. Write `.claude/hodos/tasks/<slug>/brief.md` — the printed table and verdict block, with the prompt above them:
 
    ```markdown
@@ -121,7 +125,7 @@ Every verdict but `campaign`, which opens no task — §8.
    ```
 
    An override is `Confirmed by user: overrode to <path>`. For a `bug`, the red-loop candidates of §7 go under the verdict.
-4. A path the developer changed at confirmation is also a ledger line: `ledger.mjs add "Route: <path> <type>"`.
+4. A path or a shape the developer changed at confirmation is also a ledger line: `ledger.mjs add "Route: <path> <type> [<shape>]"`. A `Route:` line with no shape clears it.
 
 ## 7. `bug` — the red loop
 
@@ -142,7 +146,7 @@ Rule 1 fired: the work is a map, not a task, and no task is opened for it: `ledg
 
 ## Completion
 
-Nine rows with evidence or `unknown`, a verdict the rules produce from those rows, the developer's confirmation, `brief.md` on disk, and `ledger.mjs init` run. On a campaign verdict this phase writes nothing: the confirmed verdict is what step 3 carries into the `campaign` skill. The verdict was reached in ≤5 evidence calls.
+Nine rows with evidence or `unknown`, a verdict the rules produce from those rows, the developer's confirmation, `brief.md` on disk, and `ledger.mjs init` run. On an inert verdict, the confirmation also covers the short plan. On a campaign verdict this phase writes nothing: the confirmed verdict is what step 3 carries into the `campaign` skill. The verdict was reached in ≤5 evidence calls.
 
 ## Anti-pattern
 

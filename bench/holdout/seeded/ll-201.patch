@@ -1,0 +1,29 @@
+# id: ll-201
+# fixture: snippets
+# package: h1
+# kind: behavioral
+# item: L8
+# line: storage/uploader.py:6
+# anchor: return None  # nothing to upload
+# trigger: Should identify L8 (Resource Lifecycle Hazard): the connection acquired by client.connect() is leaked on at least three paths. (1) Empty-data early return at line 'return None # nothing to upload' — conn is never closed. (2) UploadError exception handler returns None — conn is never closed. (3) Any non-UploadError exception inside upload() (or the open() call earlier) propagates without closing co
+# what: logic-lens case #201 (logic-review-resource-leak-on-exception), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/storage/uploader.py b/storage/uploader.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/storage/uploader.py
+@@ -0,0 +1,13 @@
++# storage/uploader.py
++def upload_blob(path, client):
++    conn = client.connect()
++    data = open(path, 'rb').read()
++    if not data:
++        return None  # nothing to upload
++    try:
++        result = conn.upload(data)
++    except UploadError as e:
++        log.error(f'upload failed: {e}')
++        return None
++    conn.close()
++    return result

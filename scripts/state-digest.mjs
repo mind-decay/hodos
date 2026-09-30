@@ -11,12 +11,12 @@
 // The digest states, never instructs: it is context, and a hook that tells the
 // model what to do fires in sessions that have nothing to do with hodos.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { crossRepoReason, findMaps, formatFrontier, frontier, parseMap, shortCounts } from './campaigns.mjs';
+import { claimsOnRefs, findMaps, formatFrontier, frontier, parseMap, refsOf, shortCounts } from './campaigns.mjs';
 import { activeTask, findConfig } from './config.mjs';
 import { anchors, barePaths, citations, verifyAnchors, verifyFile } from './verify-citations.mjs';
 
@@ -24,6 +24,7 @@ const TOKEN_CAP = 300; // AUTHORING.md §7
 const CHARS_PER_TOKEN = 4;
 const CHAR_CAP = TOKEN_CAP * CHARS_PER_TOKEN;
 const DEFAULT_STALE_DAYS = 14;
+const FETCH_TIMEOUT_MS = 5000; // decision 0138
 
 const USAGE = `Usage: node scripts/state-digest.mjs [--full|--compact]
 
@@ -33,6 +34,10 @@ Prints the hodos state of the current project as context (FORMATS.md §12).
   --full      the same content with no cap, for /hodos:status.
   --compact   the active task's ledger path and the resume line, for
               SessionStart(compact).
+  --fetch     before reading the maps, git fetch --no-tags --quiet in each
+              repository one lives in, so a claim made on another branch is
+              seen. Refs only, ${FETCH_TIMEOUT_MS / 1000} seconds, failing
+              open. Passed by /hodos:status and by no hook (decision 0080).
   --help      print this and exit 0.
 
 With no config, prints nothing. Exit codes: 0 — always; 2 — bad invocation.`;
@@ -77,19 +82,68 @@ function tasks(projectRoot) {
  * is worth. A map that cannot be parsed drops out silently: the digest is
  * context, and a broken file in it must not cost the session its state.
  */
-function campaigns(projectRoot, config) {
+/**
+ * The one network call the engine makes (decisions 0080, 0138). It runs in the
+ * repository each map lives in, updates remote-tracking refs and nothing else,
+ * is bounded by `FETCH_TIMEOUT_MS`, and its failure is a line rather than an
+ * error: a timeout, a missing remote and a credential prompt all leave the
+ * local map to be reported as it stands. Only `/hodos:status` asks for it — a
+ * hook that reached the network on every session start would be a cost every
+ * session paid for a number most sessions do not read.
+ */
+export function fetchRepos(roots) {
+  const failed = [];
+  for (const root of roots) {
+    // A repository with no remote is one of the three cases decision 0080
+    // names, and `git fetch` exits 0 there — it has nothing to fetch from, so
+    // the map is as of the last pull in the strongest sense.
+    const remotes = spawnSync('git', ['remote'], {
+      cwd: root,
+      timeout: FETCH_TIMEOUT_MS,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const named = !remotes.error && remotes.status === 0 && (remotes.stdout ?? '').trim() !== '';
+    const run = named
+      ? spawnSync('git', ['fetch', '--no-tags', '--quiet'], {
+        cwd: root,
+        timeout: FETCH_TIMEOUT_MS,
+        encoding: 'utf8',
+        stdio: ['ignore', 'ignore', 'ignore'],
+      })
+      : null;
+    if (run === null || run.error || run.status !== 0) failed.push(basename(root));
+  }
+  return failed;
+}
+
+function campaigns(projectRoot, config, { fetch = false } = {}) {
   const out = [];
-  for (const entry of findMaps(projectRoot)) {
+  // One ref list per repository, however many maps it holds: the digest runs on
+  // the SessionStart budget, and the claims of two maps in one repository are
+  // read from the same refs (decision 0135). Local git only — the fetch is
+  // `/hodos:status`'s alone (decision 0080).
+  const refs = new Map();
+  // The config is handed over rather than re-read: it also carries
+  // `campaigns.external[]`, which is half of where the maps are (Stage 9b).
+  const entries = findMaps(projectRoot, config);
+  const roots = [...new Set(entries.map((entry) => entry.root).filter(Boolean))];
+  const failed = fetch ? fetchRepos(roots) : [];
+  for (const entry of entries) {
     try {
       const map = parseMap(readFileSync(entry.path, 'utf8'));
-      const reason = crossRepoReason(map, config);
-      if (reason) out.push({ slug: entry.slug, stage9b: true });
-      else out.push({ slug: entry.slug, f: frontier(map), names: new Set(map.nodes.map((n) => n.name)) });
+      if (!refs.has(entry.root)) refs.set(entry.root, refsOf(entry.root));
+      const claims = claimsOnRefs(entry.path, { root: entry.root, refs: refs.get(entry.root) });
+      out.push({
+        slug: entry.slug,
+        f: frontier(map, { claims }),
+        names: new Set(map.nodes.map((n) => n.name)),
+      });
     } catch {
       // not a map this version can read
     }
   }
-  return out;
+  return { maps: out, failed };
 }
 
 /**
@@ -164,10 +218,15 @@ function reviewOffer(projectRoot, all) {
   return `- offer: review — ${branch} is ${commits} ahead of ${upstream} with no hodos task — /hodos:review ${branch}`;
 }
 
-/** Priority 2: a stale task, and the third verb its own row does not carry. */
+/**
+ * Priority 2: a stale task, and the third verb its own row does not carry. A
+ * task at `done` is stale by age and not open, which is what the offer says;
+ * its directory is still named by the stale row, whose "fold or delete" is the
+ * action it needs (decision 0179).
+ */
 function handoffOffer(stale) {
-  if (stale.length === 0) return null;
-  const t = stale[0];
+  const t = stale.find((task) => task.state.phase !== 'done');
+  if (!t) return null;
   return `- offer: handoff — ${t.slug} has been open ${t.ageDays} days — /hodos:handoff ${t.slug}`;
 }
 
@@ -264,7 +323,7 @@ function decayRow(projectRoot, config) {
   return `- decay: ${paths} renamed or deleted since the scan (${sha.slice(0, 7)}) — /hodos:init --refresh`;
 }
 
-export function digest(found, { full = false } = {}) {
+export function digest(found, { full = false, fetch = false } = {}) {
   if (found.notFound) return '';
   const { config, projectRoot } = found;
   const staleDays = config.tasks?.staleDays ?? DEFAULT_STALE_DAYS;
@@ -273,7 +332,7 @@ export function digest(found, { full = false } = {}) {
   const stale = all.filter((t) => t.ageDays >= staleDays);
   const active = all.filter((t) => !stale.includes(t) && t.state.phase !== 'done');
 
-  const maps = campaigns(projectRoot, config);
+  const { maps, failed } = campaigns(projectRoot, config, { fetch });
   const counts = [
     `${active.length} active task${active.length === 1 ? '' : 's'}`,
     stale.length > 0 ? `${stale.length} stale task${stale.length === 1 ? '' : 's'}` : null,
@@ -287,10 +346,10 @@ export function digest(found, { full = false } = {}) {
       (t) => `- ${t.slug} [${t.state.phase}] last: "${t.state.lastEvent ?? '—'}" — resume with /hodos:run ${t.slug}`,
     ),
     ...stale.map((t) => `- stale: ${t.slug} (${t.ageDays} days) — /hodos:status to fold or delete`),
+    // Before the campaign row, because it is what says how fresh that row is.
+    ...failed.map((name) => `- fetch failed — the map is as of your last pull (${name})`),
     maps.length > 0
-      ? `- campaigns: ${maps
-          .map((m) => (m.stage9b ? `${m.slug} — cross-repository (Stage 9b)` : `${m.slug} — frontier ${shortCounts(m.f)}`))
-          .join(' · ')}`
+      ? `- campaigns: ${maps.map((m) => `${m.slug} — frontier ${shortCounts(m.f)}`).join(' · ')}`
       : null,
     decayRow(projectRoot, config),
     // Last, so the cap drops it before it drops a row of state (FORMATS.md §12).
@@ -300,9 +359,7 @@ export function digest(found, { full = false } = {}) {
   if (full) {
     // The rows are a list and stay one per line; each map's frontier is a block
     // of its own, so `status` can read them apart at a glance.
-    const blocks = maps
-      .filter((m) => !m.stage9b)
-      .map((m) => formatFrontier(m.slug, m.f, { byName: m.names }));
+    const blocks = maps.map((m) => formatFrontier(m.slug, m.f, { byName: m.names }));
     return [[header, ...rows].join('\n'), ...blocks].join('\n\n');
   }
 
@@ -326,8 +383,8 @@ export function digest(found, { full = false } = {}) {
 // sessions/<id> first (decision 0047). The id comes from the environment
 // rather than a hook payload because this script is also the `!` injection of
 // every kernel, where stdin belongs to the shell — a blocking read there would
-// abort the invocation at turn 0 (PLATFORM-NOTES.md fact 14). With no id it
-// falls back to `active`, which is what it always read.
+// abort the invocation at turn 0 (PLATFORM-NOTES.md fact 14). With no pointer
+// of its own it reads `active` only while no session holds one (decision 0171).
 export function compactLine(found) {
   if (found.notFound) return '';
   const slug = activeTask(found.projectRoot);
@@ -340,12 +397,14 @@ export function compactLine(found) {
 
 function main(argv) {
   let mode = 'bare';
+  let fetch = false;
   for (const arg of argv) {
     if (arg === '--help' || arg === '-h') {
       process.stdout.write(`${USAGE}\n`);
       return 0;
     }
     if (arg === '--full' || arg === '--compact') mode = arg.slice(2);
+    else if (arg === '--fetch') fetch = true;
     else {
       process.stderr.write(`state-digest: unknown option: ${arg}\n${USAGE}\n`);
       return 2;
@@ -353,7 +412,7 @@ function main(argv) {
   }
 
   const found = findConfig(process.cwd());
-  const text = mode === 'compact' ? compactLine(found) : digest(found, { full: mode === 'full' });
+  const text = mode === 'compact' ? compactLine(found) : digest(found, { full: mode === 'full', fetch });
   if (text !== '') process.stdout.write(`${text}\n`);
   return 0;
 }

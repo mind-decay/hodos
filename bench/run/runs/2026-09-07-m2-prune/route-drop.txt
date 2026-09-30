@@ -1,0 +1,3 @@
+1e80b1d refactor: drop the landing route; the order list is the entry point
+ src/App.tsx | 2 --
+ 1 file changed, 2 deletions(-)

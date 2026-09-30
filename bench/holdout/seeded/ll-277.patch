@@ -1,0 +1,38 @@
+# id: ll-277
+# fixture: snippets
+# package: h6
+# kind: behavioral
+# item: L7
+# line: sync/Buffer.java:16
+# anchor: if (!ready) {
+# trigger: L7/OV Critical: classic Order-Violation pattern (Lu et al. 2008). Two defects: (1) `lock.wait()` guarded by `if (!ready)` instead of `while (!ready)` — Java permits SPURIOUS WAKEUPS, so a wait can return without anyone calling notify; the consumer then reads payload while ready is still false. The Java specification explicitly requires the loop idiom. (2) `lock.notify()` wakes only ONE waiter; if 
+# what: logic-lens case #277 (lu2008-style-wait-without-loop-OV-L7), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/sync/Buffer.java b/sync/Buffer.java
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/sync/Buffer.java
+@@ -0,0 +1,22 @@
++public class Buffer {
++    private final Object lock = new Object();
++    private boolean ready = false;
++    private String payload;
++
++    public void produce(String p) {
++        synchronized (lock) {
++            payload = p;
++            ready = true;
++            lock.notify();
++        }
++    }
++
++    public String consume() throws InterruptedException {
++        synchronized (lock) {
++            if (!ready) {
++                lock.wait();
++            }
++            return payload;
++        }
++    }
++}

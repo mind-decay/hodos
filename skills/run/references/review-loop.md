@@ -4,11 +4,11 @@
 
 ## 1. Inputs and outputs
 
-**Reads.** `state.json` for `review.iteration`, `base` and `lastCommit`; `review.md` when the reviewer has written one; `config.models.review`, `config.commands`; the files a finding names, at the lines it names. The package's `## Projects` section is the reviewer's to read: the script writes it, this session does not compute it.
+**Reads.** `state.json` for `review.iteration`, `base` and `lastCommit`; `plan.md`, for the clause a `Gap:` amends; `review.md` when the reviewer has written one; `config.models.review`, `config.commands`; the files a finding names, at the lines it names. The package's `## Projects` section is the reviewer's to read: the script writes it, this session does not compute it.
 
-**Writes.** `review-input.md`, through the script. One commit per fix pass. The ledger lines below, each through `ledger.mjs`.
+**Writes.** `review-input.md`, through the script. One commit per fix pass. The ledger lines below, each through `ledger.mjs`. An `Acceptance:` clause in `plan.md`, rewritten where a `Gap:` resolution contradicts it, the old one kept below (decision **0176**).
 
-**Entered** at phase `review` — the ledger holds `Simplify: done` — or at phase `fix`, where the open findings of the last verdict are the work.
+**Entered** at phase `review` — the ledger holds `Simplify: done` — or at phase `fix`, where the open findings of the last verdict are the work. An `inert` task, which has no simplify pass, enters straight after its last `Task <n>: done` (`skills/task/references/inert.md`, decision **0183**).
 
 **The diff is not read here.** The package is written by a script and read by a fresh agent; this session's read of the code is the files the findings name. A session that has argued its way through the diff defends it, which is the whole reason the review is a dispatch.
 
@@ -49,7 +49,7 @@ Read `review.md`: the header line and the two tables. Then record it:
 node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Review <k>: <ACCEPT|NEEDS_WORK|REJECT> <b>/<m>/<mi>"
 ```
 
-`ACCEPT` moves the phase to `verify` and this reference is done. Any other verdict moves it to `fix` and §5 runs.
+`ACCEPT` moves the phase to `verify` and this reference is done — on an `inert` task, to `finish`, because the shape has no verifier. Any other verdict moves it to `fix` and §5 runs.
 
 A reviewer that reached its turn bound comes back with **no** verdict line and no `review.md`. Say so, name the bound, and stop — there is nothing to record, and a resumed agent is a second opinion from a context this session cannot audit (decision 0044).
 
@@ -79,7 +79,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Fix <k>: done" --sha <sha>
 node ${CLAUDE_PLUGIN_ROOT}/scripts/review-package.mjs <slug> --since <fix-sha>
 ```
 
-`<fix-sha>` is the commit *before* the fix pass, so the package holds the fix diff and the previous findings table and nothing that was already judged. Read it from the ledger, not from memory: it is the sha on the last `Simplify: done (<sha>, …)` or `Task <n>: done (<sha>)` line above the `Review 1:` line. A session resumed at the fix phase has the ledger and not the value `state.lastCommit` held an hour ago.
+`<fix-sha>` is the commit *before* the fix pass, so the package holds the fix diff, and the previous review's Spec section and findings table (decision **0175**), and nothing that was already judged. Read it from the ledger, not from memory: it is the sha on the last `Simplify: done (<sha>, …)` or `Task <n>: done (<sha>)` line above the `Review 1:` line. A session resumed at the fix phase has the ledger and not the value `state.lastCommit` held an hour ago.
 
 Dispatch a fresh `hodos-reviewer` on it, the same way. Record the verdict the same way. `ACCEPT` ends the loop.
 
@@ -99,7 +99,7 @@ Any verdict other than `ACCEPT` after iteration 2 — `REJECT` and `NEEDS_WORK` 
 node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Breaker: review — <accept|manual|rollback T<n>>"
 ```
 
-The line is what moves the phase: `accept` → `verify`, `manual` → `manual`, `rollback` → `execute` at task N.
+The line is what moves the phase: `accept` → `verify`, or `finish` on an `inert` task, `manual` → `manual`, `rollback` → `execute` at task N.
 
 ## 8. Completion
 

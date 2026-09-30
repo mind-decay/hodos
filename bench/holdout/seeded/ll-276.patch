@@ -1,0 +1,34 @@
+# id: ll-276
+# fixture: snippets
+# package: h6
+# kind: behavioral
+# item: L7
+# line: config/ConfigCache.java:9
+# anchor: instance = new ConfigCache();
+# trigger: L7/AV Critical: classic broken double-checked locking pattern (Lu et al. 2008 atomicity-violation family). Two defects: (1) `instance` field is not `volatile` — under JMM (Java Memory Model), thread B can observe `instance != null` in the unsynchronized first check while still seeing `data == null` because the constructor stores can be reordered AFTER the publish of `instance`. (2) The `loadFromDi
+# what: logic-lens case #276 (lu2008-style-double-checked-locking-broken-AV-L7), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/config/ConfigCache.java b/config/ConfigCache.java
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/config/ConfigCache.java
+@@ -0,0 +1,18 @@
++public class ConfigCache {
++    private static ConfigCache instance;
++    private Map<String, String> data;
++
++    public static ConfigCache getInstance() {
++        if (instance == null) {
++            synchronized (ConfigCache.class) {
++                if (instance == null) {
++                    instance = new ConfigCache();
++                    instance.loadFromDisk();
++                }
++            }
++        }
++        return instance;
++    }
++
++    private void loadFromDisk() { /* populate this.data */ }
++}

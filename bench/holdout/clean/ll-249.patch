@@ -1,0 +1,19 @@
+diff --git a/utils/cache.py b/utils/cache.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/utils/cache.py
+@@ -0,0 +1,13 @@
++# utils/cache.py
++
++def append_to_cache(item, cache=None):
++    """Append item to cache list; creates a new list if cache not provided."""
++    if cache is None:
++        cache = []
++    cache.append(item)
++    return cache
++
++r1 = append_to_cache('a')
++r2 = append_to_cache('b')
++r3 = append_to_cache('c', r1)
++print(r1, r2, r3)

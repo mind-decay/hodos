@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { groupPackages, parseReview, prepare, resolveAnchors, commandFor } from './invoke.mjs';
+import { groupPackages, parseReview, placeOf, prepare, resolveAnchors, commandFor } from './invoke.mjs';
 
 const INVOKE = fileURLToPath(new URL('./invoke.mjs', import.meta.url));
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -59,6 +59,15 @@ test('the packages are grouped by what the patches say, not by a second list', (
     assert.ok(pkg.seeded.length >= 3, `${pkg.id} has ${pkg.seeded.length} seeded patches`);
     assert.equal(new Set(pkg.seeded.map((d) => d.fixture)).size, 1, `${pkg.id} mixes fixtures`);
   }
+});
+
+test('parseReview keeps the Coverage text, not only its length', () => {
+  // The test-floor net reads three places a cold reviewer could put a removal
+  // (bench/review/run.mjs), and the Coverage line is one of them. `words` is a
+  // count, so the text needs its own field or the net has a hole in it.
+  const review = parseReview(REVIEW);
+  assert.match(review.coverage, /Not reviewed/);
+  assert.ok(review.words.coverage > 0, 'the count stays beside the text');
 });
 
 test('parseReview reads the verdict, the rows and the section lengths', () => {
@@ -192,6 +201,17 @@ test('prepare records the files the package ships, so an absence can be proved',
       'a file the package does not ship — the shape a missing-test finding names',
     );
     assert.ok(!files.some((f) => f.startsWith('.git/')), 'tracked files, not the repository');
+
+    // These packages own no task directory and no ledger, so they carry no
+    // `Mutation:` line — the specified shape for a package built over a diff
+    // that owns no task (`FORMATS.md §8`), and the reason this bench measures
+    // nothing about decision 0122's comparison. Read off what `prepare` wrote,
+    // not off arguments this test handed `render`: the property is that
+    // `invoke.mjs` passes no count, and inventing one here would have the
+    // bench score the reviewer against a number the bench made up.
+    const input = readFileSync(join(out, 'copies', 'p1', 'review-input.md'), 'utf8');
+    assert.ok(!input.includes('Mutation:'), 'no ledger, no count');
+    assert.match(input, /^Base: [0-9a-f]{7} · Head: [0-9a-f]{7} · Commits: \d+$/m);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -216,4 +236,70 @@ test('prepare works from a relative --out, which is what the README tells you to
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+// ── the Spec section (decision 0092) ──────────────────────────────────────
+// The Unclaimed word is where a derivation defect is reported, so the parser
+// has to carry the Spec words out of review.md and not only their word count.
+
+test('parseReview reads the four Spec words, Unclaimed included', () => {
+  const text = REVIEW.replace(
+    'Missing: — · Extra: — · Misunderstood: —',
+    'Missing: — · Extra: — · Misunderstood: — · Unclaimed: `declined` — the third member of RefundState is in no claim',
+  );
+
+  const review = parseReview(text);
+
+  assert.equal(review.spec.missing, '—');
+  assert.equal(review.spec.extra, '—');
+  assert.equal(review.spec.misunderstood, '—');
+  assert.equal(review.spec.unclaimed, '`declined` — the third member of RefundState is in no claim');
+});
+
+test('a Spec word on its own line is read, and an absent word is null', () => {
+  const text = REVIEW.replace(
+    'Missing: — · Extra: — · Misunderstood: —',
+    'Missing: T3 has no test for the failing call\nUnclaimed: `declined`, added at src/features/orders/refund.ts:3',
+  );
+
+  const review = parseReview(text);
+
+  assert.equal(review.spec.missing, 'T3 has no test for the failing call');
+  assert.equal(review.spec.unclaimed, '`declined`, added at src/features/orders/refund.ts:3');
+  assert.equal(review.spec.extra, null);
+});
+
+test('a Spec word in bold is the same word: **Unclaimed:** carries its text', () => {
+  const text = REVIEW.replace(
+    'Missing: — · Extra: — · Misunderstood: —',
+    '**Missing:** T2\'s second clause has no test\n\n**Extra:** —\n\n**Misunderstood:** —\n\n**Unclaimed:** the `limit <= 0` failure path at src/services/orders.js:61 is in no claim',
+  );
+
+  const review = parseReview(text);
+
+  assert.equal(review.spec.missing, "T2's second clause has no test");
+  assert.equal(review.spec.extra, '—');
+  assert.equal(
+    review.spec.unclaimed,
+    'the `limit <= 0` failure path at src/services/orders.js:61 is in no claim',
+  );
+});
+
+test('a Spec word separated by a dash instead of a colon is read', () => {
+  const text = REVIEW.replace(
+    'Missing: — · Extra: — · Misunderstood: —',
+    '**Missing** — T1: nothing renders `OrderRefresh`\n\n**Unclaimed** — the abort path at src/lib/http.ts:12 is in no claim',
+  );
+
+  const review = parseReview(text);
+
+  assert.equal(review.spec.missing, 'T1: nothing renders `OrderRefresh`');
+  assert.equal(review.spec.unclaimed, 'the abort path at src/lib/http.ts:12 is in no claim');
+});
+
+test('the verdicts file records a copy by its place in the run, not by a machine path', () => {
+  const dir = '/Users/someone/work/repo/bench/review/runs/2026-01-01';
+
+  assert.equal(placeOf(dir, `${dir}/copies/p1`), 'copies/p1');
+  assert.equal(placeOf(dir, '/var/folders/T/hodos-dry-run/copies/p3'), 'copies/p3');
 });

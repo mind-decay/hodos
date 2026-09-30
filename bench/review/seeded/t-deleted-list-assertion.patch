@@ -1,0 +1,21 @@
+# id: t-deleted-list-assertion
+# fixture: webapp
+# package: p3
+# kind: test-floor
+# item: Removed test
+# names: OrderList.test, href
+# line: src/features/orders/ui/OrderList.test.tsx:24
+# anchor: —
+# what: the assertion pinning that each row links to its own detail route is deleted, and the suite stays green
+diff --git a/src/features/orders/ui/OrderList.test.tsx b/src/features/orders/ui/OrderList.test.tsx
+index b333f81..b333f82 100644
+--- a/src/features/orders/ui/OrderList.test.tsx
++++ b/src/features/orders/ui/OrderList.test.tsx
+@@ -21,7 +21,6 @@ describe('OrderList', () => {
+   it('lists one row per order, linking to its detail route', () => {
+     renderList(orders);
+     expect(screen.getAllByRole('listitem')).toHaveLength(2);
+-    expect(screen.getByRole('link', { name: 'Ada' }).getAttribute('href')).toBe('/orders/o-1');
+   });
+ 
+   it('says so when the filter matches nothing', () => {

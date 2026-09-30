@@ -1,0 +1,27 @@
+{
+  "slug": "home-shift-link",
+  "path": "quick",
+  "type": "feature",
+  "phase": "fix",
+  "campaign": null,
+  "branch": "feature/home-shift-link",
+  "base": "067854c",
+  "tasks": {
+    "total": 1,
+    "done": 1,
+    "current": 1
+  },
+  "redCheckAttempts": 0,
+  "review": {
+    "iteration": 1,
+    "verdict": "ACCEPT"
+  },
+  "verify": {
+    "iteration": 1,
+    "verdict": "FAIL"
+  },
+  "lastCommit": "ec30940",
+  "lastEvent": "Verify 1: FAIL 12 claims, 3 skipped",
+  "createdAt": "2026-09-07T16:46:41.308Z",
+  "updatedAt": "2026-09-07T17:00:09.362Z"
+}

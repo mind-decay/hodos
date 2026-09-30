@@ -1,0 +1,26 @@
+# id: ll-234
+# fixture: snippets
+# package: h5
+# kind: behavioral
+# item: L9
+# line: db/schema.sql:5
+# anchor: created_at TIMESTAMP NOT NULL   -- no timezone
+# trigger: Should identify L9 (Time / Locale Hazard): `TIMESTAMP` (without time zone) in PostgreSQL stores a local date-time with no timezone metadata. `NOW()` returns a `TIMESTAMPTZ` (with time zone). When comparing `created_at TIMESTAMP` with `NOW() - INTERVAL '24 hours'` (TIMESTAMPTZ), PostgreSQL implicitly casts one side using the session's `TimeZone` setting. If the DB server has `TimeZone = 'America/Ne
+# what: logic-lens case #234 (sql-timestamp-no-tz-locale-hazard-L9), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/db/schema.sql b/db/schema.sql
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/db/schema.sql
+@@ -0,0 +1,10 @@
++-- schema.sql
++CREATE TABLE events (
++    id        SERIAL PRIMARY KEY,
++    user_id   INT NOT NULL,
++    created_at TIMESTAMP NOT NULL   -- no timezone
++);
++
++-- query: fetch events from the last 24 hours
++SELECT * FROM events
++WHERE created_at >= NOW() - INTERVAL '24 hours';

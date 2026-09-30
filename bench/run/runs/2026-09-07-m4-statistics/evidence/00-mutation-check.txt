@@ -1,0 +1,16 @@
+Mutation check on the diff-added test src/features/orders/ui/OrderDetailPage.test.tsx
+
+cp OrderDetailPage.test.tsx "$TMPDIR/OrderDetailPage.test.tsx.orig"
+sed -i '' "25s/Order o-1/Order o-9/" OrderDetailPage.test.tsx
+# line 25: expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Order o-9');
+
+$ npx vitest run src/features/orders/ui/OrderDetailPage.test.tsx --reporter=verbose
+ × OrderDetailPage > names the order it is loading while the request is pending 52ms
+   -> expected 'Order o-1' to be 'Order o-9'
+ ✓ OrderDetailPage > renders no heading when no order was named 4ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+
+cp "$TMPDIR/OrderDetailPage.test.tsx.orig" OrderDetailPage.test.tsx
+$ git status --porcelain
+(empty)

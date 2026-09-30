@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -792,4 +792,157 @@ test('a layer proven by nothing is not raised twice either — the record still 
   assert.equal(second.json.layers[0].state, 'up');
   assert.equal(after.pid, before.pid);
   assert.equal(second.status, 0);
+});
+
+// --- decision 0169: a layer is shared by the sessions on it, and the last one
+// out stops it. Every session runs `up` before its verifier and `down` on the
+// way out (verify-loop.md §3), so two sessions verifying at once is the normal
+// case: neither is refused, and neither's teardown stops the other's layer.
+
+/** env.mjs under a chosen session id, or under none. */
+function envAs(cwd, session, ...args) {
+  return new Promise((resolve) => {
+    const childEnv = { ...process.env };
+    delete childEnv.CLAUDE_CODE_SESSION_ID;
+    if (session) childEnv.CLAUDE_CODE_SESSION_ID = session;
+    const child = spawn(process.execPath, [ENV, ...args], { cwd, env: childEnv });
+    let stdout = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.on('close', (status) => {
+      let parsed = null;
+      try {
+        parsed = JSON.parse(stdout);
+      } catch {
+        parsed = null;
+      }
+      resolve({ status, stdout, json: parsed });
+    });
+  });
+}
+
+/** A port nothing listens on yet, and a layer whose `up` starts a server on it. */
+async function serverLayer() {
+  const probe = await listener();
+  await probe.close();
+  const { port } = probe;
+  const server = `require('net').createServer((s) => s.end()).listen(${port}, '127.0.0.1')`;
+  const root = project({
+    api: { up: `${JSON.stringify(process.execPath)} -e "${server}"`, check: [{ kind: 'tcp', target: `127.0.0.1:${port}` }], timeout: 10 },
+  });
+  return { root, port };
+}
+
+const listening = async (port) => (await runCheckTcp(port)).ok;
+async function runCheckTcp(port) {
+  const { runCheck } = await import('./env.mjs');
+  return runCheck({ kind: 'tcp', target: `127.0.0.1:${port}`, timeout: 1 }, process.cwd());
+}
+const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+const usersOf = (root, layer) => {
+  try {
+    return readdirSync(join(root, '.claude/hodos/env', `${layer}.users`)).sort();
+  } catch {
+    return [];
+  }
+};
+
+test('two concurrent raises under two sessions leave one process, one record, and both sessions on it', posix, async () => {
+  const { root, port } = await serverLayer();
+  assert.equal(await listening(port), false, 'nothing listens before');
+
+  const [a, b] = await Promise.all([envAs(root, 'sess-a', 'up'), envAs(root, 'sess-b', 'up')]);
+  const record = JSON.parse(readFileSync(join(root, '.claude/hodos/env/api.json'), 'utf8'));
+
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(b.status, 0, b.stdout);
+  assert.deepEqual([a.json.layers[0].state, b.json.layers[0].state].sort(), ['raised', 'up']);
+  assert.doesNotThrow(() => process.kill(record.pid, 0));
+  assert.deepEqual(usersOf(root, 'api'), ['sess-a', 'sess-b']);
+
+  const downA = await envAs(root, 'sess-a', 'down');
+  await settle();
+  assert.equal(downA.json.layers[0].state, 'in-use');
+  assert.equal(await listening(port), true, 'the other session is still on it');
+
+  const downB = await envAs(root, 'sess-b', 'down');
+  await settle();
+  assert.equal(downB.json.layers[0].state, 'stopped');
+  assert.equal(await listening(port), false, 'the last one out stopped it, and nothing is orphaned');
+  assert.equal(existsSync(join(root, '.claude/hodos/env/api.json')), false);
+});
+
+test('a second session attaches to a live raise and says whose raise it is', posix, async () => {
+  const { root } = await serverLayer();
+  const first = await envAs(root, 'sess-a', 'up');
+  const before = JSON.parse(readFileSync(join(root, '.claude/hodos/env/api.json'), 'utf8'));
+
+  const second = await envAs(root, 'sess-b', 'up');
+  const after = JSON.parse(readFileSync(join(root, '.claude/hodos/env/api.json'), 'utf8'));
+  await envAs(root, null, 'down', '--all');
+
+  assert.equal(first.json.layers[0].state, 'raised');
+  assert.equal(second.json.layers[0].state, 'up');
+  assert.equal(second.json.layers[0].raisedByHodos, true);
+  assert.match(second.json.layers[0].detail, /sess-a/);
+  assert.equal(after.pid, before.pid);
+  assert.equal(after.session, 'sess-a');
+});
+
+test('a teardown under another session leaves the layer up and names who is on it; --all stops it', posix, async () => {
+  const { root, port } = await serverLayer();
+  await envAs(root, 'sess-a', 'up');
+
+  const other = await envAs(root, 'sess-b', 'down');
+  await settle();
+  assert.equal(other.status, 0);
+  assert.equal(other.json.layers[0].state, 'in-use');
+  assert.match(other.json.layers[0].detail, /sess-a/);
+  assert.equal(await listening(port), true);
+
+  const all = await envAs(root, 'sess-b', 'down', '--all');
+  await settle();
+  assert.equal(all.json.layers[0].state, 'stopped');
+  assert.equal(await listening(port), false);
+});
+
+test('a caller with no id leaves a layer that has users', posix, async () => {
+  const { root, port } = await serverLayer();
+  await envAs(root, 'sess-a', 'up');
+
+  const idless = await envAs(root, null, 'down');
+  await settle();
+  const still = await listening(port);
+  await envAs(root, 'sess-a', 'down');
+
+  assert.equal(idless.json.layers[0].state, 'in-use');
+  assert.equal(still, true);
+});
+
+test('a record with no users is stopped by any down, as it was before sessions shared a layer', posix, async () => {
+  const { root, port } = await serverLayer();
+  await envAs(root, null, 'up');
+  assert.deepEqual(usersOf(root, 'api'), []);
+
+  const run = await envAs(root, 'sess-b', 'down');
+  await settle();
+
+  assert.equal(run.json.layers[0].state, 'stopped');
+  assert.equal(await listening(port), false);
+});
+
+test('a raise that died before it recorded a pid is raised again once its timeout has passed', posix, async () => {
+  const { root } = await serverLayer();
+  mkdirSync(join(root, '.claude/hodos/env'), { recursive: true });
+  const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+  writeFileSync(join(root, '.claude/hodos/env/api.json'), json({ pid: null, startedAt: hourAgo, cmd: 'x', stop: null, cwd: root, log: null, session: 'sess-gone' }));
+
+  const run = await envAs(root, 'sess-a', 'up');
+  const record = JSON.parse(readFileSync(join(root, '.claude/hodos/env/api.json'), 'utf8'));
+  await envAs(root, 'sess-a', 'down');
+
+  assert.equal(run.json.layers[0].state, 'raised');
+  assert.equal(typeof record.pid, 'number');
+  assert.equal(record.session, 'sess-a');
 });

@@ -1,0 +1,49 @@
+{
+  "runAt": "2026-09-29T22:03:42.685Z",
+  "dispatches": 7,
+  "cost": 6.802232,
+  "turns": [
+    {
+      "id": "h2",
+      "turns": 2,
+      "seconds": 247,
+      "cost": 0.7695644
+    },
+    {
+      "id": "h3",
+      "turns": 2,
+      "seconds": 203,
+      "cost": 0.6280092
+    },
+    {
+      "id": "h4",
+      "turns": 2,
+      "seconds": 221,
+      "cost": 0.6678012
+    },
+    {
+      "id": "h5",
+      "turns": 2,
+      "seconds": 205,
+      "cost": 0.6812518
+    },
+    {
+      "id": "h6",
+      "turns": 2,
+      "seconds": 332,
+      "cost": 0.9714684000000001
+    },
+    {
+      "id": "pilot-rust",
+      "turns": 3,
+      "seconds": 520,
+      "cost": 1.5720971999999998
+    },
+    {
+      "id": "pilot-ts",
+      "turns": 2,
+      "seconds": 464,
+      "cost": 1.5120398
+    }
+  ]
+}

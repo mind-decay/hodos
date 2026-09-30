@@ -1,0 +1,21 @@
+# id: summary-clipped-line
+# plan: orders-summary
+# task: T3
+# kind: verify
+# item: detector overflow — content wider than a box that offers no way to scroll to it
+# anchor: <p style={{ width: 80, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+# what: the summary line is put in an 80px box with nowrap and overflow hidden, so the count and the total are cut off with nothing saying so. No claim of the plan names the layout, the three unit suites stay green, typecheck and lint stay green, and the review accepted the diff: the presentation detector is the only thing that reports it
+# severity: minor
+diff --git a/src/features/orders/ui/OrdersPage.tsx b/src/features/orders/ui/OrdersPage.tsx
+index 063bfb0..b898347 100644
+--- a/src/features/orders/ui/OrdersPage.tsx
++++ b/src/features/orders/ui/OrdersPage.tsx
+@@ -26,7 +26,7 @@ export function OrdersPage() {
+       {orders.isPending && <p>Loading orders…</p>}
+       {orders.isError && <p role="alert">{orders.error.message}</p>}
+       {summary && (
+-        <p>
++        <p style={{ width: 80, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+           {summary.count} orders · {summary.total.toFixed(2)}
+         </p>
+       )}

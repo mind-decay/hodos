@@ -1,0 +1,9 @@
+| Axis | Found | Rate | Threshold | |
+|---|---|---|---|---|
+| recall, overall | 3/3 | 100.0% | 80.0% | PASS |
+| recall, convention | 2/2 | 100.0% | 80.0% | PASS |
+| recall, behavioral | 1/1 | 100.0% | 80.0% | PASS |
+| precision | 7/7 | 100.0% | 85.0% | PASS |
+| recall, spec | 1/1 | 100.0% | — | measurement |
+packages scored: 1 of 6 (--only p3)
+Located by path alone: 1 of 7

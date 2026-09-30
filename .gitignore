@@ -7,3 +7,7 @@ bench/fixtures/**/coverage
 bench/router/runs/*/copies/
 bench/router/runs/*/streams/
 bench/review/runs/*/copies/
+bench/run/runs/*/run.jsonl
+bench/run/runs/*/streams/
+bench/holdout/pilot-cache/
+bench/holdout/runs/*/copies/

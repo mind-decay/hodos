@@ -1,0 +1,25 @@
+diff --git a/db/orders.py b/db/orders.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/db/orders.py
+@@ -0,0 +1,19 @@
++# db/orders.py
++
++def get_user_orders(conn, user_id: int, status: str) -> list:
++    cursor = conn.cursor()
++    cursor.execute(
++        "SELECT id, amount, status FROM orders "
++        "WHERE user_id = %s AND status = %s "
++        "ORDER BY created_at DESC",
++        (user_id, status)
++    )
++    return cursor.fetchall()
++
++def count_orders(conn, user_id: int) -> int:
++    cursor = conn.cursor()
++    cursor.execute(
++        "SELECT COUNT(*) FROM orders WHERE user_id = %s",
++        (user_id,)
++    )
++    return cursor.fetchone()[0]

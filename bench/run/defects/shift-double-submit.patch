@@ -1,0 +1,63 @@
+# id: shift-double-submit
+# plan: orders-summary
+# task: T3
+# kind: verify
+# item: attack double submit — exactly one request where one was sent
+# line: src/features/shift/ui/ShiftPage.tsx:24
+# anchor: await request<unknown>('/handover', { method: 'POST', body: JSON.stringify({ shift: 'evening' }) });
+# what: Save handover posts with nothing holding the button while the call is in flight, so two clicks send two POSTs. The route is /shift, which no claim of the plan names — the attack list is what finds it. Registering /shift in the ui recipe's routes is the arm's setup and not this patch's business (it was here until decision 0112): the patch is the defect, and under 0112 it belongs in the task's own commit, because the attacks reach only the routes the diff resolves to. Test, typecheck and lint stay green and the review sees a handler that awaits and catches
+# severity: blocker
+# note: the dev server serves no /api, so the POST answers 404 and the same route also earns a network-source row. Two sources from one seed, and the attack row is the one this defect is for
+diff --git a/src/features/shift/ui/ShiftPage.tsx b/src/features/shift/ui/ShiftPage.tsx
+index 9e3970f..527da14 100644
+--- a/src/features/shift/ui/ShiftPage.tsx
++++ b/src/features/shift/ui/ShiftPage.tsx
+@@ -1,5 +1,8 @@
++import { useState } from 'react';
+ import type { CSSProperties } from 'react';
+ 
++import { request } from '../../../lib/http';
++
+ // The three presentation defects on this page are deliberate, and the bench
+ // reads them: a banner whose content escapes it, a notes box that cuts its own
+ // text off, and two actions on top of each other. `bench/fixtures/README.md`
+@@ -9,10 +12,22 @@ const scroller: CSSProperties = { ...panel, overflowX: 'auto' };
+ const banner: CSSProperties = { ...panel, whiteSpace: 'nowrap', border: '1px solid #ccc', padding: 8 };
+ const notes: CSSProperties = { ...panel, height: 40, overflowY: 'hidden', border: '1px solid #ccc', padding: 8 };
+ const actions: CSSProperties = { ...panel, position: 'relative', height: 60 };
+-const save: CSSProperties = { position: 'absolute', left: 0, top: 0, width: 120, height: 32 };
++const saveButton: CSSProperties = { position: 'absolute', left: 0, top: 0, width: 120, height: 32 };
+ const discard: CSSProperties = { position: 'absolute', left: 100, top: 12, width: 120, height: 32 };
+ 
+ export function ShiftPage() {
++  const [saved, setSaved] = useState(0);
++  const [failed, setFailed] = useState(false);
++
++  const save = async () => {
++    try {
++      await request<unknown>('/handover', { method: 'POST', body: JSON.stringify({ shift: 'evening' }) });
++      setSaved((count) => count + 1);
++    } catch {
++      setFailed(true);
++    }
++  };
++
+   return (
+     <section>
+       <h1>Shift handover</h1>
+@@ -30,12 +45,13 @@ export function ShiftPage() {
+       </div>
+ 
+       <div style={actions}>
+-        <button type="button" style={save}>
+-          Save handover
++        <button type="button" style={saveButton} onClick={save}>
++          Save handover ({saved})
+         </button>
+         <button type="button" style={discard}>
+           Discard
+         </button>
++        {failed && <p role="alert">The handover could not be saved.</p>}
+       </div>
+     </section>
+   );

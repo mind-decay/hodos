@@ -204,9 +204,11 @@ export function findConfig(startDir = process.cwd()) {
 // Four scripts used to re-implement "read .claude/hodos/active and parse the
 // state next to it", and `active` is one pointer per project: two terminals on
 // one repository silently misattribute a Compact line, a Stop block, or a
-// denied commit. The pointer is now per session, `active` is the fallback, and
-// the resolution lives here because every one of those four already imports
-// this module.
+// denied commit. The pointer is now per session, `active` is the path of a
+// claim made with no id (decision 0171), and the resolution lives here because
+// every one of those four already imports this module. What the pointers
+// isolate — the ledger, the state and the gates — and what they do not — the
+// working tree two terminals share — is the boundary sentence of DESIGN.md §5.1.
 
 export const hodosDir = (projectRoot) => join(projectRoot, '.claude', 'hodos');
 
@@ -232,19 +234,48 @@ function firstLine(path) {
   }
 }
 
+/** Session pointers on disk; a `<id>.<pid>.tmp` is one being written, not one. */
+function pointerCount(sessionsDir) {
+  try {
+    return readdirSync(sessionsDir).filter((name) => !name.endsWith('.tmp')).length;
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * The slug this session is working on: `sessions/<id>` → `active` → null.
- * A session id that names no pointer falls through, so a machine where the id
- * is unreachable behaves exactly as it did before the pointers existed.
+ * The slug this session is working on, and how many other sessions' pointers
+ * it declined to borrow one from: `sessions/<id>` first, then `active` only
+ * while no session holds a pointer at all (decision 0171). `active` is written
+ * only by a claim made with no id, so it is the single-session path; read while
+ * another session holds a pointer, it hands a session that claimed nothing —
+ * a status terminal, plain work beside a running task — whichever task was
+ * claimed last, and its Stop and its commits are gated on it. The ambiguous
+ * case resolves to no task: a gate that stays open, never one that acts on
+ * another session's work — the direction git-guard takes on an unparsable
+ * payload.
  */
-export function activeTask(projectRoot, session = sessionOf()) {
+export function resolveTask(projectRoot, session = sessionOf()) {
   const dir = hodosDir(projectRoot);
   const id = cleanSession(session);
   if (id) {
     const claimed = firstLine(join(dir, 'sessions', id));
-    if (claimed) return claimed;
+    if (claimed) return { slug: claimed, others: 0 };
   }
-  return firstLine(join(dir, 'active'));
+  const others = pointerCount(join(dir, 'sessions'));
+  if (others > 0) return { slug: null, others };
+  return { slug: firstLine(join(dir, 'active')), others: 0 };
+}
+
+/** The slug alone, for the callers that do not report why there is none. */
+export function activeTask(projectRoot, session = sessionOf()) {
+  return resolveTask(projectRoot, session).slug;
+}
+
+/** The one line a gate prints when it stayed open for that reason. */
+export function declinedLine(others, gate) {
+  const whose = others === 1 ? '1 other session holds a task' : `${others} other sessions hold tasks`;
+  return `hodos: this session holds no task and ${whose}, so ${gate} is open (decision 0171)`;
 }
 
 /** `state.json` of a task, or null when it is missing or unreadable. */
@@ -371,6 +402,17 @@ function adaptersIn(dir, role) {
 /** Where a project's own adapters live, relative to its root (FORMATS.md §2). */
 export const projectAdaptersDir = (projectRoot) => join(hodosDir(projectRoot), 'adapters');
 
+// A pin (decision 0094): the route it is asserted on, the predicate that
+// asserts it, and the value the predicate returned when the claim passed.
+const PIN = {
+  route: { type: 'string' },
+  evaluate: { type: 'string' },
+  // Whatever the predicate returned — a string, a number, a boolean, or null.
+  // Which of those it is belongs to the claim and not to this schema, so what
+  // `checkRecipeChecks` says about it is that it is there.
+  expect: { any: true, nullable: true },
+};
+
 const RECIPE = {
   name: { type: 'string' },
   // `when` is `always | ui | api | perf | <glob>`, so its value is open and
@@ -384,6 +426,14 @@ const RECIPE = {
   base: { type: 'string' },
   // `viewport` only: the widths in CSS pixels its routes are re-visited at.
   widths: { type: 'number[]' },
+  // `browser` only: the pins of decision 0094, written back by the finish
+  // phase when the developer approves a `pass` row the verifier marked `pin`.
+  checks: { each: { closed: PIN } },
+  // Decision 0148: this recipe's command has never been observed green by the
+  // layer, so `verifiedAt` does not cover it. `init` writes it only on the
+  // approval that answered for a command which cannot run in a session, and
+  // `--refresh` clears it the first time that command runs green.
+  unrun: { type: 'boolean' },
 };
 
 // The environment stack of decision 0074. A check is one assertion that the
@@ -427,6 +477,15 @@ const RETIRED = {
   'tasks.track': 'retired — task artifacts are working state; the durable record is the commit body, the campaign node and the rules (DESIGN.md §5.1)',
 };
 
+/**
+ * The detectors `verify.detectors.allow` may name, in the order the decider
+ * runs them (`scripts/detectors.mjs`, decision 0096). The list is here because
+ * it is a closed value set of this format, like the recipe kinds; the script
+ * keeps its own copy of the order and `config.test.mjs` proves the two agree,
+ * which is cheaper than a cycle between the two modules.
+ */
+export const DETECTOR_IDS = ['overflow', 'clipped', 'overlap', 'focus', 'axe'];
+
 const SCHEMA = {
   version: { type: 'number' },
   language: { type: 'string' },
@@ -451,6 +510,8 @@ const SCHEMA = {
       profile: { type: 'string' },
       profiles: { map: { closed: PROFILE } },
       layers: { map: { closed: LAYER } },
+      // Decision 0107: one flat array of `<detector>:<route glob>` strings.
+      detectors: { closed: { allow: { type: 'string[]' } } },
     },
   },
   // Decision 0065: what the review package leaves out, and the cap behind it.
@@ -627,6 +688,8 @@ function checkValue(value, spec, path, out, ctx) {
     }
     return;
   }
+  // A value whose type is the claim's, not the schema's (PIN.expect).
+  if (spec.any) return;
   if (spec.type === 'string[]') {
     if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
       out.errors.push({ path, message: `expected an array of strings, got ${typeName(value)}` });
@@ -670,7 +733,31 @@ export function checkConfig(config, projectRoot) {
   }
   checkEnvReferences(config.verify, out);
   checkRecipeFields(config.verify, out);
+  checkRecipeChecks(config.verify, out);
+  checkUnrunRecipes(config.verify, out);
+  checkDetectorAllow(config.verify, out);
   return out;
+}
+
+/**
+ * A recipe the layer has never seen green (decision 0148). A **warning**: the
+ * field records a developer's decision about a command that cannot run in a
+ * session — the pilot's `slo_release_gate` clones a multi-GB corpus — and the
+ * cost of leaving it silent is that `verifiedAt` speaks for a recipe it never
+ * covered. `false` and an absent field say the ordinary thing and are silent.
+ */
+function checkUnrunRecipes(verify, out) {
+  if (!isPlainObject(verify) || !Array.isArray(verify.recipes)) return;
+  verify.recipes.forEach((recipe, index) => {
+    if (!isPlainObject(recipe) || recipe.unrun !== true) return;
+    const name = typeof recipe.name === 'string' ? recipe.name : `[${index}]`;
+    // No `hint`: that field renders as `(nearest: …)`, which is the
+    // unknown-key suggestion's shape and would read as nonsense here.
+    out.warnings.push({
+      path: `verify.recipes[${index}].unrun`,
+      message: `${name} has not run in a session, so verifiedAt does not cover it — the verify row for it reads "not verified in this session", and --refresh clears the field the first time the command runs green`,
+    });
+  });
 }
 
 /**
@@ -705,6 +792,182 @@ function checkRecipeFields(verify, out) {
         path: `verify.recipes[${index}].routes`,
         message: 'a viewport recipe needs routes — there is nothing to re-visit at those widths',
       });
+    }
+  });
+}
+
+/** Decision 0118: the two calls that reach for a class or an id by name. */
+const BRITTLE_CALLS = ['getElementsByClassName', 'getElementById'];
+
+/**
+ * The class or id a pinned predicate reaches for, or `null` (decision 0118).
+ * `[role="alert"]` is a selector query that satisfies decision 0094's rule and
+ * `.summary-total` is the brittleness the rule is about, so what is read is
+ * the token at the head of a compound and never the call around it.
+ */
+/**
+ * Decision 0129: the member reads that reach an element by position. A pin
+ * reaches an element two ways — a query, or a walk from something already
+ * queried — and the walk is what an element inserted between breaks, which is
+ * a smaller change than renaming a class.
+ */
+const POSITIONAL_MEMBERS = [
+  "nextElementSibling", "previousElementSibling", "nextSibling", "previousSibling",
+  "parentElement", "parentNode",
+  "firstElementChild", "lastElementChild", "firstChild", "lastChild",
+];
+
+/** Decision 0129: the indexed collections, reported with their bracket. */
+const POSITIONAL_INDEXED = ["children[", "childNodes["];
+
+/** Decision 0129: the selector pseudo-classes that pick by position. */
+const POSITIONAL_PSEUDO = [
+  ":nth-child", ":nth-last-child", ":nth-of-type", ":nth-last-of-type",
+  ":first-child", ":last-child", ":first-of-type", ":last-of-type",
+];
+
+/** Each member read, anchored on the dot that reaches it (decision 0129). */
+const POSITIONAL_MEMBER_PATTERNS = POSITIONAL_MEMBERS.map(
+  (member) => [member, new RegExp(`\\.${member}\\b`)],
+);
+
+/**
+ * The positional reach in a pinned predicate, or `null` (decision 0129).
+ * The dot is what makes it a read rather than a word: `myParentElementCount`
+ * names no element, and `.parentElementId` is somebody else`s property.
+ */
+export function positionalReach(evaluate) {
+  if (typeof evaluate !== "string") return null;
+  for (const [member, pattern] of POSITIONAL_MEMBER_PATTERNS) if (pattern.test(evaluate)) return member;
+  for (const indexed of POSITIONAL_INDEXED) if (evaluate.includes(`.${indexed}`)) return indexed;
+  for (const pseudo of POSITIONAL_PSEUDO) if (evaluate.includes(pseudo)) return pseudo;
+  return null;
+}
+
+/**
+ * Whether a pinned predicate is written as a function (decision 0130).
+ * `FORMATS.md` maps the field to `evaluate_script {function}`, so a bare
+ * expression is a pin the adapter cannot run. The parameter list is what
+ * settles an arrow: the `=>` follows that list`s own closing paren, so a
+ * parenthesised expression carrying an arrow inside it is not one.
+ */
+export function isFunctionSource(evaluate) {
+  if (typeof evaluate !== "string") return false;
+  const source = evaluate.trim();
+  if (/^(async\s+)?function\b/.test(source)) return true;
+  if (/^(async\s+)?[A-Za-z_$][\w$]*\s*=>/.test(source)) return true;
+  if (!/^(async\s*)?\(/.test(source)) return false;
+  let depth = 0;
+  for (let at = source.indexOf("("); at < source.length; at += 1) {
+    if (source[at] === "(") depth += 1;
+    else if (source[at] === ")" && (depth -= 1) === 0) return /^\s*=>/.test(source.slice(at + 1));
+  }
+  return false;
+}
+
+export function brittleSelector(evaluate) {
+  if (typeof evaluate !== 'string') return null;
+  for (const call of BRITTLE_CALLS) if (evaluate.includes(call)) return call;
+  for (const literal of evaluate.match(/'[^']*'|"[^"]*"|`[^`]*`/g) ?? []) {
+    const hit = literal.slice(1, -1).match(/(?:^|[\s>+~,(])([.#][A-Za-z_][\w-]*)/);
+    if (hit) return hit[1];
+  }
+  return null;
+}
+
+/**
+ * What a per-value check cannot judge about a pin (decision 0094): it belongs
+ * to a `browser` recipe, it names all three of its members, and its predicate
+ * is written the way a pin survives a redesign. The first two are errors — a
+ * check missing a member is a check nothing can run. The third is **three
+ * warnings**, one per shape that rots: a class or an id (decision 0118), a walk
+ * to an element rather than a query for it (0129), and a bare expression where
+ * the adapter runs a function (0130). Warnings rather than errors because each
+ * loads and fails later, and later is where the row is read: a pin is a browser
+ * row, so it has no base-sha *run* at all (0119) and reaches `pre-existing`
+ * only inside the `git` bound of decision 0127 — outside it, a rotted pin is
+ * this run's `fail · major` naming the base sha.
+ */
+function checkRecipeChecks(verify, out) {
+  if (!isPlainObject(verify) || !Array.isArray(verify.recipes)) return;
+  verify.recipes.forEach((recipe, index) => {
+    if (!isPlainObject(recipe) || recipe.checks === undefined) return;
+    const path = `verify.recipes[${index}].checks`;
+    if (recipe.kind !== 'browser') {
+      out.errors.push({
+        path,
+        message: `checks belongs to a browser recipe, and this one is ${JSON.stringify(recipe.kind)}`,
+      });
+      return;
+    }
+    // A `checks` of the wrong shape already has its finding from the type
+    // check — one finding per fault, as `checkEnvReferences` has it.
+    if (!Array.isArray(recipe.checks)) return;
+    recipe.checks.forEach((pin, at) => {
+      if (!isPlainObject(pin)) return;
+      const pinPath = `${path}[${at}]`;
+      if (pin.route === undefined) {
+        out.errors.push({ path: pinPath, message: 'a check needs a route — it is re-visited on every run of this recipe' });
+      }
+      if (pin.evaluate === undefined) {
+        out.errors.push({ path: pinPath, message: 'a check needs an evaluate predicate — a route with nothing asserted on it is a visit' });
+      }
+      if (pin.expect === undefined) {
+        out.errors.push({ path: pinPath, message: 'a check needs the expect it was pinned at — a predicate with nothing to compare against proves nothing' });
+      }
+      const form = brittleSelector(pin.evaluate);
+      if (form) {
+        out.warnings.push({
+          path: `${pinPath}.evaluate`,
+          message: `${form} pins a class or an id — a predicate over a role or text is what survives a redesign`,
+        });
+      }
+      const walk = positionalReach(pin.evaluate);
+      if (walk) {
+        out.warnings.push({
+          path: `${pinPath}.evaluate`,
+          message: `${walk} reaches by position — an element inserted between breaks the pin, so reach every element by a query (decision 0129)`,
+        });
+      }
+      if (pin.evaluate !== undefined && !isFunctionSource(pin.evaluate)) {
+        out.warnings.push({
+          path: `${pinPath}.evaluate`,
+          message: "evaluate is not a function — the adapter runs it as one, so write it as `() => (…)`; the run wraps a bare expression, so this pin still fires (decision 0130)",
+        });
+      }
+    });
+  });
+}
+
+/**
+ * What a per-value check cannot judge about an allowlist entry: it is a
+ * detector and a route glob with a colon between them (decision 0107). A
+ * route with no detector in front of it and a detector nobody runs both read
+ * as an entry that silences something, and neither silences anything.
+ */
+function checkDetectorAllow(verify, out) {
+  if (!isPlainObject(verify) || !isPlainObject(verify.detectors)) return;
+  if (!Array.isArray(verify.detectors.allow)) return;
+  verify.detectors.allow.forEach((entry, index) => {
+    // A non-string entry has its own finding from the type check already.
+    if (typeof entry !== 'string') return;
+    const path = `verify.detectors.allow[${index}]`;
+    const colon = entry.indexOf(':');
+    if (colon < 0) {
+      out.errors.push({ path, message: 'an entry is "<detector>:<route glob>", and this one names no detector' });
+      return;
+    }
+    const detector = entry.slice(0, colon);
+    if (detector !== '*' && !DETECTOR_IDS.includes(detector)) {
+      out.errors.push({
+        path,
+        message: `no such detector — one of ${DETECTOR_IDS.join(', ')}, or * for every one of them`,
+        hint: nearest(detector, DETECTOR_IDS),
+      });
+      return;
+    }
+    if (entry.slice(colon + 1) === '') {
+      out.errors.push({ path, message: 'an entry needs a route glob after the colon — it silences a detector on routes' });
     }
   });
 }

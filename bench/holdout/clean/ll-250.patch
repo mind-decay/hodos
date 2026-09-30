@@ -1,0 +1,36 @@
+diff --git a/store/cache.go b/store/cache.go
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/store/cache.go
+@@ -0,0 +1,30 @@
++// store/cache.go
++package store
++
++import (
++    "errors"
++    "sync"
++)
++
++type Store struct {
++    mu      sync.RWMutex
++    data    map[string]string
++    maxSize int
++}
++
++func (s *Store) Get(key string) (string, bool) {
++    s.mu.RLock()
++    defer s.mu.RUnlock()
++    val, ok := s.data[key]
++    return val, ok
++}
++
++func (s *Store) Set(key, value string) error {
++    s.mu.Lock()
++    defer s.mu.Unlock()
++    if len(s.data) >= s.maxSize {
++        return errors.New("cache full")
++    }
++    s.data[key] = value
++    return nil
++}

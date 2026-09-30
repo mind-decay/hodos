@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { activeTask, checkConfig, findConfig, forFiles, gitRoot, merge, preflight, readState } from './config.mjs';
+import { DETECTOR_IDS, activeTask, resolveTask, checkConfig, findConfig, forFiles, gitRoot, isFunctionSource, merge, positionalReach, preflight, readState } from './config.mjs';
 
 const CONFIG = fileURLToPath(new URL('./config.mjs', import.meta.url));
 
@@ -427,6 +427,297 @@ test('widths is a list of numbers, and a string in it is an error', () => {
   assert.match(errors[0].message, /array of numbers/);
 });
 
+// --- check: `verify.detectors.allow`, whose entries name a detector and a
+// route glob (decision 0107). The field is one flat array of strings and one
+// `split(':')` to read, so what a check has to catch is a string that says
+// nothing: a route with no detector in front of it, or a detector nobody runs.
+
+test('an allowlist entry naming a detector and a route glob is accepted', () => {
+  const config = validConfig();
+  config.verify.detectors = { allow: ['overflow:/marketing/*', '*:/legacy/**', 'axe:/print'] };
+
+  const { errors, warnings } = checkConfig(config);
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('an allowlist entry with no detector in front of the route is an error naming the form', () => {
+  const config = validConfig();
+  config.verify.detectors = { allow: ['/marketing/*'] };
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.detectors.allow[0]');
+  assert.match(errors[0].message, /<detector>:<route glob>/);
+});
+
+test('an allowlist entry naming a detector nobody runs is an error, with the nearest id', () => {
+  const config = validConfig();
+  config.verify.detectors = { allow: ['overflw:/marketing/*'] };
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.detectors.allow[0]');
+  assert.match(errors[0].message, /overflow, clipped, overlap, focus, axe/);
+  assert.equal(errors[0].hint, 'overflow');
+});
+
+test('an allowlist entry with nothing after the colon silences nothing, and is an error', () => {
+  const config = validConfig();
+  config.verify.detectors = { allow: ['overflow:'] };
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.detectors.allow[0]');
+  assert.match(errors[0].message, /route glob/);
+});
+
+test('every entry is checked, and the path names the one at fault', () => {
+  const config = validConfig();
+  config.verify.detectors = { allow: ['overflow:/a', 'nope:/b', 'clipped:/c'] };
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.detectors.allow[1]');
+});
+
+test('the allowlist is a list of strings, and a key beside it is an error', () => {
+  const wrong = validConfig();
+  wrong.verify.detectors = { allow: 'overflow:/a' };
+  const a = checkConfig(wrong);
+  assert.equal(a.errors.length, 1);
+  assert.equal(a.errors[0].path, 'verify.detectors.allow');
+  assert.match(a.errors[0].message, /array of strings/);
+
+  const stray = validConfig();
+  stray.verify.detectors = { allow: [], thresholds: { overflowPx: 4 } };
+  const b = checkConfig(stray);
+  assert.equal(b.errors.length, 1);
+  assert.equal(b.errors[0].path, 'verify.detectors.thresholds');
+});
+
+test('the ids the config admits are the detectors the script runs', async () => {
+  const { DETECTORS } = await import('./detectors.mjs');
+  assert.deepEqual([...DETECTOR_IDS], DETECTORS);
+});
+
+// --- check: `verify.recipes[].checks[]`, the pins of decision 0094. A claim
+// proved once is written back as `{route, evaluate, expect}` by the finish
+// phase, so the field is read on every later `ui` run and a malformed entry is
+// a check nobody can run. Decision 0118 settles the predicate rule: a
+// selector reaching for a class or an id **warns** and loads, because
+// `config.mjs`'s errors are for a config that cannot be run at all.
+
+test('a pin naming a route, a predicate and the value it expects is accepted', () => {
+  const config = validConfig();
+  config.verify.recipes[1].checks = [
+    { route: '/orders', evaluate: "() => document.querySelector('[role=\"status\"]').textContent.trim()", expect: 'Total 3' },
+    { route: '/orders/o-1', evaluate: '() => document.body.innerText.includes("Refund")', expect: true },
+    { route: '/shift', evaluate: '() => document.querySelectorAll("[role=listitem]").length', expect: 4 },
+  ];
+
+  const { errors, warnings } = checkConfig(config);
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('checks belongs to a browser recipe, and to no other kind', () => {
+  const config = validConfig();
+  config.verify.recipes[0].checks = [{ route: '/', evaluate: '() => true', expect: true }];
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.recipes[0].checks');
+  assert.match(errors[0].message, /browser recipe/);
+  assert.match(errors[0].message, /"command"/);
+});
+
+test('a pin missing any of its three members is an error naming the member', () => {
+  for (const [drop, pattern] of [['route', /route/], ['evaluate', /predicate|evaluate/], ['expect', /expect/]]) {
+    const config = validConfig();
+    const pin = { route: '/orders', evaluate: '() => document.body.innerText.includes("Total")', expect: true };
+    delete pin[drop];
+    config.verify.recipes[1].checks = [pin];
+
+    const { errors } = checkConfig(config);
+
+    assert.equal(errors.length, 1, `dropping ${drop} produced ${errors.length} errors`);
+    assert.equal(errors[0].path, 'verify.recipes[1].checks[0]');
+    assert.match(errors[0].message, pattern);
+  }
+});
+
+test('a pin whose expect is null is accepted — the value seen is the claim\'s, not the schema\'s', () => {
+  const config = validConfig();
+  config.verify.recipes[1].checks = [{ route: '/orders', evaluate: '() => document.title', expect: null }];
+
+  const { errors, warnings } = checkConfig(config);
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('a pin that is not an object, and a route or predicate that is not a string, are errors', () => {
+  const notObject = validConfig();
+  notObject.verify.recipes[1].checks = ['/orders'];
+  const a = checkConfig(notObject);
+  assert.equal(a.errors.length, 1);
+  assert.equal(a.errors[0].path, 'verify.recipes[1].checks[0]');
+  assert.match(a.errors[0].message, /object/);
+
+  const wrongTypes = validConfig();
+  wrongTypes.verify.recipes[1].checks = [{ route: 7, evaluate: '() => true', expect: true }];
+  const b = checkConfig(wrongTypes);
+  assert.equal(b.errors.length, 1);
+  assert.equal(b.errors[0].path, 'verify.recipes[1].checks[0].route');
+  assert.match(b.errors[0].message, /string/);
+
+  const stray = validConfig();
+  stray.verify.recipes[1].checks = [{ route: '/', evaluate: '() => true', expect: true, width: 360 }];
+  const c = checkConfig(stray);
+  assert.equal(c.errors.length, 1);
+  assert.equal(c.errors[0].path, 'verify.recipes[1].checks[0].width');
+  assert.match(c.errors[0].message, /unknown key/);
+});
+
+test('checks is an array, and one object where a list belongs is an error', () => {
+  const config = validConfig();
+  config.verify.recipes[1].checks = { route: '/', evaluate: '() => true', expect: true };
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.recipes[1].checks');
+  assert.match(errors[0].message, /array/);
+});
+
+// Decision 0118. `[role="alert"]` is a selector that satisfies 0094's rule and
+// `.summary-total` is the brittleness the rule is about, so the check is on
+// the class and the id and not on the call.
+test('a predicate reaching for a class or an id warns, names the form, and loads', () => {
+  const cases = [
+    ["() => document.querySelector('.summary-total').textContent", '.summary-total'],
+    ['() => document.querySelector("#total").textContent', '#total'],
+    ['() => document.getElementsByClassName("row").length', 'getElementsByClassName'],
+    ['() => document.getElementById("total").textContent', 'getElementById'],
+  ];
+  for (const [evaluate, form] of cases) {
+    const config = validConfig();
+    config.verify.recipes[1].checks = [{ route: '/orders', evaluate, expect: 'Total 3' }];
+
+    const { errors, warnings } = checkConfig(config);
+
+    assert.deepEqual(errors, [], `${evaluate} produced an error`);
+    assert.equal(warnings.length, 1, `${evaluate} produced ${warnings.length} warnings`);
+    assert.equal(warnings[0].path, 'verify.recipes[1].checks[0].evaluate');
+    assert.match(warnings[0].message, /role|text/);
+    assert.ok(warnings[0].message.includes(form), `the warning does not name ${form}`);
+  }
+});
+
+test('a predicate over a role, a label or text warns about nothing', () => {
+  for (const evaluate of [
+    '() => document.querySelector(\'[role="status"]\').textContent.trim()',
+    "() => document.querySelector('[aria-label=\"Total\"]').textContent",
+    '() => document.body.innerText.includes("Total 3")',
+    '() => document.querySelectorAll("li[role=listitem]").length',
+    // A dot inside a word is not a class, which is what the compound anchor
+    // in `brittleSelector` is for: text is where a pin is supposed to look.
+    '() => document.body.innerText.includes("Imported from orders.csv")',
+  ]) {
+    const config = validConfig();
+    config.verify.recipes[1].checks = [{ route: '/orders', evaluate, expect: 'x' }];
+
+    const { errors, warnings } = checkConfig(config);
+
+    assert.deepEqual(errors, [], `${evaluate} produced an error`);
+    assert.deepEqual(warnings, [], `${evaluate} produced a warning`);
+  }
+});
+
+// Decision 0129. There are two ways a predicate reaches an element: a query,
+// or a walk from something already queried. The walk is what an inserted
+// element breaks, which is a smaller change than renaming a class.
+test("a predicate that reaches by position warns, names the form, and loads", () => {
+  const cases = [
+    ["() => document.querySelector(\"h1\").nextElementSibling.textContent", "nextElementSibling"],
+    ["() => document.querySelector(\"h1\").previousElementSibling.textContent", "previousElementSibling"],
+    ["() => document.querySelector(\"nav\").parentElement.textContent", "parentElement"],
+    ["() => document.querySelector(\"nav\").firstElementChild.textContent", "firstElementChild"],
+    ["() => document.querySelector(\"nav\").children[1].textContent", "children["],
+    ["() => document.querySelector(\"li:nth-child(2)\").textContent", ":nth-child"],
+  ];
+  for (const [evaluate, form] of cases) {
+    const config = validConfig();
+    config.verify.recipes[1].checks = [{ route: "/orders", evaluate, expect: "Total 3" }];
+
+    const { errors, warnings } = checkConfig(config);
+
+    assert.deepEqual(errors, [], evaluate + " produced an error");
+    assert.equal(warnings.length, 1, evaluate + " produced " + warnings.length + " warnings");
+    assert.equal(warnings[0].path, "verify.recipes[1].checks[0].evaluate");
+    assert.ok(warnings[0].message.includes(form), "the warning does not name " + form);
+  }
+});
+
+test("positionalReach reads the walk out of a predicate and nothing else", () => {
+  assert.equal(positionalReach("() => a.nextElementSibling"), "nextElementSibling");
+  assert.equal(positionalReach("() => document.querySelector(\"[role=status]\").textContent"), null);
+  // A word that merely contains one of the forms is not a walk: the property
+  // is read where a member access reaches it, never inside an identifier.
+  assert.equal(positionalReach("() => myParentElementCount"), null);
+  // The boundary, not just the dot: a property whose name starts with one of
+  // the forms reaches nothing by position.
+  assert.equal(positionalReach("() => a.parentElementId"), null);
+  assert.equal(positionalReach(42), null);
+});
+
+// Decision 0130. FORMATS.md maps the field to evaluate_script {function}, so a
+// bare expression is a pin the adapter cannot run: it warns, and the run wraps
+// it, because a config that loads and fails later is 0118's own reasoning.
+test("an evaluate that is not a function warns, names the shape, and loads", () => {
+  const config = validConfig();
+  config.verify.recipes[1].checks = [
+    { route: "/orders", evaluate: "document.querySelector(\"[role=status]\").textContent", expect: "Total 3" },
+  ];
+
+  const { errors, warnings } = checkConfig(config);
+
+  assert.deepEqual(errors, []);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].path, "verify.recipes[1].checks[0].evaluate");
+  assert.match(warnings[0].message, /function/);
+});
+
+test("isFunctionSource takes every shape a predicate is written in", () => {
+  for (const source of [
+    "() => document.title",
+    "()=>document.title",
+    "(a) => a.textContent",
+    "a => a.textContent",
+    "async () => document.title",
+    "function () { return document.title; }",
+    "async function () { return document.title; }",
+    "  () => document.title  ",
+  ]) assert.equal(isFunctionSource(source), true, source + " was not read as a function");
+
+  for (const source of [
+    "document.title",
+    "document.querySelector(\"a\").textContent",
+    "[...document.querySelectorAll(\"a\")].map(a => a.textContent)",
+    "(document.title)",
+    "",
+    42,
+  ]) assert.equal(isFunctionSource(source), false, String(source) + " was read as a function");
+});
+
 // --- check: the environment stack of decision 0074. The keys sit under
 // `verify` beside `recipes`; a project's layer names are its own, so the two
 // maps are open by key and closed inside each entry.
@@ -643,12 +934,34 @@ test('activeTask prefers the session pointer over active', () => {
   assert.equal(activeTask(twoTasks(), 'sess-a'), 'orders-summary');
 });
 
-test('activeTask falls back to active for a session with no pointer', () => {
-  assert.equal(activeTask(twoTasks(), 'sess-unknown'), 'users-export');
+// Decision 0171: `active` is the path of a claim made with no id, so it is
+// read only while no session holds a pointer. Otherwise a session that claimed
+// nothing — a status terminal, plain work beside a running task — was handed
+// whichever task claimed last, and its Stop and its commits were gated on it.
+test('activeTask gives a session with no pointer nothing while another session holds one', () => {
+  assert.equal(activeTask(twoTasks(), 'sess-unknown'), null);
 });
 
-test('activeTask falls back to active when there is no session id at all', () => {
-  assert.equal(activeTask(twoTasks(), null), 'users-export');
+test('activeTask gives a caller with no id nothing while a session holds a pointer', () => {
+  assert.equal(activeTask(twoTasks(), null), null);
+});
+
+test('activeTask falls back to active while no session holds a pointer', () => {
+  const files = {
+    '.git/HEAD': 'ref: refs/heads/main\n',
+    '.claude/hodos/config.json': json({ version: 1 }),
+    '.claude/hodos/active': 'users-export\n',
+  };
+  assert.equal(activeTask(tree(files), null), 'users-export');
+  assert.equal(activeTask(tree(files), 'sess-x'), 'users-export');
+  // A pointer being written is `<id>.<pid>.tmp` for an instant: not a pointer.
+  const writing = tree({ ...files, '.claude/hodos/sessions/sess-a.4242.tmp': 'orders-summary\n' });
+  assert.equal(activeTask(writing, null), 'users-export');
+});
+
+test('resolveTask says how many other sessions it declined for', () => {
+  assert.deepEqual(resolveTask(twoTasks(), 'sess-unknown'), { slug: null, others: 1 });
+  assert.deepEqual(resolveTask(twoTasks(), 'sess-a'), { slug: 'orders-summary', others: 0 });
 });
 
 test('activeTask is null when neither pointer exists', () => {
@@ -1134,4 +1447,42 @@ test('a half-written operation line maps nothing', () => {
 
   assert.equal(errors.length, 1, JSON.stringify(errors));
   assert.match(errors[0].message, /codeIndex names affectedTests/);
+});
+
+// `verify.recipes[].unrun` — decision 0148. A recipe whose command has never
+// been observed green by the layer says so, and `verifiedAt` stops speaking
+// for it. A warning and not an error: it records a developer's decision on a
+// command that cannot run in a session, not a mistake.
+
+test('an unrun recipe is a warning naming it, and says verifiedAt does not cover it', () => {
+  const config = validConfig();
+  config.verify.recipes.push({ name: 'perf', kind: 'command', run: 'cargo nextest run -p e2e', when: 'perf', unrun: true });
+
+  const { errors, warnings } = checkConfig(config);
+
+  assert.deepEqual(errors, []);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].path, 'verify.recipes[2].unrun');
+  assert.match(warnings[0].message, /perf/);
+  assert.match(warnings[0].message, /verifiedAt/);
+});
+
+test('unrun false, and an absent unrun, are silent', () => {
+  const config = validConfig();
+  config.verify.recipes[0].unrun = false;
+
+  const { errors, warnings } = checkConfig(config);
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('unrun is a boolean: a string there is an error', () => {
+  const config = validConfig();
+  config.verify.recipes[0].unrun = 'yes';
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'verify.recipes[0].unrun');
 });

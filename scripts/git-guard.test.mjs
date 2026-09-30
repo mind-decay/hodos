@@ -202,3 +202,43 @@ test('the session whose own task is not in fix commits freely', () => {
 
   assert.equal(out.stdout.trim(), '');
 });
+
+// --- decision 0171: a commit from a session with no pointer of its own is not
+// denied on another session's fix, and the guard says why it let it through.
+
+function heldInFix() {
+  const root = project({ gates: { blockCommitOnFailedReview: true }, phase: 'fix' });
+  mkdirSync(join(root, '.claude', 'hodos', 'sessions'), { recursive: true });
+  writeFileSync(join(root, '.claude', 'hodos', 'sessions', 'sess-a'), 'orders-summary\n');
+  return root;
+}
+
+function commitAs(root, sessionId) {
+  const env = { ...process.env };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  const payload = { tool_name: 'Bash', cwd: root, tool_input: { command: 'git commit -m x' } };
+  if (sessionId) payload.session_id = sessionId;
+  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), encoding: 'utf8', env });
+}
+
+test('a commit with no session id is not denied on another session\'s fix, and says why', () => {
+  const out = commitAs(heldInFix(), null);
+
+  assert.equal(out.status, 0);
+  assert.equal(out.stdout.trim(), '');
+  assert.match(out.stderr, /1 other session holds a task/);
+});
+
+test('a commit from a session with no pointer is not denied on another session\'s fix', () => {
+  const out = commitAs(heldInFix(), 'sess-stranger');
+
+  assert.equal(out.stdout.trim(), '');
+  assert.match(out.stderr, /1 other session holds a task/);
+});
+
+test('a claim made with no id is still denied through active while no session holds a pointer', () => {
+  const root = project({ gates: { blockCommitOnFailedReview: true }, phase: 'fix' });
+  const out = commitAs(root, null);
+
+  assert.equal(JSON.parse(out.stdout).hookSpecificOutput.permissionDecision, 'deny');
+});

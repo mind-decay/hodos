@@ -27,7 +27,12 @@ by removing one file. It is not part of the layer `--strip-claude` removes — a
 project may declare MCP servers before it has ever seen hodos — so every
 session started inside a `webapp` copy carries it: an interactive run gets a
 trust prompt for the server, and its first use fetches `chrome-devtools-mcp`
-over the network. Never run a stage test against the checked-in tree: copy it first with
+over the network. `webapp`'s dev server answers its own `/api` (decision **0123**): `dev-api.ts` is
+a pure function from a URL to a status and a body, tested beside itself, and
+`vite.config.ts` is the hook that writes what it returns. Before it, every data
+route rendered its error state under `npm run dev` and every route earned an
+ambient failed-request row in a `verify.md`. Never run a stage test against the
+checked-in tree: copy it first with
 `node bench/scripts/fixture-copy.mjs <name>`, which gives a git repository with
 three seeded conventional commits.
 
@@ -46,8 +51,8 @@ release is the runner's.
 
 ## `webapp` — front end
 
-Three routes (`/`, `/orders`, `/orders/:id`), one feature module with a query
-layer and a store, one shared library.
+Four routes (`/`, `/orders`, `/orders/:id`, `/shift`), two feature modules —
+one with a query layer and a store — and one shared library.
 
 1. **The network is reached through `request()`.** `bench/fixtures/webapp/src/lib/http.ts:9`
    is the only place that calls `fetch`. Callers get parsed JSON or an error;
@@ -63,6 +68,31 @@ layer and a store, one shared library.
 4. **Query keys come from the feature's `api.ts`.** `bench/fixtures/webapp/src/features/orders/api.ts:16`
    owns every key. No component writes a literal key array, so an invalidation
    cannot miss a cache entry.
+
+### `/shift` — three seeded presentation defects
+
+`bench/fixtures/webapp/src/features/shift/ui/ShiftPage.tsx` carries one defect
+per detector of `scripts/detectors.mjs`, and they are deliberate: this route is
+what the bench's environment check reads, and a session that "fixes" them has
+removed the measurement (decision **0096**).
+
+| On the page | Detector | Why it fires |
+|---|---|---|
+| the handover banner | `overflow` | one unwrapped line in a 320px box; the box around it scrolls, so the escape stays inside the banner and the document does not side-scroll |
+| the notes box | `clipped` | three lines of text in a 40px box with `overflow-y: hidden`, no ellipsis and no line clamp — truncation the page never declared |
+| Save handover / Discard | `overlap` | two absolutely positioned buttons whose boxes intersect by 20×20px |
+
+Nothing else on the route fires: `index.html` gives every control a 3px focus
+outline, so the `focus` detector stays quiet, and `axe` runs only where an
+`a11y` recipe declares it. Three hits and no fourth is the check
+(`BUILD-PLAN.md` Stage 11d, *The environment is verified, not tested, in the
+bench*), and the fourth detector staying quiet is half of what it proves.
+
+**jsdom cannot see any of it.** `scrollWidth`, `clientHeight` and
+`getBoundingClientRect` are all zero without a layout engine, so a unit test of
+this page would pass whatever the CSS said. That is the whole reason the
+detector logic is tested against a stub of the properties it reads and this page
+verifies the environment instead — the page is not where the logic is tested.
 
 ## `api` — service
 
@@ -128,6 +158,18 @@ harness.
 3. **Named exports only.** `bench/fixtures/kit/eslint.config.js:21` makes a
    default export an error: a default export is renamed at every call site, and a
    library's names are its contract.
+
+## The pair — `mono` beside `kit`
+
+The two fixtures above are also one arrangement: a component library published
+as a package beside the monorepo that consumes it, which is the live shape
+decision **0077** names for cross-repository campaigns.
+`bench/scripts/pair-seed.mjs` seeds it — sibling checkouts `mono/` and `kit/`
+under one workspace, a bare clone of each as its `origin`, each config naming
+the other's maps in `campaigns.external[]`, and the `badge-rollout` map in
+`mono` with a node in `kit`, a release node, a metric measured in `kit`, and a
+claim committed by a teammate on a branch only the origin holds. `docs/BENCH.md`
+says what each seed stands for.
 
 ## Checking this file
 

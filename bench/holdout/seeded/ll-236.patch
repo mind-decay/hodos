@@ -1,0 +1,31 @@
+# id: ll-236
+# fixture: snippets
+# package: h6
+# kind: behavioral
+# item: L5
+# line: deploy/deploy.sh:6
+# anchor: ./manage.py migrate || true      # suppress migration errors
+# trigger: Should identify L5 (Control Flow Escape): `|| true` causes the shell to evaluate to exit code 0 regardless of whether `./manage.py migrate` succeeds or fails. Because `set -euo pipefail` only aborts on non-zero exit codes, the subsequent `systemctl restart myapp` runs even when migrations failed — restarting a service that requires a migrated schema against an un-migrated database, which can cause
+# what: logic-lens case #236 (bash-or-true-suppresses-error-L5), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/deploy/deploy.sh b/deploy/deploy.sh
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/deploy/deploy.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++deploy() {
++    echo "Running migrations..."
++    ./manage.py migrate || true      # suppress migration errors
++
++    echo "Restarting service..."
++    systemctl restart myapp
++
++    echo "Notifying team..."
++    curl -s -X POST "$SLACK_WEBHOOK" -d '{"text":"Deploy successful"}'
++}
++
++deploy

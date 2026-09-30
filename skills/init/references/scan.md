@@ -16,6 +16,7 @@ One pass, no subagents. Every line gets a value or the word `absent`.
 | CI | `.github/workflows/*`, `.gitlab-ci.yml`, `azure-pipelines.yml` — what CI runs is what works |
 | test · lint · typecheck config | the runner's config, the linter's config, `tsconfig*.json`, `.editorconfig` |
 | existing AI instructions | `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/*.mdc`, `.cursorrules`, `.github/copilot-instructions.md`, `.windsurfrules`, `.claude/**` |
+| routes | where the application declares its routes, and `absent` for a project that serves none — the router's own file (`createBrowserRouter`, a `<Routes>` tree, a framework's `app/`/`pages/` directory), quoted as `path:line`. It is read by two things that name a "route table" and had nowhere to find one: the attack surface, which resolves a changed file to the routes that render it (decision **0112**), and `--refresh`'s pin prune, which asks whether a pinned route still exists (decision **0094**) |
 | MCP | the server keys of `.mcp.json` |
 | size | `git ls-files | wc -l`, and the five directories holding the most of them |
 

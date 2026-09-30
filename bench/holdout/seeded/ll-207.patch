@@ -1,0 +1,23 @@
+# id: ll-207
+# fixture: snippets
+# package: h2
+# kind: behavioral
+# item: L2
+# line: signup/eligibility.py:7
+# anchor: return is_eligible(age)
+# trigger: 应识别 L2（类型契约违反 / Type Contract Breach）：is_eligible 的默认参数 min_age=18 隐含 age 应当是数字类型（int）。但 check_signup 把 form.get('age') 直接传进去，得到的是 str。Python 3 不允许 str 与 int 直接比较：'21' >= 18 抛 TypeError: '>=' not supported between instances of 'str' and 'int'。 注意 L2 不同于 L3（边界）和 L6（被调方契约）：本 case 的根因是 is_eligible 没有强制 age 的类型契约，调用方传入了不兼容类型。Trace 必须展示 form.get 返回 str → 传入 is_eligible → `>=` 运算符要求 numeric 类型 → 抛 TypeE
+# what: logic-lens case #207 (zh-python-str-int-comparison-L2), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/signup/eligibility.py b/signup/eligibility.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/signup/eligibility.py
+@@ -0,0 +1,7 @@
++def is_eligible(age, min_age=18):
++    """Return True if age meets the minimum age requirement (years)."""
++    return age >= min_age
++
++def check_signup(form):
++    age = form.get('age')   # form.get returns str (or None)
++    return is_eligible(age)

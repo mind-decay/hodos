@@ -1,0 +1,70 @@
+{
+  "repo": "ariadne_v2",
+  "note": "Cases from the pilot. No line of the pilot is stored: each is keyed by its shas, its file:line and the sha-256 of that line trimmed. The package is the one the first reviewer received, kept in pilot-cache/ (gitignored) and checked against packageSha256.",
+  "cases": [
+    {
+      "id": "p-outline-total",
+      "package": "pilot-outline",
+      "slug": "outline-assert-messages",
+      "base": "3a86a6a",
+      "head": "0c98a6f",
+      "kind": "convention",
+      "item": "plan T3 Acceptance",
+      "file": ".claude/rules/assert-message.md",
+      "line": 43,
+      "trigger": "—",
+      "what": "the rule block's own bare-assertion total does not reproduce under the counting method it states: a bare multi-line call with a trailing comma after its last operand is counted as messaged",
+      "found": "Stage 12c-2 pair 4, Review 1 (2026-09-13), major; fixed in 1be6ba8",
+      "anchorSha256": "f2becc39733d80cb10b05ef1bade983ed1245ff93f3b50043f5f3e480e556b7d",
+      "packageSha256": "b1e3cad5c75d47fb107c652f122f0e9e997fa0dc34315a8131888d600784576e"
+    },
+    {
+      "id": "p-outline-heaviest",
+      "package": "pilot-outline",
+      "slug": "outline-assert-messages",
+      "base": "3a86a6a",
+      "head": "0c98a6f",
+      "kind": "convention",
+      "item": "plan T3 Acceptance",
+      "file": ".claude/rules/assert-message.md",
+      "line": 49,
+      "trigger": "—",
+      "what": "the same miscount in the heaviest-crates list: two of its four rows are low",
+      "found": "Stage 12c-2 pair 4, Review 1 (2026-09-13), major; fixed in 1be6ba8",
+      "anchorSha256": "df007068dd494c58c5800e715823b4b9737962ccb5283eae357aea0a4a7aaf34",
+      "packageSha256": "b1e3cad5c75d47fb107c652f122f0e9e997fa0dc34315a8131888d600784576e"
+    },
+    {
+      "id": "p-ts-comment-extra",
+      "package": "pilot-ts",
+      "slug": "parse-facts-ts-js",
+      "base": "5ff6f31",
+      "head": "10c7835",
+      "kind": "behavioral",
+      "item": "L6",
+      "file": "crates/ariadne-parser/src/adapters/treesitter/signature.rs",
+      "line": 287,
+      "trigger": "a TS class member with an own-line comment between its decorator and itself, e.g. a lint directive: the decorator binds to the class and the member loses its doc",
+      "what": "the leading-sibling walk stops at a comment, because comments are named nodes, so the decorator run is cut short",
+      "found": "Stage 12c-2 D2, Review 1 (2026-09-23), major, filed L6; fixed in 7b40489",
+      "anchorSha256": "4b7b4b780fb4e126016ea4e84b20bcc1b240f501b2ad83be71bb7d1150bfa257",
+      "packageSha256": "f327902a1e7d85d13baaf37be7db323af917ffdc98bfa37234c17b5b56ca91c0"
+    },
+    {
+      "id": "p-rust-nested-attribute",
+      "package": "pilot-rust",
+      "slug": "parse-facts-rust-python",
+      "base": "c8abe4f",
+      "head": "7d63b44",
+      "kind": "convention",
+      "item": "plan Invariants",
+      "file": "crates/ariadne-parser/src/adapters/treesitter/signature.rs",
+      "line": 345,
+      "trigger": "—",
+      "what": "an attribute on an item nested in a captured declaration now binds to the item and not its container, which flips the Rust and Python dead-code roots; no task claims the change and no test past the parser pins it",
+      "found": "Stage 12c-2 D4, Review 1 (2026-09-29), major; fixed in 4224b6b",
+      "anchorSha256": "05607555a54343a2d842e37f9b44acfe261ce6056b1fdd4fe7cffa44a1aa97b2",
+      "packageSha256": "dcb60133cc56b7201d04aedd19cdbbd6d2d127435f8c3c484ab37b59accb3e56"
+    }
+  ]
+}

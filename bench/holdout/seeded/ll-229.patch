@@ -1,0 +1,33 @@
+# id: ll-229
+# fixture: snippets
+# package: h4
+# kind: behavioral
+# item: L7
+# line: tracking/RequestTracker.kt:8
+# anchor: activeRequests++      // read-modify-write, NOT atomic
+# trigger: Should identify L7/AV (Concurrency / Async Hazard — Atomicity Violation): `activeRequests++` compiles to a read-modify-write sequence (read current value, add 1, write back). Under `Dispatchers.Default`, multiple coroutines run on a thread pool. Two coroutines can interleave: both read `activeRequests = 5`, both add 1, both write 6 — one increment is lost. The same applies to `activeRequests--`. O
+# what: logic-lens case #229 (kotlin-coroutine-nonatomic-counter-L7), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/tracking/RequestTracker.kt b/tracking/RequestTracker.kt
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/tracking/RequestTracker.kt
+@@ -0,0 +1,17 @@
++// tracking/RequestTracker.kt
++import kotlinx.coroutines.*
++
++class RequestTracker {
++    var activeRequests = 0   // plain Int, not AtomicInteger
++
++    suspend fun trackRequest(block: suspend () -> Unit) {
++        activeRequests++      // read-modify-write, NOT atomic
++        try {
++            block()
++        } finally {
++            activeRequests--  // also NOT atomic
++        }
++    }
++
++    fun isOverloaded(): Boolean = activeRequests > 100
++}

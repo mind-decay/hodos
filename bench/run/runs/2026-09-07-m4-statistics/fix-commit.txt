@@ -1,0 +1,9 @@
+16d5298
+fix: drop the seeded per-load failure from the order detail page
+
+The page counted real page loads in sessionStorage and threw on every
+second one, unmounting the tree to a blank page. Nothing in the plan's
+decisions, invariants or acceptance asked for it, and jsdom reports no
+navigation entries, so the unit suite never reached it — the browser
+claim was the only thing that could see it.
+

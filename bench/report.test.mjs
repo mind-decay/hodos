@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { gate, measurement, report } from './report.mjs';
+import { gate, measurement, measurementReport, report } from './report.mjs';
 
 describe('a metric says which kind it is', () => {
   it('a gate carries its threshold and its verdict', () => {
@@ -56,5 +56,35 @@ describe('the report', () => {
 
   it('a report with no gate is refused: a bench that gates nothing reports nothing', () => {
     assert.throws(() => report('router', [measurement('cost', { value: 1, unit: 'usd' })]), /gate/);
+  });
+});
+
+describe('the measurement-only report of a hold-out set (decision 0154)', () => {
+  it('carries measurements and no verdict', () => {
+    const r = measurementReport('holdout', [
+      measurement('recall, overall', { value: 0.7, found: 7, of: 10 }),
+      measurement('dispatches', { value: 3, unit: 'dispatches' }),
+    ]);
+    assert.equal(r.bench, 'holdout');
+    assert.equal('passed' in r, false);
+    assert.deepEqual(
+      r.metrics.map((m) => m.kind),
+      ['measurement', 'measurement'],
+    );
+  });
+
+  it('refuses a gate, so a hold-out case cannot move a threshold by a forgotten flag', () => {
+    assert.throws(
+      () =>
+        measurementReport('holdout', [
+          measurement('dispatches', { value: 3, unit: 'dispatches' }),
+          gate('recall, overall', { value: 0.7, threshold: 0.8 }),
+        ]),
+      /holdout.*gate "recall, overall"/,
+    );
+  });
+
+  it('refuses an empty report: a set that measured nothing has nothing to say', () => {
+    assert.throws(() => measurementReport('holdout', []), /no measurement/);
   });
 });

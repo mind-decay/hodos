@@ -2,13 +2,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, appendFileSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { changedExports, section, previousFindings } from './review-package.mjs';
+import { changedExports, section, previousFindings, taskDirPaths } from './review-package.mjs';
 
 const SCRIPT = fileURLToPath(new URL('./review-package.mjs', import.meta.url));
 
@@ -218,6 +218,7 @@ test('--since scopes the diff to the fix and carries the previous findings verba
   const text = inputOf(dir);
   assert.match(text, new RegExp(`^Base: ${fixSha.slice(0, 7)} ·`, 'm'));
   assert.match(text, /^## Previous findings$/m);
+  assert.match(text, /^### Spec\nMissing: — · Extra: — · Misunderstood: —$/m);
   assert.ok(text.includes('| major | src/features/orders/summary/api.ts:22 | rules/http.md §2 | — | raw `fetch` instead of the project client | use `request()` |'));
   assert.match(text, /^\+export const fixed = true;$/m);
   assert.ok(!text.includes('+export const f1 = 1;'), 'the first iteration\'s diff is out of scope');
@@ -255,17 +256,42 @@ test('section() returns null for a heading the plan does not have', () => {
   assert.equal(section(PLAN, 'Outcome'), null);
 });
 
-test('previousFindings() returns the Standards table and nothing around it', () => {
-  const table = previousFindings(REVIEW_1);
+test('previousFindings() returns the Spec section and the Standards table, and nothing around them', () => {
+  const found = previousFindings(REVIEW_1);
 
-  assert.ok(table.startsWith('| Sev | Location | Item | Trigger | Finding | Fix |'));
-  assert.ok(table.includes('| minor | src/features/orders/summary/Widget.tsx:31'));
-  assert.ok(!table.includes('## Coverage'));
-  assert.ok(!table.includes('Two findings'), 'the section\'s prose is not part of the table');
-  assert.equal(table.split('\n').length, 4, 'the header, the rule row and the two findings');
+  assert.ok(found.startsWith('### Spec\nMissing: — · Extra: — · Misunderstood: —\n\n### Standards\n| Sev | Location | Item | Trigger | Finding | Fix |'));
+  assert.ok(found.includes('| minor | src/features/orders/summary/Widget.tsx:31'));
+  assert.ok(!found.includes('## Coverage'));
+  assert.ok(!found.includes('## Checks run'));
+  assert.ok(!found.includes('Two findings'), 'the Standards section\'s prose is not part of the table');
 });
 
-test('previousFindings() returns null when the review has no Standards table', () => {
+// Decision 0175: on the pilot's D5 both of review 1's majors were Spec lines —
+// decision 0122's mutation count — and review 2, handed the Standards table
+// alone, returned ACCEPT on what the fix pass had closed with a ruling.
+const REVIEW_SPEC_MAJORS = `# Review 1 — doc-module-token-budget
+Verdict: NEEDS_WORK · blockers 0 · majors 2 · minors 2
+
+## Spec
+Missing: — · Extra: — · Misunderstood: — · Unclaimed: —
+Mutation (major, T2): the ledger records 12 tests and the diff adds 8 declarations.
+Mutation (major, T3): the ledger records 4 tests and the diff adds none.
+
+## Standards
+| Sev | Location | Item | Trigger | Finding | Fix |
+|---|---|---|---|---|---|
+| minor | src/doc.rs:40 | lint | — | unused import | remove |
+`;
+
+test('previousFindings() carries a Spec major the Standards table does not hold', () => {
+  const found = previousFindings(REVIEW_SPEC_MAJORS);
+
+  assert.match(found, /^Mutation \(major, T2\): the ledger records 12 tests/m);
+  assert.match(found, /^Mutation \(major, T3\)/m);
+  assert.match(found, /^\| minor \| src\/doc\.rs:40/m);
+});
+
+test('previousFindings() returns null when the review has neither section', () => {
   assert.equal(previousFindings('# Review 1 — x\nVerdict: ACCEPT · blockers 0 · majors 0 · minors 0\n'), null);
 });
 
@@ -397,6 +423,122 @@ test('--mechanical needs a codemod that is part of the change', () => {
 
   assert.equal(out.status, 1);
   assert.match(out.stderr, /not-committed\.mjs/);
+});
+
+test('the header carries the mutation counts the ledger holds, and a dash where it holds none', () => {
+  // Decision 0122 asks the reviewer to compare <k> against the test declarations
+  // the diff adds. Its inputs are a closed list and none of them was the ledger,
+  // so the count was written and unreadable (proposal XXX, decision 0143). The
+  // dash is the load-bearing half: a diff that adds three test declarations
+  // under `Mutation: —` is the silence the row exists to end.
+  const root = project();
+  const { dir } = task(root);
+
+  let out = run(root, 'orders-summary');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(inputOf(dir), /^Mutation: —$/m);
+
+  appendFileSync(
+    join(dir, 'ledger.md'),
+    '2026-09-01T11:00:00Z Task 1: mutation (3 tests)\n' +
+      '2026-09-01T11:30:00Z Task 2: mutation (0 tests)\n',
+  );
+  out = run(root, 'orders-summary');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(inputOf(dir), /^Mutation: T1 3 tests · T2 0 tests$/m);
+});
+
+test('a ledger row is read in ledger order and a re-mutated task is counted once, latest wins', () => {
+  const root = project();
+  const { dir } = task(root);
+  appendFileSync(
+    join(dir, 'ledger.md'),
+    '2026-09-01T11:00:00Z Task 2: mutation (1 tests)\n' +
+      '2026-09-01T11:30:00Z Task 1: mutation (2 tests)\n' +
+      '2026-09-01T12:00:00Z Task 1: mutation (4 tests)\n',
+  );
+  const out = run(root, 'orders-summary');
+  assert.equal(out.status, 0, out.stderr);
+  // Task order, not ledger order: the reviewer reads the plan's tasks in their
+  // own order. A second row for one task is the later run of the same check.
+  assert.match(inputOf(dir), /^Mutation: T1 4 tests · T2 1 tests$/m);
+});
+
+test('the header reads only the rows after a rollback breaker', () => {
+  // The same rule deriveState obeys (FORMATS.md §7, decision 0023): a rollback
+  // restarts the counters, so everything before it is history. The second
+  // task's row is what pins the slice — review 2's minor 2: with T1's stale row
+  // before the rollback, latest-wins alone already prints the right number, so
+  // that arrangement proved nothing the slice owns. Here T2's only row is
+  // before the rollback, and dropping the slice makes it reappear.
+  const root = project();
+  const { dir } = task(root);
+  appendFileSync(
+    join(dir, 'ledger.md'),
+    '2026-09-01T11:00:00Z Task 2: mutation (7 tests)\n' +
+      '2026-09-01T11:30:00Z Breaker: verify — rollback T1\n' +
+      '2026-09-01T12:00:00Z Task 1: mutation (2 tests)\n',
+  );
+  const out = run(root, 'orders-summary');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(inputOf(dir), /^Mutation: T1 2 tests$/m);
+  const line = /^Mutation: .*$/m.exec(inputOf(dir))[0];
+  assert.doesNotMatch(line, /T2/, 'T2 was rolled back with everything else before the breaker');
+});
+
+test('a task whose only mutation row is before a rollback has no count after it', () => {
+  const root = project();
+  const { dir } = task(root);
+  appendFileSync(
+    join(dir, 'ledger.md'),
+    '2026-09-01T11:00:00Z Task 1: mutation (7 tests)\n' +
+      '2026-09-01T11:30:00Z Breaker: verify — rollback T1\n',
+  );
+  const out = run(root, 'orders-summary');
+  assert.equal(out.status, 0, out.stderr);
+  // A dash, not the stale 7: the rebuilt task has no record yet, which is what
+  // the reviewer should see and file.
+  assert.match(inputOf(dir), /^Mutation: —$/m);
+});
+
+test('a task directory with no ledger packages with a dash, and does not refuse', () => {
+  // `ledger.mjs init` always writes one, so this is a hand-made or damaged
+  // state — and a header cell is not a reason to refuse a review of real code.
+  const root = project();
+  const { dir } = task(root);
+  rmSync(join(dir, 'ledger.md'));
+
+  const out = run(root, 'orders-summary');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(inputOf(dir), /^Mutation: —$/m);
+});
+
+test('an unreadable ledger says so in the cell rather than reading as no rows', { skip: process.platform === 'win32' && 'chmod 0o000 does not make a file unreadable on Windows' }, () => {
+  // Decision 0139's rule, one layer down: the cell is reported in place and the
+  // reason is said. A dash alone would read as "the task mutated nothing".
+  const root = project();
+  const { dir } = task(root);
+  chmodSync(join(dir, 'ledger.md'), 0o000);
+  try {
+    const out = run(root, 'orders-summary');
+    assert.equal(out.status, 0, out.stderr);
+    assert.match(inputOf(dir), /^Mutation: — \(ledger\.md unreadable\)$/m);
+  } finally {
+    chmodSync(join(dir, 'ledger.md'), 0o644);
+  }
+});
+
+test('--target carries no Mutation line: it owns no task and no ledger', () => {
+  const root = project();
+  git(root, 'checkout', '-q', '-b', 'teammate/feature');
+  writeFileSync(join(root, 'their.ts'), 'export const t = 1;\n');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-qm', 'feat: theirs');
+
+  const out = run(root, '--target', 'teammate/feature');
+  assert.equal(out.status, 0, out.stderr);
+  const text = readFileSync(out.stdout.trim(), 'utf8');
+  assert.ok(!text.includes('Mutation:'), 'a diff no task owns has no ledger to read');
 });
 
 // ── --target: a diff hodos did not write (Stage 11c) ────────────────────────
@@ -765,4 +907,130 @@ test('the symbol inside a string is not a call site', () => {
 
   assert.match(input, /- `listOrders` · caller\.ts:3/);
   assert.doesNotMatch(input, /server\.test\.ts/);
+});
+
+// --- decision 0172: a tracked line that names a task directory. `init`
+// gitignores `.claude/hodos/tasks/` (decision 0144), so a citation into it
+// resolves to nothing in any other checkout — 32 of them reached the pilot's
+// trunk. The package computes the list; the reviewer judges each line.
+
+const CITING = [
+  'diff --git a/src/economy.rs b/src/economy.rs',
+  'index 1111111..2222222 100644',
+  '--- a/src/economy.rs',
+  '+++ b/src/economy.rs',
+  '@@ -10,3 +10,5 @@ fn budget() {',
+  ' let a = 1;',
+  '+// the cap is 4000 [src: .claude/hodos/tasks/doc-module-token-budget/plan.md D1]',
+  ' let b = 2;',
+  '-// [src: .claude/hodos/tasks/old-task/plan.md D3] — removing one is the repair',
+  '+let c = 3;',
+  'diff --git a/.gitignore b/.gitignore',
+  '--- a/.gitignore',
+  '+++ b/.gitignore',
+  '@@ -1 +1,2 @@',
+  ' node_modules',
+  '+.claude/hodos/tasks/scratch-task/',
+  'diff --git a/docs/how.md b/docs/how.md',
+  'new file mode 100644',
+  '--- /dev/null',
+  '+++ b/docs/how.md',
+  '@@ -0,0 +1,2 @@',
+  '+Each task writes `.claude/hodos/tasks/<slug>/plan.md`.',
+  '+See .claude/hodos/tasks/orders-summary/plan.md for the decision.',
+].join('\n');
+
+test('taskDirPaths lists the added lines that name a concrete task directory, with their file:line', () => {
+  assert.deepEqual(taskDirPaths(CITING), [
+    '- src/economy.rs:11 — `// the cap is 4000 [src: .claude/hodos/tasks/doc-module-token-budget/plan.md D1]`',
+    '- docs/how.md:2 — `See .claude/hodos/tasks/orders-summary/plan.md for the decision.`',
+  ]);
+});
+
+test('taskDirPaths skips the <slug> placeholder, a removed line, and a .gitignore', () => {
+  const lines = taskDirPaths(CITING).join('\n');
+  assert.doesNotMatch(lines, /<slug>/);
+  assert.doesNotMatch(lines, /old-task/);
+  assert.doesNotMatch(lines, /scratch-task/);
+});
+
+test('a package whose diff cites a task directory carries the section, and one that does not carries none', () => {
+  const root = project();
+  const { dir } = task(root);
+  writeFileSync(join(root, 'cite.ts'), '// capped at 40 [src: .claude/hodos/tasks/orders-summary/plan.md D2]\nexport const cap = 40;\n');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-qm', 'feat: the cap');
+
+  const out = run(root, 'orders-summary');
+
+  assert.equal(out.status, 0, out.stderr);
+  const text = inputOf(dir);
+  assert.match(text, /^## Task-directory paths$/m);
+  assert.match(text, /^- cite\.ts:1 — `\/\/ capped at 40 \[src: \.claude\/hodos\/tasks\/orders-summary\/plan\.md D2\]`$/m);
+
+  const clean = project();
+  const other = task(clean);
+  assert.equal(run(clean, 'orders-summary').status, 0);
+  assert.doesNotMatch(inputOf(other.dir), /## Task-directory paths/);
+});
+
+// --- an inert task's plan (decision 0183)
+//
+// An `inert` change has no behaviour, so its plan carries no design fields and
+// the package has none to copy. What the reviewer is handed instead is the
+// claim the developer confirmed at the verdict, so that it can check it.
+
+const INERT_PLAN = `# Plan — fix-doc
+Path: quick · Type: refactor · Shape: inert · Branch: fix/fix-doc
+
+## Goal
+The doc comment on the two exports says what each one holds.
+
+## Non-goals
+- No line a program reads.
+
+## Tasks
+### T1. Reword the doc comments
+Files: file1.ts, file2.ts
+Acceptance: \`commands.test\` and \`commands.lint\` green.
+`;
+
+/** `task()` with the inert plan and a state that carries the shape, or not. */
+function inertTask(root, { shape = 'inert' } = {}) {
+  const made = task(root, 'fix-doc', { plan: INERT_PLAN });
+  const statePath = join(made.dir, 'state.json');
+  const state = JSON.parse(readFileSync(statePath, 'utf8'));
+  writeFileSync(statePath, JSON.stringify({ ...state, path: 'quick', type: 'refactor', shape }));
+  return made;
+}
+
+test('an inert task whose plan has no Design is packaged, and the package states the shape', () => {
+  const root = project();
+  const { dir } = inertTask(root);
+  const out = run(root, 'fix-doc');
+
+  assert.equal(out.status, 0, out.stderr);
+  const text = inputOf(dir);
+  assert.match(text, /^## Shape: inert \(decision 0183\)$/m);
+  assert.match(text, /no program reads/);
+  assert.ok(!text.includes('## Design (from plan)'), 'an inert plan has no design to copy');
+  assert.ok(text.includes('## Tasks (from plan)\n### T1. Reword the doc comments\n'));
+  assert.match(text, /^## Diff$/m);
+});
+
+test('the same plan without the shape still exits 1: only inert goes without a design', () => {
+  for (const shape of [null, 'mechanical']) {
+    const root = project();
+    inertTask(root, { shape });
+    const out = run(root, 'fix-doc');
+    assert.equal(out.status, 1, `shape ${shape}`);
+    assert.match(out.stderr, /no "## Design" section/);
+  }
+});
+
+test('a task with a design and no shape carries no Shape section', () => {
+  const root = project();
+  const { dir } = task(root);
+  assert.equal(run(root, 'orders-summary').status, 0);
+  assert.ok(!inputOf(dir).includes('## Shape'), 'a shape section appeared on a task with none');
 });

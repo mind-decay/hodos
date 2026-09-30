@@ -1,0 +1,32 @@
+# id: ll-203
+# fixture: snippets
+# package: h2
+# kind: behavioral
+# item: L7
+# line: fetch/fanout.go:7
+# anchor: resp, err := http.Get(u)
+# trigger: 应识别 L7（并发 / 异步风险）：所有 goroutine 共享同一个循环变量 u（Go 1.22 之前的行为），每次循环迭代都覆盖 u 的值。goroutine 启动是异步的，调度时机不确定，多个 goroutine 实际读到的可能是循环结束后的 u（最后一个 URL）或循环中途某个时刻的 u。这正好解释了'同一个 URL 多次出现 + 有些 URL 缺失'的现象。L7 而不是 L4，因为 bug 只在多 goroutine 并发读取共享变量时才出现。修复：在循环内引入局部变量 `u := u`（或使用 Go 1.22+ 的 per-iteration 变量），或把 u 作为参数传给闭包 `go func(u string) {...}(u)`。输出必须以中文为主。
+# what: logic-lens case #203 (zh-go-goroutine-loop-variable-race), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/fetch/fanout.go b/fetch/fanout.go
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/fetch/fanout.go
+@@ -0,0 +1,16 @@
++func fanOut(urls []string) {
++    var wg sync.WaitGroup
++    for _, u := range urls {
++        wg.Add(1)
++        go func() {
++            defer wg.Done()
++            resp, err := http.Get(u)
++            if err != nil {
++                log.Printf("fetch %s failed: %v", u, err)
++                return
++            }
++            resp.Body.Close()
++        }()
++    }
++    wg.Wait()
++}

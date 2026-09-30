@@ -12,7 +12,7 @@
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -61,12 +61,47 @@ export function groupPackages(setDir) {
   });
 }
 
+/**
+ * Where a copy sits in its run, `copies/<id>`, rather than where this machine
+ * put it. Nothing reads the field back — the copies are gitignored and
+ * rebuildable — and an absolute path in a committed file carries a home
+ * directory into the public tree, which `tools/export-public.mjs` refuses.
+ */
+export function placeOf(outDir, copyDir) {
+  const at = relative(outDir, copyDir).split(sep).join('/');
+  return at === '' || at.startsWith('..') ? `copies/${basename(copyDir)}` : at;
+}
+
 const cell = (value) => {
   const text = String(value ?? '').trim();
   return text === '' || text === '—' ? null : text;
 };
 
-/** A `review.md` as the scorer needs it: verdict, rows, section lengths. */
+/**
+ * The Spec section's four words, each with the text the reviewer put after it
+ * (decision 0092). The Unclaimed word is where a derivation defect is reported,
+ * so it has to reach verdicts.json as text: the scorer matches the tokens its
+ * answer key names, and a word count cannot answer that.
+ */
+export function specWords(text) {
+  const body = section(text, 'Spec') ?? '';
+  // The word is the word however it is emphasised. Reviewers write all three
+  // of `Unclaimed:`, `**Unclaimed:**` and `**Unclaimed** —`, and the token the
+  // answer key matches is in the text after the separator either way, so the
+  // reader takes the emphasis and the dash and keeps the prose intact.
+  const marks = [
+    ...body.matchAll(/(?:^|[\s·|])\*{0,2}(Missing|Extra|Misunderstood|Unclaimed)\*{0,2}\s*[:—]\s*\*{0,2}/g),
+  ]
+    .map((m) => ({ word: m[1].toLowerCase(), at: m.index, after: m.index + m[0].length }));
+  const words = { missing: null, extra: null, misunderstood: null, unclaimed: null };
+  for (const [i, mark] of marks.entries()) {
+    const end = i + 1 < marks.length ? marks[i + 1].at : body.length;
+    words[mark.word] = body.slice(mark.after, end).replace(/[\s·]+$/, '').trim() || null;
+  }
+  return words;
+}
+
+/** A `review.md` as the scorer needs it: verdict, rows, the Spec words, section lengths. */
 export function parseReview(text) {
   const verdict = /^Verdict:\s*(ACCEPT|NEEDS_WORK|REJECT)/m.exec(text)?.[1] ?? null;
   const counts = /blockers\s+(\d+)\D+majors\s+(\d+)\D+minors\s+(\d+)/.exec(text);
@@ -112,6 +147,11 @@ export function parseReview(text) {
       ? { blockers: Number(counts[1]), majors: Number(counts[2]), minors: Number(counts[3]) }
       : null,
     findings,
+    spec: specWords(text),
+    // The text as well as the length: the test-floor net reads the Coverage
+    // line, which is one of the three places a cold reviewer could file a
+    // removal, and a word count cannot be matched against a token.
+    coverage: (section(text, 'Coverage') ?? '').trim(),
     words: { spec: words('Spec'), standards: words('Standards'), coverage: words('Coverage') },
     checks: (section(text, 'Checks run') ?? '').split('\n').filter((l) => l.trim().startsWith('-')),
   };
@@ -162,15 +202,24 @@ export function commandFor(pkg, { pluginRoot, copyDir }) {
 
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 
-/** A copy with the package applied, its package file written, and its anchors read. */
-export function prepare(pkg, out) {
+/** The default copy: `fixture-copy.mjs` over `bench/fixtures/<pkg.fixture>`. */
+function copyFromFixtures(pkg, copyDir) {
+  const made = spawnSync('node', [COPIER, pkg.fixture, '--into', copyDir], { encoding: 'utf8' });
+  if (made.status !== 0) throw new Error(`fixture-copy failed for ${pkg.id}: ${made.stderr}`);
+}
+
+/**
+ * A copy with the package applied, its package file written, and its anchors
+ * read. `copy` makes the copy: the hold-out set's fixture lives outside
+ * `bench/fixtures/` (decision 0154), so it passes its own.
+ */
+export function prepare(pkg, out, { copy = copyFromFixtures } = {}) {
   // Absolute from here down: every path below is handed to a process whose cwd
   // is the copy, so a relative `--out` — the form the README's usage line
   // shows — would resolve inside the copy and name nothing.
   const outDir = resolve(out);
   const copyDir = join(outDir, 'copies', pkg.id);
-  const made = spawnSync('node', [COPIER, pkg.fixture, '--into', copyDir], { encoding: 'utf8' });
-  if (made.status !== 0) throw new Error(`fixture-copy failed for ${pkg.id}: ${made.stderr}`);
+  copy(pkg, copyDir);
   const base = git(copyDir, ['rev-parse', '--short', 'HEAD']).stdout.trim();
 
   for (const patch of [...pkg.seeded.map((d) => d.text), ...pkg.clean.map((c) => c.text)]) {
@@ -240,7 +289,7 @@ function configFor(copyDir) {
   };
 }
 
-const dispatch = (command, cwd) =>
+export const dispatch = (command, cwd) =>
   new Promise((done) => {
     const child = spawn(command.file, command.args, { cwd });
     const events = [];
@@ -262,6 +311,85 @@ const dispatch = (command, cwd) =>
     child.on('close', (code) => done({ code, events }));
     child.on('error', (error) => done({ code: 1, events, error: error.message }));
   });
+
+/**
+ * Prepare, dispatch and record every package, `concurrency` at a time, and
+ * write the run's `verdicts.json` and `measurements.json`. `prep(pkg, outDir)`
+ * returns the copy's facts — this bench's `prepare`, or the hold-out set's own
+ * for a case built from a checkout rather than a fixture.
+ */
+export async function runPackages({ packages, outDir, only = null, concurrency = 1, dryRun = false, prep, pluginRoot = REPO }) {
+  mkdirSync(join(outDir, 'copies'), { recursive: true });
+  const results = [];
+
+  const one = async (pkg) => {
+    const started = Date.now();
+    const { copyDir, base, head, files, anchors } = prep(pkg, outDir);
+    process.stdout.write(`${pkg.id}: ${copyDir}\n`);
+    if (dryRun) {
+      results.push({ id: pkg.id, copyDir, files, anchors, findings: [], verdict: null, dryRun: true });
+      return;
+    }
+    const { code, events } = await dispatch(commandFor(pkg, { pluginRoot, copyDir }), copyDir);
+    const result = events.find((e) => e.type === 'result');
+    const reviewPath = join(copyDir, 'review.md');
+    const review = existsSync(reviewPath) ? parseReview(readFileSync(reviewPath, 'utf8')) : null;
+    if (review) cpSync(reviewPath, join(outDir, `${pkg.id}-review.md`));
+    results.push({
+      id: pkg.id,
+      copyDir,
+      base,
+      head,
+      files,
+      anchors,
+      exit: code,
+      verdict: review?.verdict ?? null,
+      counts: review?.counts ?? null,
+      findings: review?.findings ?? [],
+      spec: review?.spec ?? null,
+      coverage: review?.coverage ?? '',
+      words: review?.words ?? null,
+      checks: review?.checks ?? [],
+      turns: result?.num_turns ?? null,
+      cost: result?.total_cost_usd ?? null,
+      seconds: Math.round((Date.now() - started) / 1000),
+    });
+    process.stdout.write(`${pkg.id}: ${review?.verdict ?? 'no review.md'} · ${review?.findings.length ?? 0} findings\n`);
+  };
+
+  const queue = [...packages];
+  const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+    for (;;) {
+      const pkg = queue.shift();
+      if (!pkg) return;
+      await one(pkg);
+    }
+  });
+  await Promise.all(workers);
+
+  results.sort((a, b) => a.id.localeCompare(b.id));
+  for (const result of results) result.copyDir = placeOf(outDir, result.copyDir);
+  // `only` is recorded because the scorer gates on the whole set: a file that
+  // holds part of it is a passing run of that part, or a run that lost the
+  // rest, and nothing else in the file tells the two apart.
+  writeFileSync(
+    join(outDir, 'verdicts.json'),
+    `${JSON.stringify({ runAt: new Date().toISOString(), only, packages: results }, null, 2)}\n`,
+  );
+  writeFileSync(
+    join(outDir, 'measurements.json'),
+    `${JSON.stringify(
+      {
+        runAt: new Date().toISOString(),
+        dispatches: results.length,
+        cost: results.reduce((sum, r) => sum + (r.cost ?? 0), 0),
+        turns: results.map((r) => ({ id: r.id, turns: r.turns, seconds: r.seconds, cost: r.cost })),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
 
 async function main(argv) {
   let outDir = null;
@@ -312,6 +440,8 @@ async function main(argv) {
         verdict: review.verdict,
         counts: review.counts,
         findings: review.findings,
+        spec: review.spec,
+        coverage: review.coverage,
         words: review.words,
         checks: review.checks,
       });
@@ -327,73 +457,7 @@ async function main(argv) {
   }
 
   const packages = groupPackages(HERE).filter((p) => only === null || only.includes(p.id));
-  mkdirSync(join(outDir, 'copies'), { recursive: true });
-  const results = [];
-
-  const one = async (pkg) => {
-    const started = Date.now();
-    const { copyDir, base, head, files, anchors } = prepare(pkg, outDir);
-    process.stdout.write(`${pkg.id}: ${copyDir}\n`);
-    if (dryRun) {
-      results.push({ id: pkg.id, copyDir, files, anchors, findings: [], verdict: null, dryRun: true });
-      return;
-    }
-    const { code, events } = await dispatch(commandFor(pkg, { pluginRoot: REPO, copyDir }), copyDir);
-    const result = events.find((e) => e.type === 'result');
-    const reviewPath = join(copyDir, 'review.md');
-    const review = existsSync(reviewPath) ? parseReview(readFileSync(reviewPath, 'utf8')) : null;
-    if (review) cpSync(reviewPath, join(outDir, `${pkg.id}-review.md`));
-    results.push({
-      id: pkg.id,
-      copyDir,
-      base,
-      head,
-      files,
-      anchors,
-      exit: code,
-      verdict: review?.verdict ?? null,
-      counts: review?.counts ?? null,
-      findings: review?.findings ?? [],
-      words: review?.words ?? null,
-      checks: review?.checks ?? [],
-      turns: result?.num_turns ?? null,
-      cost: result?.total_cost_usd ?? null,
-      seconds: Math.round((Date.now() - started) / 1000),
-    });
-    process.stdout.write(`${pkg.id}: ${review?.verdict ?? 'no review.md'} · ${review?.findings.length ?? 0} findings\n`);
-  };
-
-  const queue = [...packages];
-  const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
-    for (;;) {
-      const pkg = queue.shift();
-      if (!pkg) return;
-      await one(pkg);
-    }
-  });
-  await Promise.all(workers);
-
-  results.sort((a, b) => a.id.localeCompare(b.id));
-  // `only` is recorded because the scorer gates on the whole set: a file that
-  // holds part of it is a passing run of that part, or a run that lost the
-  // rest, and nothing else in the file tells the two apart.
-  writeFileSync(
-    join(outDir, 'verdicts.json'),
-    `${JSON.stringify({ runAt: new Date().toISOString(), only, packages: results }, null, 2)}\n`,
-  );
-  writeFileSync(
-    join(outDir, 'measurements.json'),
-    `${JSON.stringify(
-      {
-        runAt: new Date().toISOString(),
-        dispatches: results.length,
-        cost: results.reduce((sum, r) => sum + (r.cost ?? 0), 0),
-        turns: results.map((r) => ({ id: r.id, turns: r.turns, seconds: r.seconds, cost: r.cost })),
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  await runPackages({ packages, outDir, only, concurrency, dryRun, prep: prepare });
   process.stdout.write(`verdicts: ${join(outDir, 'verdicts.json')}\n`);
   return 0;
 }

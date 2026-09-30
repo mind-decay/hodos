@@ -15,9 +15,9 @@ The developer is the driver of ideas and decisions. hodos is the driver of the *
 | | hodos |
 |---|---|
 | **Project-aware** | `init` derives rules from the codebase's own precedents and from authoritative stack sources, filtered by a behavior-shaping test. No system in the survey does this. |
-| **Frugal** | Three skill descriptions in the model's listing, and only because a kernel invokes them; diff never enters the orchestrator's context; one reviewer; model tiering; frugality is a measured acceptance criterion (§11). |
+| **Frugal** | Three skill descriptions in the model's listing, and only because a kernel invokes them; diff never enters the orchestrator's context; one reviewer; model tiering; frugality is measured and reported as a price, with no threshold (§11). |
 | **Bounded** | 2 review + 2 verify iterations, then a breaker that hands the decision to the human. No infinite loops by construction. |
-| **Verified** | "Done" requires fresh execution evidence against the project's own verify recipe — tests, typecheck, lint, browser, HTTP, accessibility, viewport. |
+| **Verified** | "Done" requires fresh execution evidence from the project's own commands and verify recipe — tests, typecheck, lint, browser, HTTP, accessibility, viewport. |
 | **Human-gated** | The agent never decides what the plan didn't settle. A gap goes to the chat, not to a silent ruling. |
 
 **Beside the first-party tools.** Claude Code ships four things that touch this, and naming them is part of the claim (`research/05`). `/code-review` reviews a diff on demand; hodos's reviewer is the same idea inside a loop that cannot run forever, over a package a script builds — the project's own `commands.test` and `commands.lint` run, the call sites of the exports the diff changed named, and a scored bench behind it. `code-simplifier` refines code while preserving behavior with guidelines; hodos's simplify pass is an ordered ladder with a first-rung stop, one line per cut, a `net:` line, and a marker where a cut was declined. `claude-code-setup` recommends MCP servers, hooks and subagents and writes nothing; `init` writes rules with ≥2 `file:line` precedents, a migration ledger for the instructions a project already had, and a config whose commands were run. `session-report` and `receipts` read the same transcripts `scripts/usage.mjs` does, and `receipts` reporting no dollar figure is the caution `status --cost` copies. The difference in every case is one property: a step here leaves evidence a later step checks.
@@ -117,7 +117,7 @@ Work enters through one command: `/hodos:task <description>`. The other commands
 
 | Path | Research | Plan | Review | Verify |
 |---|---|---|---|---|
-| `quick` | none (one Explore call if needed) | short plan in chat + `plan.md` with all ten design fields, a field with nothing under it written as `none` plus its reason (decision 0032) | one fresh reviewer, both axes | recipe-driven |
+| `quick` | none (one Explore call if needed) | short plan in chat + `plan.md` with all ten design fields, a field with nothing under it written as `none` plus its reason (decision 0032); the `inert` shape writes its short form instead (decision **0183**) | one fresh reviewer, both axes | recipe-driven; the `inert` shape has no verifier, and its evidence is `commands.test` and `commands.lint` |
 | `standard` | on demand — when grilling hits a fact | full grilling, 2–3 architecture options, all design fields | one fresh reviewer | recipe-driven |
 | `deep` | mandatory | full grilling + plan review by a fresh subagent before approval | one fresh reviewer | recipe-driven, perf if declared |
 
@@ -126,6 +126,8 @@ Work enters through one command: `/hodos:task <description>`. The other commands
 **Guarding against the router preferring speed.** The burden of proof is on the lighter path: the router fills a "why not deep" checklist with evidence (files touched, contracts, dependencies, migrations); any unknown moves the verdict heavier; an empty checklist is `deep`. The ratchet is one-way — a task upgrades mid-flight and never downgrades; every upgrade is a ledger event. `/hodos:status` reports the upgrade rate so the criteria are tuned by measurement, not belief.
 
 `quick` eligibility (hypothesis, tuned on the pilot): ≤3 files, no new module, no contract/schema/route change, no new dependency, no data migration. The two rows that carry a judgement — new module, contract/schema/route change — are defined by test in `FORMATS.md §3` (decision 0068).
+
+**`inert`, a shape of `quick`** (decision **0183**). A change whose every edited line is text no program reads to decide anything — a comment, documentation, a message only a human reads, whitespace — keeps the router, one fresh reviewer and the project's own commands, and drops what has nothing to act on. That means no design fields, no second session, no simplify pass and no verifier. Like `mechanical` for `refactor`, it adds no path and changes none of the six rules. The pilot's three `quick` runs were all this kind of change and cost 17.42× their bare arms, because `quick` is otherwise the whole kernel. Any line a program reads upgrades the task to `quick` by the ratchet. The edit is reverted and rebuilt test-first, and the ledger restarts its counts at the upgrade (decision **0184**).
 
 **Campaign verdict.** The router routes to a campaign — semantic criteria, never line counts — when any holds: the work cannot ship as one mergeable unit without breaking main or losing reviewability — which **crossing a repository, or creating, removing or splitting a package or service**, does on its own (row 6 carries both halves; decision 0071) · more than one developer · **fog** (work visible but not yet formulable) · external waits (backend not ready, design pending). A wide refactor is **deep**, not a campaign: it is rule 3's second clause in `FORMATS.md §3`, which is where the reference implementation has read it since Stage 2, and it reads the type and row 1 — a done-metric is part of what a `refactor` plan always has, so naming one selected nothing (decisions 0069, 0071, 0072).
 
@@ -138,7 +140,7 @@ S1  /hodos:task ──► route ──► [research] ──► grill + plan ─�
 S2  /hodos:run  ──► execute (task by task, commit each) ──► simplify ──► review ⇄ fix (≤2) ──► verify ⇄ fix (≤2) ──► finish
 ```
 
-S1 is one unbroken context: grilling, decisions, and the plan build on the same thinking. S2 starts clean: it knows only `plan.md`, `ledger.md`, the rules, and the code. The planning dialogue never pollutes execution, and execution never leaks into review.
+S1 is one unbroken context: grilling, decisions, and the plan build on the same thinking. S2 starts clean: it knows only `plan.md`, `ledger.md`, the rules, and the code. An `inert` task has no S2 (decision **0183**). It has no plan dialogue to keep out of execution and no diff that the session reads, since the reviewer is still a fresh dispatch, so the edit runs in S1 right after the verdict. The planning dialogue never pollutes execution, and execution never leaks into review.
 
 **Phases are not skills.** `task` and `run` are kernels (≤150 lines each, user-invoked, zero listing cost). Each phase is a reference file under `skills/<kernel>/references/`, read from disk **on entering the phase**, completely, fail-closed: if the reference cannot be read, the kernel stops and reports rather than reconstructing the procedure from memory. After compaction the kernel survives (≤5k tokens) and the phase is re-read.
 
@@ -163,11 +165,11 @@ Fresh subagents never see the conversation. Forks are forbidden for review and v
 
 ### 4.4 Human gates and autonomy
 
-Mandatory stops: router verdict (path/type/campaign) · plan approval · a fork the plan did not settle that changes behavior, contract, structure, or dependency · the breaker · destructive or outward-facing actions (push, merge, deleting tracked files).
+Mandatory stops: router verdict (path/type/campaign) · plan approval — one question on an `inert` verdict, which confirms the shape and the short plan together (decision **0183**) · a fork the plan did not settle that changes behavior, contract, structure, or dependency · the breaker · destructive or outward-facing actions (push, merge, deleting tracked files).
 
 Not stops: purely local choices (a name, an order) — the agent decides and records `Ruling: <what> — <why> — <cost if wrong>` in the ledger; all rulings appear in the finish report.
 
-Every plan gap that reached the chat is recorded as `Gap:` — the plan quality metric.
+Every plan gap that reached the chat is recorded as `Gap:` — the plan quality metric. A gap whose resolution overrides an acceptance clause also amends that clause in `plan.md`, dated, with the approved wording kept below it (decision 0176), because both agents read their claims from the plan.
 
 `config.autonomy: "ask"` (default) | `"rulings"` (superpowers-style: decide, record, continue). `"rulings"` downgrades **one** class of stop — the fork the plan did not settle — into a recorded `Ruling:`; the router verdict, the plan approval, the breaker and destructive or outward-facing actions stop under every setting (decision 0030). Off by default because the audience is business software.
 
@@ -196,7 +198,7 @@ Gitignored: working state, one developer, one task.
 |---|---|---|
 | `brief.md` | router | until finish |
 | `research.md` | research | until finish |
-| `plan.md` | planner; `Outcome` section appended by finish | until finish |
+| `plan.md` | planner; an acceptance clause amended by a `Gap:` (decision 0176); `Outcome` section appended by finish | until finish |
 | `ledger.md` | `scripts/ledger.mjs` only | until finish |
 | `state.json` | `scripts/ledger.mjs` only | until finish |
 | `review.md`, `verify.md` | subagents | folded into `plan.md#Outcome`, then deleted |
@@ -204,7 +206,7 @@ Gitignored: working state, one developer, one task.
 | `env.md` | `hodos-preparer`, when a layer would not come up | folded into `plan.md#Outcome` with the rest |
 | `evidence/` | verifier | until finish |
 
-**One writer for machine state.** The model calls `ledger.mjs add "<line>"` (shorthand for `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs …`); the script validates the line against the grammar (`FORMATS.md §6`), reads `ledger.md`, appends to it, and derives `state.json`. The read comes first and an unreadable ledger is a refusal — the file named, nothing written, a non-zero exit — because a state derived from zero events parses cleanly and says the task is at its beginning; and `state.json` and the two claim pointers are **replaced by a rename**, so a kill mid-write leaves the old file rather than half of the new one (decision 0101). An absent ledger is the first line of a task and is not that failure. `.claude/hodos/sessions/<session-id>` names the task **that session** works on and `.claude/hodos/active` the project's, in that order of preference, so hooks need no arguments and two terminals on one repository do not take each other's ledger (decision 0047). Hooks and `status` read only JSON. The model never edits the ledger by hand, and no script parses prose. (Incident: the resume-system's three-grep marker parser and the awk locale bug — `research/01 §3`.)
+**One writer for machine state.** The model calls `ledger.mjs add "<line>"` (shorthand for `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs …`); the script validates the line against the grammar (`FORMATS.md §6`), reads `ledger.md`, appends to it, and derives `state.json`. The read comes first and an unreadable ledger is a refusal — the file named, nothing written, a non-zero exit — because a state derived from zero events parses cleanly and says the task is at its beginning; and `state.json` and the two claim pointers are **replaced by a rename**, so a kill mid-write leaves the old file rather than half of the new one (decision 0101). An absent ledger is the first line of a task and is not that failure. `.claude/hodos/sessions/<session-id>` names the task **that session** works on. `.claude/hodos/active` names the task of a claim made where no id was reachable, and it is read only while no session holds a pointer (decisions 0047, 0171). So hooks need no arguments, and two terminals on one repository do not take each other's ledger. **What the pointers isolate, and what they do not:** they keep each terminal's ledger, state and gates its own, and they do not separate the git working tree the terminals share. The index, the branch and the files are common to both, because worktree per task is a v1 non-goal (§1). So one session's `git commit` can carry the other's edits, and keeping two tasks apart on one checkout is the developers' discipline, not the engine's. Hooks and `status` read only JSON. The model never edits the ledger by hand, and no script parses prose. (Incident: the resume-system's three-grep marker parser and the awk locale bug — `research/01 §3`.)
 
 **Resume.** `run` reads `state.json` + `ledger.md` and continues from the first open line. After compaction, the `SessionStart(compact)` hook re-injects the ledger path. The ledger names commits; git has them even when context does not.
 
@@ -224,11 +226,11 @@ Restating SOLID/KISS/DRY in a rule is a no-op — the model knows them. Quality 
 
 ### 6.1 Grilling
 
-Map the design as a tree; the **frontier** is every decision whose prerequisites are settled. Ask the whole frontier in one round, numbered, each with a recommended answer. Facts are the agent's job (dispatch Explore); decisions are the human's. Done when the frontier is empty — nothing silently assumed. Merged with the decisions table (Principle 7).
+Map the design as a tree; the **frontier** is every decision whose prerequisites are settled. Ask the whole frontier in one round, through `AskUserQuestion` — four questions per call, the recommended answer first — the medium the router's confirmation and the plan's approval already use (decision 0178). Facts are the agent's job (dispatch Explore); decisions are the human's. Done when the frontier is empty — nothing silently assumed. Merged with the decisions table (Principle 7).
 
 ### 6.2 Design section — mandatory plan fields
 
-An empty field means the plan is not ready.
+An empty field means the plan is not ready. The one plan that carries none is an `inert` task's (decision **0183**, amending 0032 for that shape alone): a change no program reads leaves them nothing to hold.
 
 | Field | What it forces |
 |---|---|
@@ -257,9 +259,9 @@ Plan size is an advisory lint (>250 lines: "check whether this is one mergeable 
 
 ### 7.1 Execute
 
-Task by task in the S2 main context: acceptance criterion → the test that pins it, run first and red (`Task N: test red`), unless the task carries one of the four exemptions of §6.2 → code → run the task's check → **commit per task** → `Task N: done (<hash>)`. The red phase is evidence, not a claim: `ledger.mjs` refuses `Task N: done` for a task with no `Task N: test red` before it unless `done` names the exemption (decision 0022). Commit messages are exemplary and project-aware: `init` detects the convention; a real one is followed, a degenerate one ("fix", two letters) is replaced by the engine default (conventional commits, imperative subject, "why" in body, no trailers).
+Task by task in the S2 main context: acceptance criterion → the test that pins it, run first and red (`Task N: test red`), unless the task carries one of the four exemptions of §6.2 → code → run the task's check → **commit per task** → `Task N: done (<hash>)`. The red phase is evidence, not a claim: `ledger.mjs` refuses `Task N: done` for a task with no `Task N: test red` before it unless `done` names the exemption (decision 0022), or carries `--inert` on a task whose shape is `inert` (decision **0183**). Commit messages are exemplary and project-aware: `init` detects the convention; a real one is followed, a degenerate one ("fix", two letters) is replaced by the engine default (conventional commits, imperative subject, "why" in body, no trailers).
 
-Test proof is **mutation**: break the production line the test must pin; the test must go red; restore. Re-reading a test is not proof.
+Test proof is **mutation**: break the production line the test must pin; the test must go red; restore. Re-reading a test is not proof. The run is recorded where a fresh reader can check it — `Task N: mutation (<k> tests)`, `<k>` the number of tests the task wrote and mutated — because a transcript is not a record a resumed session or a review can read, and one proven test out of `k` is a ceiling thinner than the sentence above reads (decision **0122**). The count travels to the reviewer in the review package's `Mutation:` header, which is the only route it has into a closed input list, and the reviewer contradicts it from the diff where it disagrees (decision **0143**).
 
 After all tasks: a **simplify pass** — the author walks its own diff against the defaults list (§7.2) and cuts. Cheap (same context), and it leaves the reviewer with defects rather than helpers. The walk is ordered by the ladder of §7.2 and stops at the first rung that holds, so the pass terminates instead of re-scanning the catalogue against every hunk. It emits to the transcript one line per cut — `L<line>: <tag> <what>. <replacement>.` over the tags `delete/stdlib/native/yagni/shrink`, prefixed with the file on a multi-file diff — and closes with `net: -<N> lines`, or `Lean already.` when nothing was cut. The ledger's line is `Simplify: done (<sha>, net -<n>)` either way: a pass that cut nothing makes no commit and records `net -0` against the head it examined. The transcript and the ledger are two channels, not two alternatives (decision 0034). The net count is reported, never optimized: a readable diff beats a short one, and the count carries no threshold and appears in no bench with a target attached to it (decision 0018).
 
@@ -308,21 +310,53 @@ Input is a file produced by `scripts/review-package.mjs`: the plan's design sect
 
 The prompt states as fact, not role: the code was written by another agent; the implementer's report is testimony, not evidence; a stated rationale never lowers a finding's severity; inspect code outside the diff only for one named risk with one focused check; do not dispatch subagents.
 
-Output — two sections that are never merged or re-ranked against each other: **Spec** (Missing / Extra / Misunderstood against the plan) and **Standards** (findings with severity `blocker/major/minor`, `file:line`, and the violated item: a rule, a plan field, or a concrete defect). A finding without `file:line` and an item is dropped; "would look cleaner" is not a finding. Coverage — what was not reviewed — is stated. ≤400 words per section.
+Output — two sections that are never merged or re-ranked against each other: **Spec** (Missing / Extra / Misunderstood against the plan, and **Unclaimed** the other way — a state member, a failure path or an invariant clause that no `Acceptance:` clause names, derived over the diff and the plan sections the package carries — which are the tasks' clauses and not `## Verify plan` — carrying no severity, decision 0092) and **Standards** (findings with severity `blocker/major/minor`, `file:line`, and the violated item: a rule, a plan field, or a concrete defect). A finding without `file:line` and an item is dropped; "would look cleaner" is not a finding. Coverage — what was not reviewed — is stated. ≤400 words per section.
 
 Iteration 1 fixes blockers and majors (minors if cheap); iteration 2 is a scoped re-review of the fix diff; any verdict other than `ACCEPT` after iteration 2 → breaker.
 
 ### 7.4 Verify contract
 
-Fresh `hodos-verifier` (sonnet). Input: the plan's acceptance criteria, `config.verify.recipes`, the browser adapter, and the profile whose layers the kernel raised before dispatching it. The environment is raised by `scripts/env.mjs` from the run session and never by the verifier: an agent that raises what it then grades has an interest in the result, and a process started inside an agent is orphaned when that agent ends (decision 0074).
+Fresh `hodos-verifier` (sonnet). Input: the plan's acceptance criteria, `config.verify.recipes`, the browser adapter, and the profile whose layers the kernel raised before dispatching it. The environment is raised by `scripts/env.mjs` from the run session and never by the verifier: an agent that raises what it then grades has an interest in the result, and a process started inside an agent is orphaned when that agent ends (decision 0074). Several sessions share one layer: a second `up` attaches to the live raise and spawns nothing, and the layer stops when the last session on it runs `down` (decision 0169).
 
 **Iron law:** no completion claim without a verification command run in this message. Output is a table claim → command → evidence (output excerpt or `evidence/<n>.png`) → status. Every `Skip` carries a reason; a route dropped from the summary is a named failure.
 
-Boundaries: the browser is for CSS variables, layout, cascade, animations, hover/focus, breakpoints — not for logic jsdom already covers; a logic bug found in the browser becomes a finding "+ cover with a test". Sampled mutation checks on new tests. Performance checks only when the plan declared them.
+Boundaries: the browser is for CSS variables, layout, cascade, animations, hover/focus, breakpoints — not for logic jsdom already covers; a logic bug found in the browser becomes a finding "+ cover with a test". Sampled mutation checks on new tests, or on a test line the diff changed where it added none (decision 0173). Performance checks only when the plan declared them.
+
+**What the verifier may add** (decision 0093). A defect on a route no claim names reaches the table from four sources and nothing else: a console error or a failed request on a route the run visited; a detector hit; a crash under an attack; a pin that no longer holds. The row is an ordinary `pass`/`fail` row naming its source in the Command column, counted in the header and carried into the fix pass; an intended case is silenced by `verify.detectors.allow` (`FORMATS.md §2`). A fifth source would be a judgement, and the row's severity is derived from the source rather than chosen (decision 0108).
+
+**The five statuses, and not one of them judged** (decisions **0097**, **0098**, **0108**, **0119**, **0126**, **0127**). A row is `pass`, `fail`, `flaky`, `pre-existing` or `skip`, and each of the last four is a run rather than an opinion. A `fail` carries `blocker | major | minor` read out of a six-row table keyed on the row's own source, because a severity chosen row by row is a judgement wearing a mechanical column. `flaky` is a failure that passed on **exactly one** retry **and that nothing explains**, with both outputs in evidence, and it fails the verdict: a flake recorded as a pass on its retry is the one outcome that actively misinforms. A failure whose mechanism the verifier can name is a `fail` at its severity however the retry went, because the status carries no severity of its own and would drop the row out of the fix pass's order (decision **0126**). `pre-existing` is a **command** row proved red at the task's base sha in a `git worktree` — no base output, no status — and a browser row has no base **run** at all, since the base tree would have to be served and the environment is the kernel's — but it can have a base **proof**, from `git`, inside the bound `FORMATS.md §10` states: the elements byte-identical at base and the diff touching nothing their render depends on (decision **0127**). Outside that bound a pin that no longer holds is this run's `fail · major` with the base sha named and the confusion left to the developer. A `pre-existing` row fails the verdict where its claim is **the plan's**, because the verdict answers for the plan's contract and a claim that never passed is unmet whoever broke it, and does not where nobody claimed it; neither is repaired in the fix pass, which would be editing code outside the diff the review accepted (decision **0120**). A claim whose evidence is a number names the statistic it was read on, and a timing claim reports median and p95 over at least five runs. The catalogue the verifier reads is `oracles.md §5`; the shape is `FORMATS.md §10`.
+
+**Five classes, each with a derivation rule and a decidable oracle** (decision 0096). They are the five things a tester does that the phase did not — Whittaker's tours (`research/09 §2.4`) — and each is a class of claims *derived* from an input the plan already carries, never an exploration:
+
+| Class | Derived from | Oracle |
+|---|---|---|
+| regression (*Money*) | the pins of decision 0094, over a surface of the diff's files and the review package's `## Callers`, resolved through the `ui` recipe's `when` globs to routes | the check's own `expect`; where a route has no pin yet, the plan-independent oracles below |
+| state coverage (*Landmark*) | every member of a typed state the tasks touch (`skills/task/references/plan.md §3` rule 2) | the claim the member yields |
+| negative paths (*Saboteur*) | the preconditions of `### Invariants & failure modes` (rule 1), plus schema and property checks where the project declares a runner | the stated failure, which a precondition names |
+| the state sweep (*Garbage Collector*) | the derived claims × the recipe's routes, each state forced through the adapter's `initScript` | the claim, per state |
+| presentation (*Supermodel*) | the detectors of `scripts/detectors.mjs` on every route swept | the threshold in the decider, measured (decision 0109) |
+
+**The presentation thresholds**, measured on `bench/fixtures/webapp`'s `/shift` page through the browser adapter on 2026-09-07 and kept in `bench/run/runs/2026-09-07-detector-thresholds/` (decision 0109). They are the only numbers in the phase, they live in one pure function, and they are read again at the pilot:
+
+| Detector | Threshold | What the page separated |
+|---|---|---|
+| `overflow` | escape > **1px** | ten boxes at exactly 0, the seeded banner at **352** — `scrollWidth` and `clientWidth` are integers in Chrome even at a device pixel ratio of 2, so 1 excludes a one-pixel rounding and nothing else |
+| `clipped` | cut > **1px** | the seeded notes box at **34**, and no other element on the page with `overflow-y: hidden` at all |
+| `overlap` | both axes > **1px** | the seeded pair at **20×20**, and a 0.5px nudge moved the measured intersection to **19.5** — `getBoundingClientRect` is fractional, so 1 is what excludes a sub-pixel touch |
+| `focus` | ring < **2px** | 0px with the ring removed, 3px with it present — the page bounds the number from above rather than pinning it, and 2 sits inside that interval and is WCAG 2.2 SC 2.4.13's minimum thickness |
+| `axe` | — | none: `lighthouse_audit`'s accessibility category is axe underneath, so the row keeps the audit's `impact` |
+
+A measured fact the `focus` row rests on: with `outline: none` applied, Chrome still reports `outlineWidth: 3px` and changes only `outlineStyle`. The width alone cannot tell a ring from no ring, so the decider reads the style first and the width second.
+
+**And one plan-independent class**, the one that finds what nobody wrote down: on the routes the diff resolves to, under a **closed** attack list — invalid input in every field, permission denied through `stub`, the network killed and throttled through `emulate`, a double submit, a back-and-forward round-trip — the application does not crash. Six conditions say so: no uncaught exception, no console error, no unhandled rejection, no 5xx, a snapshot that still answers, and exactly one request where one was sent. The list is closed because an open one is an exploration with a label on it.
+
+**Four bounds**, and they are what keep the classes from being a cost with no ceiling: the sweep is **pairwise** over routes × states × widths, by the NIST interaction rule (`scripts/matrix.mjs`); every recipe stays **`when`-gated** to the surface the diff touched; the stages run in a **fail-fast order** — command recipes, then `http`, then the browser sweep — with rows behind a red stage written `skip: not run — <recipe> red`; and the **attacks run only on the routes the diff resolves to**, a route the sweep visits and the diff does not reach being swept and not attacked, on a row that says so (decision **0112**, which added this bound after a four-route sweep measured 64 browser operations and reached the verifier's turn bound three operations into its first attack). The fourth is the third's argument applied to a class that had escaped it: a crash on a route this task never touched is not this task's news. The catalogues themselves live in `skills/run/references/oracles.md`, handed to the verifier by path (decision 0106).
+
+**The position, in one sentence.** hodos derives the claims, runs them, and shows the evidence; it does not judge, and the judgement is the developer's. That is why every row above is a command that ran or an action that was taken, why severity is a table rather than a choice, and why what the engine does **not** check is stated in every report rather than imitated: the first cross-feature interaction before a neighbor is pinned, aesthetics and product fit, and usability as a person means it. Those three are Q3 (`research/09 §1`), they are a person's, and `## Not covered`'s residue line says so verbatim on every run.
 
 ### 7.5 Finish
 
-Report to chat: what was done; the simplify pass's `net:` line and any `hodos:` markers written during the task; `Gap:` lines; `Ruling:` lines; open minors; proposals — only where a finding traces to a missing convention, and then of the kind the two `Grep` counts earn (decision 0050): a **rule proposal** where the target shape has ≥2 precedents, a **convention proposal** where it has fewer than two but the flagged shape occurs ≥2 times — a target the code contradicts, so the developer decides it rather than confirms it — and neither where both counts are under two (→ an observation in the report and in `plan.md#Outcome`, decision 0049); a hook proposal on a repeated rule violation. `review.md`/`verify.md` fold into `plan.md#Outcome` and are deleted; the task directory is deleted on confirmation. If the task is a campaign node: the node line → `done` + sha, and the done-metric is re-measured. The branch stays; push and merge never happen.
+Report to chat: what was done; the simplify pass's `net:` line and any `hodos:` markers written during the task; `Gap:` lines; `Ruling:` lines; open minors; proposals — only where a finding traces to a missing convention, and then of the kind the two `Grep` counts earn (decision 0050): a **rule proposal** where the target shape has ≥2 precedents, a **convention proposal** where it has fewer than two but the flagged shape occurs ≥2 times — a target the code contradicts, so the developer decides it rather than confirms it — and neither where both counts are under two (→ an observation in the report and in `plan.md#Outcome`, decision 0049); a hook proposal on a repeated rule violation. `review.md`/`verify.md` fold into `plan.md#Outcome` — the counts, the severities of its `fail` rows, and any `pre-existing` defect the run found and did not introduce — and are deleted; the task directory is deleted on confirmation. **A `pass · pin` row outlives all of it** (decision **0094**): on the developer's approval, its `{route, evaluate, expect}` is written into `verify.recipes[<ui>].checks[]` of the config the recipe came from, so a claim proved once is an assertion every later run of that recipe checks, and one that stops holding is a `fail` row with source *pin* rather than a silence. What survives a finished task is therefore the commits, `history.jsonl`, `plan.md#Outcome`, `evidence/` — and the pins. If the task is a campaign node: the node line → `done` + sha, and the done-metric is re-measured. **A rule anchor this branch moved is re-pointed before the merge** (decision 0180). `verify-citations.mjs` runs over `.claude/rules/`, and a precedent whose anchor moved in a file the branch changed is rewritten on the developer's approval, for their one `docs(rules)` commit on the branch. The change that moved the line carries its repair, the way it carries the tests it updates, and rot no task caused stays with `/hodos:status --prune`. The branch stays; push and merge never happen.
 
 ## 8. Init
 
@@ -352,7 +386,9 @@ Work that is bigger than one mergeable unit, longer than one developer-session, 
 
 **Multiple developers:** a claim is `[active] … @owner` committed on the node's branch; races are resolved socially in v1; `status` shows claims from known branches. A tracker adapter (assignment as claim) is post-v1.
 
-**Multiple repositories:** the map lives in the home repo; a node carries `repo:` and `path:`. Map lookup: current project → upward to the git root (a session in `spa/` sees the monorepo root's maps) → `config.campaigns.external[]`. `finish` in a foreign repo edits the home map and asks the human to commit it; auto-commit is opt-in. Done-metrics carry `repo:`.
+*What "resolved socially" rests on, and what it does not.* The mechanical half is built and measured on a seeded pair of repositories (Stage 9b, decisions **0135**, **0080**): a claim committed on somebody else's branch is read from the refs, reported with its owner and its branch, kept off the frontier, and refused by `claim` unless the developer has settled it and `--force` is passed on their word (decision **0170**), and `/hodos:status` fetches first so that what it reports is not a week old. The **social** half is not a mechanism and is not measured by a fixture: that the owner named is a person who answers, and that two developers who reach for one node settle it between themselves, are what a seed imitates — the owner is a committer identity a script wrote. Stage 12's confirmation row asks for both by name (decision **0077**, `BUILD-PLAN.md` Stage 12); until then this sentence is a design intent with the reporting built under it, and nothing in the engine decides a race — `claim` refuses to write over one it can see, and `--force` is passed only on the developer's word that it is settled — and where the pilot's own pair has one developer, saying so is the answer the row gets, not a pass.
+
+**Multiple repositories:** the map lives in the home repo; a node carries `repo:` and `path:`, and a `repo:` name is that repository root's own directory name, resolved through `config.campaigns.external[]` (decision 0134). Map lookup: current project → upward to the git root (a session in `spa/` sees the monorepo root's maps) → `config.campaigns.external[]`. `finish` in a foreign repo edits the home map, prints the repository, the file and the command, and the developer commits it — that is what "opt-in" is, and no config key does it instead (decisions 0137, 0090). Done-metrics carry `repo:`, and a row that does runs in that repository's git root (decision 0075).
 
 **Close:** all nodes done/dropped, metrics met, human confirms → `status: done`; the file stays for the team; deletion is manual.
 
@@ -378,9 +414,17 @@ Project-specific hooks (formatters, save-time lint) are not the engine's; `init`
 
 **By construction:** the diff never enters the main context; subagent outputs are files, the context gets the verdict; nothing in the skill listing; research returns file lists, not retellings; one reviewer; tiered models; three skill descriptions in the listing rather than eleven — the assistive capabilities of decision **0081** enter through the router, the phases and one conditional digest line, so eleven commands still cost three descriptions; the ledger plus `SessionStart(compact)` make auto-compaction safe (a skill cannot invoke `/compact`; the design assumes auto-compaction will happen).
 
-**Measured frugality — acceptance criterion for v1 (T-1), reported as two numbers** (decision 0045). The **multiplier**: on the pilot project, 5 `quick` and 5 `standard` tasks with and without hodos; starting thresholds `quick` ≤1.3× bare Claude, `standard` ≤2×. And the **findings caught before human review**: blockers and majors from `review.md`, failed claims from `verify.md`. The multiplier alone compares a run that reviews, verifies and mutation-checks against one that does none of it, so it is a ratio between unequal things and rejecting a system on it is Goodhart; the second number is what the first is paid for.
+**Measured frugality — reported as two numbers, with no threshold** (decisions 0045, 0158, 0182). The first is the **multiplier**, hodos ÷ bare Claude on the same work. The second is the **findings caught before human review**: blockers and majors from `review.md`, failed claims from `verify.md`. The multiplier alone compares a run that reviews, verifies and mutation-checks against one that does none of it, so it is a ratio between unequal things, and judging a system on it is Goodhart. The second number is what the first is paid for.
 
-The multiplier is not measured by hand once at the pilot. `scripts/usage.mjs` sums the token usage of a task's sessions from their transcripts — free, no model call — `ledger.mjs` writes it into `history.jsonl` on `Finish`, and `status --cost` reads it. Token counts only: the price of a token is not in the transcript, and one bad number discredits the rest of the report. The pilot corrects the thresholds; without the measurement "frugal" is belief.
+The pilot measured the multiplier at 0.2 (`PILOT.md §12`, `§13`):
+- `quick` **17.42×**, on `claude-opus-5`;
+- `standard` **3.49×**, the same task in both arms, on `claude-opus-5-5`;
+- `deep` **5.28×**, on one task;
+- the `inert` shape, a median of **4.39×**, the same task in both arms, on `claude-opus-5-5`.
+
+The starting thresholds were `quick` ≤1.3× and `standard` ≤2×. Every set missed them, and they are withdrawn rather than reset (decision **0182**), for three reasons. A threshold on a price is the acceptance criterion 0158 removed. A new one would be read off the pairs it then judges. And the denominator moves with the model.
+
+The multiplier is not measured by hand once at the pilot. `scripts/usage.mjs` sums the token usage of a task's sessions from their transcripts — free, no model call — `ledger.mjs` writes it into `history.jsonl` on `Finish`, and `status --cost` reads it. Token counts only: the price of a token is not in the transcript, and one bad number discredits the rest of the report. Without the measurement "frugal" is belief. With it, "frugal" is a price that each project reads off its own tasks.
 
 ## 12. Plugin quality
 
@@ -390,9 +434,22 @@ The multiplier is not measured by hand once at the pilot. `scripts/usage.mjs` su
 
 **Pilot:** `ariadne_v2` (a Rust workspace, ~60k lines, with an existing `.claude/` to migrate and one MCP server — decision 0021). **Dogfooding** from v0.2. **PR policy:** wording changes to skills or rules require evidence (an eval or a reproducible scenario); lint must be green — the only defense against corpus bloat (superpowers, CE, BMAD all fight their own). Releases: semver, CHANGELOG, tag → `marketplace.json` → `claude plugin update`. The name never changes.
 
-## 13. Numbers (hypotheses, corrected by the pilot)
+## 13. Numbers (hypotheses, read against the pilot at 0.2)
 
-250 plan lines (advisory) · 3 attempts on a red check · 2 + 2 iterations · `staleDays` 14 · 1.3× / 2×, reported beside the findings caught before human review (§11) · ≤5 router evidence calls · ≤8 interview questions per batch · `quick` criteria (§4.1).
+250 plan lines (advisory) · 3 attempts on a red check · 2 + 2 iterations · `staleDays` 14 · the multiplier, a price with no threshold, reported beside the findings caught before human review (§11) · ≤5 router evidence calls · ≤8 interview questions per batch · `quick` criteria (§4.1).
+
+Each number was read against the pilot's records on `ariadne_v2` at 0.2 (`docs/stages/12d2-plan.md §1`, `PILOT.md §12–§13`). A number that held is kept as it stands. A number the pilot did not exercise is kept as a hypothesis. A number the pilot missed was changed by a decision, not by this reading.
+
+| Number | What it was read against | Reading |
+|---|---|---|
+| 250 plan lines | ten plans at approval: **1 of 10** over, pair 2's, at 279 and then 280 lines, one mergeable unit, merged as one | held, with no case either way |
+| 3 attempts on a red check | **0** `red-check attempt` lines across the 30 tasks of ten ledgers | unexercised |
+| 2 + 2 iterations | review used its second iteration on **5 of 10** runs, all `ACCEPT` there. Verify used its second on **3 of 10**, all `PASS` there. Both breakers came at verify 1 | held |
+| `staleDays` 14 | the longest-open task ran 11.8 hours | unexercised |
+| the multiplier | `quick` **17.42×** (three different tasks per arm, `claude-opus-5`). `standard` **3.70×** (different tasks) and **3.49×** (D2–D5, the same task, `claude-opus-5-5`). `deep` **5.28×** (D1). The `inert` shape, a median of **4.39×** (M2–M4, the same task, `claude-opus-5-5`) | demoted to a price (decisions **0158**, **0182**) |
+| ≤5 router evidence calls | ten S1 transcripts: **2, 2, 3, 3, 4, 4, 4, 5, 5, 5**, never over | held |
+| ≤8 interview questions per batch | one `init`, two batches: **5**, then **8** | held, at n=1 |
+| `quick` criteria | the three runs the router left at `quick` touched **2, 2 and 1** files and none upgraded. No run was misrouted | held |
 
 ## 14. Glossary — leading words
 
@@ -411,3 +468,4 @@ Use these tokens consistently; they recruit the concept without a sentence.
 - **evidence** — a fresh command output, a screenshot, a citation. Testimony is not evidence.
 - **adapter** — role → tools. **source** — a pointer to authoritative material.
 - **kernel** — a ≤150-line skill that owns a session; **reference** — a phase procedure read on entry.
+- **shape** — a variant of a path that adds no path: **mechanical** (one edit repeated, a `refactor`), **inert** (text no program reads, a `quick`).

@@ -50,6 +50,7 @@ A `target` judgement needs a reason that is not the model's taste: the stack's o
 
   Omitting `paths` loads the rule at every launch, which is for a rule true of every file the project has.
 - Carry the precedents in a `## Precedents` block, one entry per line: the `file:line` resolved from the project root — never as the path reads from the rule's own directory — an em dash, and the text of that line in backticks (`AUTHORING.md §10`). The quoted line is the anchor: it is what tells `--refresh` and `/hodos:status --prune` where the code went when it moves. The source URL and the incident, where there are any, stay in the rule's prose.
+- A rule that asks for a source names what counts as one: a tracked file, a URL, or the fact written in place. It never names a path under `.claude/hodos/tasks/`, which `init` gitignores, so a citation into it resolves in no other checkout (decision **0172**).
 - Target state only. "X for new code, Y for old" hands the model the choice the rule existed to remove.
 - ≤100 lines. A rule that needs more is two rules, or it is documentation.
 

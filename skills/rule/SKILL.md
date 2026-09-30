@@ -45,6 +45,7 @@ Show the file before writing it:
 - A code example over a paragraph, copied from a precedent rather than invented — and for a prescriptive rule, which has none, from the target's own documentation, with the URL.
 - The precedents in a `## Precedents` block: `file:line`, an em dash, and the text of that line in backticks — the anchor `/hodos:status --prune` re-points from when the code moves (`AUTHORING.md §10`). The URL, when the rule came from a source, stays in the prose.
 - The incident, where there was one.
+- A rule that asks for a source says what counts as one: a tracked file, a URL, or the fact written in place. It never names a task directory, which is gitignored (decision **0172**).
 - No legacy clause. A rule describes the target state; "X for new code, Y for old" is two rules and the model picks the wrong one.
 - A `## Migration` section when the rule is prescriptive or resolves a drift: how many places carry the old shape, cited by `file:line`. It goes below the rule, never inside its sentence.
 

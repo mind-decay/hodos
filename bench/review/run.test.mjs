@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { parseMeta, hunkRanges, kindOfItem, score } from './run.mjs';
+import { parseMeta, hunkRanges, kindOfItem, score , report } from './run.mjs';
 
 const RUN = fileURLToPath(new URL('./run.mjs', import.meta.url));
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -272,15 +272,235 @@ test('a finding in another package does not find this package\'s defect', () => 
   assert.equal(result.recall.overall.found, 0);
 });
 
+// ── the test floor: a defect nobody instructed the reviewer to look for ─────
+// Decision 0121 buys its mechanism only if this measurement misses, so the
+// matching rule is fixed **before** the baseline and is the same afterwards:
+// the two numbers compare only if the net does not move between them. A cold
+// reviewer has no assigned section for a removal, so the net is the three
+// places one could land — a Standards row, a Spec word, the Coverage line.
+
+const floorDefect = (over = {}) => ({
+  id: 't1',
+  package: 'p3',
+  fixture: 'webapp',
+  kind: 'test-floor',
+  item: 'Removed test',
+  names: ['OrderList.test', 'href'],
+  file: 'src/features/orders/ui/OrderList.test.tsx',
+  line: 30,
+  // the deletion hunk, as hunkRanges reads it off the patch
+  ranges: { 'src/features/orders/ui/OrderList.test.tsx': [[21, 26]] },
+  ...over,
+});
+
+test('a test-floor defect is found from a Standards row that names it', () => {
+  const result = score({
+    defects: [floorDefect()],
+    clean: [],
+    packages: [
+      pkg({
+        findings: [
+          {
+            sev: 'major',
+            file: 'src/features/orders/ui/OrderList.test.tsx',
+            line: 30,
+            location: 'src/features/orders/ui/OrderList.test.tsx:30',
+            item: 'test floor',
+            trigger: null,
+            finding: 'the href assertion is deleted and no clause names the removal',
+            fix: 'restore it',
+          },
+        ],
+      }),
+    ],
+  });
+
+  assert.equal(result.testFloor.total, 1);
+  assert.equal(result.testFloor.found, 1);
+  assert.deepEqual(result.missed, []);
+});
+
+test('a test-floor defect is found from the Coverage line, not only from a row', () => {
+  const result = score({
+    defects: [floorDefect()],
+    clean: [],
+    packages: [pkg({ coverage: 'Not reviewed: the fixtures. Noted: OrderList.test lost its href assertion.' })],
+  });
+
+  assert.equal(result.testFloor.found, 1);
+});
+
+test('a test-floor defect is found from a Spec word', () => {
+  const result = score({
+    defects: [floorDefect()],
+    clean: [],
+    packages: [pkg({ spec: { extra: 'a deletion in OrderList.test: the href assertion is gone' } })],
+  });
+
+  assert.equal(result.testFloor.found, 1);
+});
+
+test('a review that names the file but not what went is a miss, and says so', () => {
+  const result = score({
+    defects: [floorDefect()],
+    clean: [],
+    packages: [pkg({ coverage: 'Not reviewed: OrderList.test' })],
+  });
+
+  assert.equal(result.testFloor.found, 0);
+  assert.deepEqual(result.missed, ['t1']);
+});
+
+test('a test-floor defect is in no gate denominator', () => {
+  // Decision 0117's reasoning at n=1: a new class entering the four gates would
+  // move a threshold with no decision behind it, and one case cannot bear 80%.
+  const result = score({
+    defects: [floorDefect(), specDefect()],
+    clean: [],
+    packages: [pkg()],
+  });
+
+  assert.equal(result.recall.overall.total, 0, 'neither kind is in overall recall');
+  assert.equal(result.recall.convention.total, 0);
+  assert.equal(result.recall.behavioral.total, 0);
+  assert.equal(result.testFloor.total, 1);
+  assert.equal(result.spec.total, 1);
+});
+
+test('--check-key fails a test-floor patch whose line names a file its diff does not touch', () => {
+  // The file `# line:` names is what the clean-file narrowing keys on, so it is
+  // the one part of the line field a test-floor patch still has to earn.
+  const dir = setCopy();
+  const path = join(dir, 'seeded', 't-deleted-list-assertion.patch');
+  writeFileSync(
+    path,
+    readFileSync(path, 'utf8').replace(
+      '# line: src/features/orders/ui/OrderList.test.tsx:24',
+      '# line: src/features/orders/refund.ts:24',
+    ),
+  );
+  const out = run('--check-key', '--set', dir);
+
+  assert.equal(out.status, 1);
+  const said = out.stdout + out.stderr;
+  assert.match(said, /t-deleted-list-assertion/);
+  assert.match(said, /does not change src\/features\/orders\/refund\.ts/);
+});
+
+test('--check-key holds a test-floor patch to its own contract', () => {
+  const dir = setCopy();
+  const path = join(dir, 'seeded', 't-deleted-list-assertion.patch');
+  writeFileSync(
+    path,
+    readFileSync(path, 'utf8')
+      .replace('# item: Removed test', '# item: L4')
+      .replace('# names: OrderList.test, href', '# names:'),
+  );
+  const out = run('--check-key', '--set', dir);
+
+  assert.equal(out.status, 1);
+  const said = out.stdout + out.stderr;
+  assert.match(said, /t-deleted-list-assertion/);
+  assert.match(said, /item is Removed test/);
+  assert.match(said, /names the tokens/);
+});
+
+test('a finding on the line a seeded defect changed in a clean file is not a false positive', () => {
+  // Found by Stage 12a's baseline run: `t-deleted-list-assertion` deletes a
+  // line from the one file p3's clean set names, so the reviewer's correct
+  // catch was scored a false positive and precision printed 43/44. clean.json
+  // says its files are "changed correctly", and that stops being true of a
+  // file a seeded patch also edits.
+  const finding = {
+    sev: 'major',
+    file: 'src/features/orders/ui/OrderList.test.tsx',
+    line: 23,
+    location: 'src/features/orders/ui/OrderList.test.tsx:23',
+    item: 'plan `### Refactor in scope`',
+    trigger: null,
+    finding: 'the href assertion is gone',
+    fix: 'restore it',
+  };
+  const clean = [{ package: 'p3', file: 'src/features/orders/ui/OrderList.test.tsx' }];
+  const files = ['src/features/orders/ui/OrderList.test.tsx'];
+
+  const shielded = score({
+    defects: [floorDefect()],
+    clean,
+    packages: [pkg({ files, findings: [finding] })],
+  });
+  assert.equal(shielded.precision.falsePositives, 0, 'the seeded defect names that file');
+
+  // and the rule has not gone away: the same finding in a package whose seeded
+  // defects leave that file alone is still a false positive.
+  const bare = score({
+    defects: [floorDefect({ file: 'src/features/orders/refund.ts' })],
+    clean,
+    packages: [pkg({ files, findings: [finding] })],
+  });
+  assert.equal(bare.precision.falsePositives, 1);
+});
+
+test('the exclusion is the seeded hunk, not the whole clean file', () => {
+  // Review 1's major 3: keying on the file exempted every finding in it and
+  // silently cost one of six clean files, while MINIMUMS.clean and --check-key
+  // still counted six. Keyed on the seeded patch's own hunk, the clean set is
+  // six files and only the lines the seeded patch changed are exempt.
+  const clean = [{ package: 'p3', file: 'src/features/orders/ui/OrderList.test.tsx' }];
+  const files = ['src/features/orders/ui/OrderList.test.tsx'];
+  const at = (line) => ({
+    sev: 'major',
+    file: 'src/features/orders/ui/OrderList.test.tsx',
+    line,
+    location: `src/features/orders/ui/OrderList.test.tsx:${line}`,
+    item: 'plan `### Refactor in scope`',
+    trigger: null,
+    finding: 'something',
+    fix: 'something',
+  });
+  // the seeded deletion's hunk, as hunkRanges reads it from the patch
+  const seeded = floorDefect({ ranges: { 'src/features/orders/ui/OrderList.test.tsx': [[21, 26]] } });
+
+  const inside = score({ defects: [seeded], clean, packages: [pkg({ files, findings: [at(23)] })] });
+  assert.equal(inside.precision.falsePositives, 0, 'the seeded patch changed that line');
+
+  const outside = score({ defects: [seeded], clean, packages: [pkg({ files, findings: [at(35)] })] });
+  assert.equal(outside.precision.falsePositives, 1, 'the clean change in the same file is still clean');
+});
+
+test('the report prints recall, test-floor as a measurement', () => {
+  const lines = report({
+    packages: ['p3'],
+    spec: { total: 0, found: 0, rate: 1, entries: 0 },
+    testFloor: { total: 1, found: 1, rate: 1 },
+    recall: {
+      overall: { total: 1, found: 1, rate: 1 },
+      convention: { total: 1, found: 1, rate: 1 },
+      behavioral: { total: 0, found: 0, rate: 1 },
+    },
+    precision: { findings: 1, invalid: 0, falsePositives: 0, absences: 0, value: 1 },
+    missed: [],
+    miscategorised: [],
+    invalidFindings: [],
+    falsePositiveFindings: [],
+  });
+
+  assert.match(lines, /recall, test-floor \| 1\/1/);
+  assert.match(lines, /recall, test-floor.*measurement/);
+});
+
 test('--check-key exits 0 on the shipped set and reports its shape', () => {
   const out = run('--check-key');
 
   assert.equal(out.status, 0, out.stderr);
-  assert.match(out.stdout, /19 seeded/);
+  assert.match(out.stdout, /22 seeded/);
   assert.match(out.stdout, /12 convention/);
   assert.match(out.stdout, /7 behavioral/);
+  assert.match(out.stdout, /2 spec/);
+  assert.match(out.stdout, /1 test-floor/);
   assert.match(out.stdout, /7 distinct/);
   assert.match(out.stdout, /6 clean files/);
+  assert.match(out.stdout, /6 packages/);
 });
 
 /** A copy of the shipped set, so a doctored patch never touches the repository. */
@@ -463,5 +683,131 @@ test('--json prints the labeled report: four gates, and measurements when the ru
   assert.equal(report.metrics.find((m) => m.name === 'turns, mean').value, 3);
   assert.equal(report.passed, true);
   assert.equal(report.details.recall.overall.found, 18);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+
+// ── the spec kind (decision 0092) ──────────────────────────────────────────
+// A derivation defect is not a row of the Standards table: the reviewer names
+// it in the Spec section's Unclaimed word. So it is scored on that text, and
+// the answer key says which token has to be in it — the member's own name.
+
+const specDefect = (over = {}) => ({
+  id: 's1',
+  package: 'p3',
+  fixture: 'webapp',
+  kind: 'spec',
+  item: 'Unclaimed',
+  names: ['declined'],
+  file: 'src/features/orders/refund.ts',
+  line: 3,
+  ...over,
+});
+
+const pkg = (over = {}) => ({ id: 'p3', files: [], findings: [], ...over });
+
+test('a spec defect is found when the Unclaimed word names its member', () => {
+  const result = score({
+    defects: [specDefect()],
+    clean: [],
+    packages: [pkg({ spec: { unclaimed: '`declined` — the third member of RefundState, added at src/features/orders/refund.ts:3, is in no claim' } })],
+  });
+
+  assert.equal(result.spec.total, 1);
+  assert.equal(result.spec.found, 1);
+  assert.deepEqual(result.missed, []);
+});
+
+test('a spec defect the Unclaimed word does not name is missed', () => {
+  const result = score({
+    defects: [specDefect()],
+    clean: [],
+    packages: [pkg({ spec: { unclaimed: '`requested` — the busy flag has no claim' } })],
+  });
+
+  assert.equal(result.spec.found, 0);
+  assert.deepEqual(result.missed, ['s1']);
+});
+
+test('an empty Spec section finds no spec defect, and does not throw', () => {
+  const result = score({ defects: [specDefect()], clean: [], packages: [pkg()] });
+
+  assert.equal(result.spec.found, 0);
+});
+
+test('spec defects stay out of the recall gates and are counted beside them', () => {
+  // The gates were bought on twelve convention and seven behavioral defects.
+  // A new class entering their denominator would move a threshold without a
+  // decision, so it is reported as its own measurement (11d-1 T4).
+  const result = score({
+    defects: [defect(), specDefect()],
+    clean: [],
+    packages: [pkg({ id: 'p1', findings: [finding()] }), pkg()],
+  });
+
+  assert.equal(result.recall.overall.total, 1);
+  assert.equal(result.recall.overall.rate, 1);
+  assert.equal(result.spec.total, 1);
+  assert.equal(result.spec.found, 0);
+});
+
+test('a row finding never credits a spec defect, whatever line it names', () => {
+  const result = score({
+    defects: [specDefect({ file: 'src/features/orders/model.ts', line: 21 })],
+    clean: [],
+    packages: [pkg({ findings: [finding()] })],
+  });
+
+  assert.equal(result.spec.found, 0);
+});
+
+test('--check-key accepts the spec kind and counts it in the shape', () => {
+  const out = run('--check-key');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /22 seeded/);
+  assert.match(out.stdout, /12 convention/);
+  assert.match(out.stdout, /7 behavioral/);
+  assert.match(out.stdout, /2 spec/);
+});
+
+test('--check-key fails a spec patch that names no token to match on', () => {
+  const dir = setCopy();
+  const path = join(dir, 'seeded', 's-unclaimed-refund-state.patch');
+  writeFileSync(path, readFileSync(path, 'utf8').replace(/# names: .*\n/, ''));
+  const out = run('--check-key', '--set', dir);
+
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /names/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('--check-key fails a spec patch that carries a trigger', () => {
+  const dir = setCopy();
+  const path = join(dir, 'seeded', 's-unclaimed-refund-state.patch');
+  writeFileSync(path, `${readFileSync(path, 'utf8').replace('# names:', '# trigger: a refund that was declined\n# names:')}`);
+  const out = run('--check-key', '--set', dir);
+
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /trigger/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the spec recall is a measurement in the JSON report, never a gate', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodos-review-spec-'));
+  const verdicts = join(dir, 'verdicts.json');
+  cpSync(join(HERE, 'runs/2026-09-02/verdicts.json'), verdicts);
+  const out = spawnSync(process.execPath, [RUN, '--verdicts', verdicts, '--json'], { encoding: 'utf8' });
+
+  assert.equal(out.status, 0, out.stderr);
+  const report = JSON.parse(out.stdout.slice(out.stdout.indexOf('{')));
+  const spec = report.metrics.find((m) => m.name === 'recall, spec');
+  assert.equal(spec.kind, 'measurement');
+  assert.equal('threshold' in spec, false);
+  assert.deepEqual(
+    report.metrics.filter((m) => m.kind === 'gate').map((m) => m.name),
+    ['recall, overall', 'recall, convention', 'recall, behavioral', 'precision'],
+  );
+  assert.equal(report.passed, true);
   rmSync(dir, { recursive: true, force: true });
 });

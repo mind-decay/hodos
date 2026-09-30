@@ -1,0 +1,33 @@
+# id: ll-232
+# fixture: snippets
+# package: h5
+# kind: behavioral
+# item: L1
+# line: billing/invoice.js:13
+# anchor: return this.subtotal * (1 + TAX_RATE);  // which TAX_RATE?
+# trigger: Should identify L1 (Shadow Override): `total()` references `TAX_RATE` in its closure. JavaScript's lexical scoping resolves `TAX_RATE` in `total()` to the nearest enclosing scope where it is defined. The `const TAX_RATE = taxExempt ? 0 : 0.08` declaration inside `constructor` is block-scoped to the constructor body — it does NOT exist in the class method scope. The `total()` method is defined at c
+# what: logic-lens case #232 (js-constructor-const-shadow-L1), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/billing/invoice.js b/billing/invoice.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/billing/invoice.js
+@@ -0,0 +1,17 @@
++// billing/invoice.js
++const TAX_RATE = 0.08;   // module-level constant
++
++class Invoice {
++    constructor(subtotal, taxExempt = false) {
++        const TAX_RATE = taxExempt ? 0 : 0.08;  // local const, same name
++        this.subtotal = subtotal;
++        this.taxExempt = taxExempt;
++        // TAX_RATE local is unused after this line
++    }
++
++    total() {
++        return this.subtotal * (1 + TAX_RATE);  // which TAX_RATE?
++    }
++}
++
++console.log(new Invoice(100, true).total());  // expected 100, actual?

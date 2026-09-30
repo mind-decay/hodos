@@ -49,3 +49,25 @@ export function report(bench, metrics, details) {
   if (details !== undefined) out.details = details;
   return out;
 }
+
+/**
+ * The report of a hold-out set: measurements and nothing else (decision 0154).
+ * A hold-out case exists to be read, never to fail a stage, so a gate here is
+ * a case promoted to a threshold without a decision — refused, like the two
+ * ways `gate` and `measurement` refuse a label that drifted.
+ * @param {string} bench
+ * @param {ReturnType<typeof measurement>[]} metrics
+ * @param {Record<string, unknown>} [details]
+ */
+export function measurementReport(bench, metrics, details) {
+  const gated = metrics.find((m) => m.kind !== 'measurement');
+  if (gated) {
+    throw new Error(`report "${bench}": gate "${gated.name}" in a measurement-only set — a threshold here needs a decision`);
+  }
+  if (metrics.length === 0) {
+    throw new Error(`report "${bench}": no measurement — a set that measured nothing has nothing to report`);
+  }
+  const out = { bench, metrics };
+  if (details !== undefined) out.details = details;
+  return out;
+}

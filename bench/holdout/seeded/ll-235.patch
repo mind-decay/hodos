@@ -1,0 +1,24 @@
+# id: ll-235
+# fixture: snippets
+# package: h5
+# kind: behavioral
+# item: L9
+# line: reports/parser.py:6
+# anchor: return datetime.datetime.strptime(date_str, "%A, %d %B %Y").date()
+# trigger: Should identify L9 (Time / Locale Hazard): Python's `strptime` uses the process locale to interpret `%A` (weekday name) and `%B` (month name) directives. On the developer's machine with `en_US.UTF-8`, `%A` matches 'Monday' and `%B` matches 'March'. On the French-locale container (`fr_FR.UTF-8`), `%A` expects 'lundi' and `%B` expects 'mars' — parsing 'Monday, 03 March 2025' raises `ValueError: time
+# what: logic-lens case #235 (python-strptime-locale-dependent-L9), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/reports/parser.py b/reports/parser.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/reports/parser.py
+@@ -0,0 +1,8 @@
++# reports/parser.py
++import datetime
++
++def parse_report_date(date_str: str) -> datetime.date:
++    """Parse dates like 'Monday, 03 March 2025'."""
++    return datetime.datetime.strptime(date_str, "%A, %d %B %Y").date()
++
++# Example: parse_report_date('Monday, 03 March 2025') -> date(2025, 3, 3)

@@ -1,0 +1,23 @@
+# id: ll-202
+# fixture: snippets
+# package: h2
+# kind: behavioral
+# item: L9
+# line: booking/slots.py:7
+# anchor: return (last + timedelta(hours=24)).isoformat()
+# trigger: Should identify L9 (Time / Locale Hazard): datetime.fromisoformat returns a naive datetime — no timezone attached. Adding timedelta(hours=24) advances by exactly 86400 wall-clock-equivalent seconds, but the user thinks of '24 hours later' as 'same wall-clock time tomorrow'. On the DST spring-forward day in America/Los_Angeles, midnight-to-midnight is only 23 wall-clock hours, so '01:30 + 24h' land
+# what: logic-lens case #202 (logic-review-naive-datetime-dst-arithmetic), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/booking/slots.py b/booking/slots.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/booking/slots.py
+@@ -0,0 +1,7 @@
++from datetime import datetime, timedelta
++
++def next_appointment_slot(last_visit_iso):
++    # last_visit_iso is a wall-clock ISO timestamp like '2026-03-08T01:30:00'
++    # Schedule the next visit exactly 24 hours later.
++    last = datetime.fromisoformat(last_visit_iso)
++    return (last + timedelta(hours=24)).isoformat()

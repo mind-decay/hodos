@@ -1,6 +1,6 @@
 ---
 name: status
-description: Show the hodos state of this project and its hygiene — active and stale tasks, config validity, rule lint, session pointers, and the rates history.jsonl has accumulated. Read-only until the developer confirms an action. Run it as /hodos:status, with --debt for the simplify markers left in the code, --cost for token usage, or --prune for the rules and whether their anchored precedents still resolve.
+description: Show the hodos state of this project and its hygiene — active and stale tasks, config validity, rule lint, session pointers, and the rates history.jsonl has accumulated. It writes nothing to the project until the developer confirms an action; §1's git fetch updates remote-tracking refs and nothing else. Run it as /hodos:status, with --debt for the simplify markers left in the code, --cost for token usage, or --prune for the rules and whether their anchored precedents still resolve.
 disable-model-invocation: true
 argument-hint: "[--debt|--cost|--prune]"
 allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
@@ -8,7 +8,7 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 
 # status
 
-Report what this project's hodos layer holds and what has gone stale in it. Every section is a script's output plus what to do about it. Nothing is deleted, moved or rewritten until the developer says so, and `--debt` changes nothing at all.
+Report what this project's hodos layer holds and what has gone stale in it. Every section is a script's output plus what to do about it. Nothing is deleted, moved or rewritten until the developer says so, and `--debt` changes nothing at all. The one call that reaches outside this machine is §1's fetch, which updates remote-tracking refs and nothing else (decision **0080**).
 
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/config.mjs find` first. `notFound` → say `run /hodos:init first` and stop: there is no hodos layer to report on.
 
@@ -17,10 +17,10 @@ Report what this project's hodos layer holds and what has gone stale in it. Ever
 ## 1. The digest
 
 ```
-node ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs --full
+node ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs --full --fetch
 ```
 
-The same content the `SessionStart` hook prints, uncapped: the header, one line per active task with its phase and last event, one per stale task with its age, then one block per campaign map — its frontier counts, its ready and held nodes, its blocked ones with what they wait for, its fog, its active ones with the owner and branch each is claimed on, and its waits. Print it as it comes; its resume line already names the command for each task. A `held` node is a status and a dependency disagreeing: name the map and the node, and offer to fix the map, which is where node lines are changed. A map that reads `cross-repository (Stage 9b)` reaches into another repository, which 0.1 does not resolve — report the line and carry on.
+`--fetch` is `git fetch --no-tags --quiet` under five seconds in each repository a campaign map lives in, so a claim committed on somebody else's branch is read from a current ref (decisions **0080**, **0138**). No merge, no rebase, no working-tree change; no hook passes the flag. Then the same content the `SessionStart` hook prints, uncapped: the header, one line per active task with its phase and last event, one per stale task with its age, then one block per campaign map — its frontier counts, its ready and held nodes, its blocked ones with what they wait for, its fog, its active ones with the owner and branch each is claimed on, and its waits. Print it as it comes; its resume line already names the command for each task. A `held` node is a status and a dependency disagreeing: name the map and the node, and offer to fix the map, which is where node lines are changed. A map may live in another repository — `config.campaigns.external[]` names it, and its block reads like any other. A `claimed` node is one another branch holds: name the owner and the branch, and say that it is not on this session's frontier (decision **0135**). `fetch failed — the map is as of your last pull` means the claims below it are as fresh as the developer's last pull and no fresher — report the line and the frontier both, and never a retry loop.
 
 ## 2. The config
 
@@ -28,7 +28,7 @@ The same content the `SessionStart` hook prints, uncapped: the header, one line 
 node ${CLAUDE_PLUGIN_ROOT}/scripts/config.mjs check
 ```
 
-Exit 0 and `config: ok` → one line saying so. Findings → print them: an `error` is a key the scripts do not read, so the feature it names is off, which is what this check exists for — a misspelled gate is off in silence. A `warning` is a key hodos does not know, which a newer version may.
+Exit 0 and `config: ok` → one line saying so. Findings → print them: an `error` is a key the scripts do not read, so the feature it names is off, which is what this check exists for — a misspelled gate is off in silence. A `warning` is a config that loads carrying something that will not do what it looks like: a key hodos does not know, which a newer version may; a key it has retired; or a pinned predicate written on a shape that rots — a class or an id, a walk to an element rather than a query for it, a bare expression where the adapter runs a function (decisions **0118**, **0129**, **0130**).
 
 ## 3. The rules
 
@@ -84,7 +84,7 @@ Read `history.jsonl`. For each finished task with a `usage` object: the slug, `i
 
 `"usage": null` → `no usage data` for that row: no transcript could be read when it finished. Never a substituted number.
 
-Token counts only. hodos prints no dollar figure — the price of a token is not in the transcript — and the T-1 multiplier needs the paired runs of the pilot (`DESIGN.md §11`), so say that rather than dividing by something this file does not hold.
+Token counts only. hodos prints no dollar figure — the price of a token is not in the transcript — and the multiplier, hodos ÷ bare on the same task, needs a bare run of that task, which this file does not hold (`DESIGN.md §11`). Say that rather than dividing by anything else.
 
 ## Completion
 

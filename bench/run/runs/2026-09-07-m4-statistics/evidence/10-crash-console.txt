@@ -1,0 +1,25 @@
+Route: /orders/o-1 (real, full top-level navigation — not a client-side route change)
+Reproduced twice in this run (initial attack setup, and again on retry):
+
+[error] Uncaught Error: the order detail failed to render on this load (0 args)
+[warn] An error occurred in the <OrderDetailPage> component. Consider adding an
+error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+Cause (src/features/orders/ui/OrderDetailPage.tsx, added in this task's diff,
+f034685..HEAD): a `loadNumber()` counter keyed on `performance.getEntriesByType
+('navigation')`, persisted in sessionStorage, throws on every second real page
+load of this route:
+  if (loadNumber() % 2 === 0) throw new Error('the order detail failed to render on this load');
+jsdom reports no navigation entries, so the unit suite (npm test) never
+exercises this branch — only a real browser load does. No ErrorBoundary wraps
+<App> (src/main.tsx), so the thrown error unmounts the tree to a blank page.
+
+Observed load sequence in this run (real top-level navigations to /orders/:id only):
+  load 1 (odd)  -> ok            (evidence/03-orders-detail-load1.png)
+  load 2 (even) -> CRASH         (evidence/04-orders-detail-crash.png)
+  load 3 (odd)  -> ok, under Slow 3G (evidence/06-orders-detail-slow3g.png)
+  load 4 (even) -> CRASH, retry, under Slow 3G (evidence/08-orders-detail-crash-retry.png)
+An `offline` reload in between (load attempt that failed at the network layer,
+chrome-error://chromewebdata/) rendered no application JS and is not counted
+as one of the above.

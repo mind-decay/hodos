@@ -21,7 +21,7 @@ The dispatch names paths, and nothing else arrives with it:
 - `.claude/rules/*.md` — the project's rules, each with its precedents
 - the repository — for checking a citation or a claim about existing code
 
-## The six gaps
+## The seven gaps
 
 A gap is a place where an implementer with only this plan would guess. Each one is a finding; everything else is noise.
 
@@ -31,12 +31,14 @@ A gap is a place where an implementer with only this plan would guess. Each one 
 4. **An unstated assumption about data or scale.** A list the plan iterates whose length nothing bounds; a query per row; a payload whose size is never named. The `Data & scale` field is where this belongs, and its absence from *that* field is gap 1 — this gap is the assumption living silently in another field.
 5. **A decision with no real alternative.** The decisions table offers one option and a straw man, or the `Architecture alternatives` field points at a decision that compares nothing. Design-it-twice is the requirement it fails. An architecture row whose `Axis` cell is empty, or whose alternatives do not actually differ on the axis it names, is the same gap read from the other end (decision **0085**): the five axes are module boundary · dependency direction · where state lives · what becomes an invariant · what fails and how, and a row naming one of them while both options put state in the same place has compared two spellings.
 
-6. **A spike bar with no statistic.** A numeric bar in a `spike` plan's `## Question` names the statistic it is read on — median, worst, p75, or *n of m samples over* — or it is not approvable (decision **0088**): "does it cross ~100 ms at N = 1000" is answered both ways by seven samples at 78.5 median and 241.5 worst, and the spike then asks the developer the question its own `## Exit` was for. Read the bar and the exit together; a bar the exit cannot be applied to is this gap whichever of the two is missing.
+6. **A numeric bar with no statistic, or a comparison with no tolerance.** An acceptance clause that compares a number — *no regression*, *not slower*, *within* — names its tolerance as well as its statistic (decision **0177**). A numeric bar in a `spike` plan's `## Question` names the statistic it is read on — median, worst, p75, or *n of m samples over* — or it is not approvable (decision **0088**): "does it cross ~100 ms at N = 1000" is answered both ways by seven samples at 78.5 median and 241.5 worst, and the spike then asks the developer the question its own `## Exit` was for. Read the bar and the exit together; a bar the exit cannot be applied to is this gap whichever of the two is missing.
+
+7. **A claim the plan's own contract demands, that no clause names.** The three rules of the plan phase derive the claim set from the plan's own inputs, and this gap is the check that they ran (decision **0092**). Three inputs, each read against the tasks' `Acceptance:` clauses and `## Verify plan`: a **member of a typed state** the tasks touch that no claim names — read the type in the code, the reviewer's own repository access is for exactly this; a **branch** a task adds whose failure path no claim names; and a **postcondition, invariant or precondition** in `### Invariants & failure modes` with no claim. Where the state is not a type, the plan's own line — `States: idle | loading | error | empty — not a type; enumerated by hand.` — is what the claims are read against, and a plan that neither types the state nor writes that line has this gap on the state rather than gap 1 on the field. One row per unnamed member, branch or clause, and the consequence to state is the concrete one: that path reaches no row in `verify.md`, so it ships unexercised.
 
 ## Procedure
 
 1. Read `plan.md` whole. Read `research.md`. List the rules and read each one.
-2. Walk the ten design fields; then the tasks; then the decisions table, whose architecture rows are checked for their axis the way a design field is checked for content. On a `spike` plan, walk `## Question`, `## Timebox` and `## Exit` in their place, and check a numeric bar for its statistic the same way.
+2. Walk the ten design fields; then the tasks; then the decisions table, whose architecture rows are checked for their axis the way a design field is checked for content. Walking the tasks includes the claim set: `### Invariants & failure modes` clause by clause, the types the tasks touch read in the code, and the branches the tasks add — the three inputs of gap 7. On a `spike` plan, walk `## Question`, `## Timebox` and `## Exit` in their place, and check a numeric bar for its statistic the same way.
 3. For each candidate finding, name the line in `plan.md` and the concrete consequence during implementation. A finding whose consequence you cannot state is dropped — that pass is what keeps this review worth its dispatch.
 4. Check every `file:line` the plan cites that carries a claim you depend on. A citation that does not say what the plan says it says is gap 3.
 5. Write `plan-review.md` beside the plan. Return the verdict line.
@@ -59,7 +61,7 @@ plan.md, research.md, .claude/rules/{a,b}.md, src/orders/api.ts (the precedent D
 
 ## Verdict
 
-`APPROVE` — no gap of the six, or only gaps whose fix is a sentence the planner can add without re-deciding anything.
+`APPROVE` — no gap of the seven, or only gaps whose fix is a sentence the planner can add without re-deciding anything.
 `GAPS <n>` — `n` gaps that would make an implementer guess. The kernel folds them and may dispatch you once more.
 
 ## Completion

@@ -1,0 +1,48 @@
+# id: s-unclaimed-refund-state
+# fixture: webapp
+# package: p3
+# kind: spec
+# item: Unclaimed
+# names: declined
+# line: src/features/orders/refund.ts:2
+# anchor: export type RefundState = 'requested' | 'approved' | 'declined';
+# what: the plan claims two of the three refund states, so the third reaches no row in verify.md
+diff --git a/src/features/orders/refund.test.ts b/src/features/orders/refund.test.ts
+new file mode 100644
+index 0000000..520bc4c
+--- /dev/null
++++ b/src/features/orders/refund.test.ts
+@@ -0,0 +1,17 @@
++import { describe, expect, it } from 'vitest';
++
++import { refundLabel } from './refund';
++
++describe('refundLabel', () => {
++  it('names a requested refund', () => {
++    expect(refundLabel('requested')).toBe('Refund requested');
++  });
++
++  it('names an approved refund', () => {
++    expect(refundLabel('approved')).toBe('Refund approved');
++  });
++
++  it('names a declined refund', () => {
++    expect(refundLabel('declined')).toBe('Refund declined');
++  });
++});
+diff --git a/src/features/orders/refund.ts b/src/features/orders/refund.ts
+new file mode 100644
+index 0000000..8b9e771
+--- /dev/null
++++ b/src/features/orders/refund.ts
+@@ -0,0 +1,10 @@
++/** Where a refund request has got to. The detail page reads it for its badge. */
++export type RefundState = 'requested' | 'approved' | 'declined';
++
++const LABELS: Record<RefundState, string> = {
++  requested: 'Refund requested',
++  approved: 'Refund approved',
++  declined: 'Refund declined',
++};
++
++export const refundLabel = (state: RefundState): string => LABELS[state];

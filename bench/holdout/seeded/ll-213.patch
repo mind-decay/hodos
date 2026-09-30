@@ -1,0 +1,36 @@
+# id: ll-213
+# fixture: snippets
+# package: h3
+# kind: behavioral
+# item: L3
+# line: reports/orders.py:11
+# anchor: customer = db.query_one(
+# trigger: Should identify L3 (Boundary Blindspot): the function executes 1 + N database queries for N orders — the classic N+1 query problem. The first query batches all N orders, then a separate `db.query_one()` fires inside the loop for each individual order's customer. With 10,000 orders this becomes 10,001 database round-trips. At ~1ms per query that is ~10 seconds of query time; at higher latency the i
+# what: logic-lens case #213 (python-n-plus-one-query-L3), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/reports/orders.py b/reports/orders.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/reports/orders.py
+@@ -0,0 +1,20 @@
++# reports/orders.py
++def get_order_summaries(db, order_ids: list[int]) -> list[dict]:
++    """Return summary dicts with order id, customer name, and total."""
++    orders = db.query(
++        "SELECT id, customer_id, total FROM orders WHERE id = ANY(%s)",
++        (order_ids,)
++    )
++    summaries = []
++    for order in orders:
++        # Fetch the customer name for each order individually
++        customer = db.query_one(
++            "SELECT name FROM customers WHERE id = %s",
++            (order['customer_id'],)
++        )
++        summaries.append({
++            'order_id':      order['id'],
++            'customer_name': customer['name'],
++            'total':         order['total'],
++        })
++    return summaries

@@ -1,0 +1,157 @@
+{
+  "runAt": "2026-09-07T09:51:29.116Z",
+  "only": [
+    "p3"
+  ],
+  "packages": [
+    {
+      "id": "p3",
+      "copyDir": "<scratch>/p3run/copies/p3",
+      "base": "932ae3d",
+      "head": "a149a38",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/refund.test.ts",
+        "src/features/orders/refund.ts",
+        "src/features/orders/ui/OrderActions.test.tsx",
+        "src/features/orders/ui/OrderActions.tsx",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useCancelOrder.ts",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l5-control-flow-escape": 12,
+        "s-unclaimed-refund-state": 2,
+        "w-error-role-alert": 26,
+        "w-test-mocking-boundary": 6
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 2,
+        "majors": 4,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/ui/useCancelOrder.ts",
+          "line": 12,
+          "location": "src/features/orders/ui/useCancelOrder.ts:12",
+          "item": "L5 control-flow escape",
+          "trigger": "`cancel()` pressed while `order` is `undefined` — the detail page's pending state, `enabled: id !== ''`",
+          "finding": "`setBusy(true)` sits above the guard, so `return` skips `setBusy(false)` and `busy` latches true forever — the exact path T2 names",
+          "fix": "set the flag below the guard, or `try { … } finally { setBusy(false); }`"
+        },
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/ui/useCancelOrder.ts",
+          "line": 13,
+          "location": "src/features/orders/ui/useCancelOrder.ts:13",
+          "item": "L6 callee-contract mismatch",
+          "trigger": "`request()` throws `ApiError` on any non-OK response or dead network (`src/lib/http.ts:17,19`) — e.g. the 404 `/api` returns in dev",
+          "finding": "line 14 never runs: `busy` stays true after a failed cancel and the rejection escapes the click handler unhandled",
+          "fix": "wrap in `try/finally`, and surface the caught `ApiError` per the invariant"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 26,
+          "location": "src/features/orders/ui/OrderActions.tsx:26",
+          "item": "rules/error-role-alert.md",
+          "trigger": null,
+          "finding": "`{error && <p>{error}</p>}` renders a failure silently; the rule's precedents render the message with `role=\"alert\"`",
+          "fix": "`<p role=\"alert\">{error}</p>`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 17,
+          "location": "src/features/orders/ui/OrderActions.tsx:17",
+          "item": "rules/api-error-propagation.md",
+          "trigger": null,
+          "finding": "the `catch` keeps only `(cause as Error).message`, discarding the `ApiError`'s `code` and `status` — the \"a string\" case the rule names",
+          "fix": "hold the `ApiError` in state, read `.message` at render"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.test.tsx",
+          "line": 6,
+          "location": "src/features/orders/ui/OrderActions.test.tsx:6",
+          "item": "rules/test-mocking-boundary.md",
+          "trigger": null,
+          "finding": "`vi.mock('../../../lib/http')` replaces a project module and a plain `Error`, not an `ApiError`; the rule's own evidence is that no `vi.mock()` of project code exists in this repository",
+          "fix": "`vi.stubGlobal('fetch', …)` with a non-OK response, unstubbed in `afterEach`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useCancelOrder.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useCancelOrder.test.ts",
+          "item": "CLAUDE.md conventions — a test sits beside the file it covers",
+          "trigger": null,
+          "finding": "the hook has no test file; both blockers above are uncovered and unrendered",
+          "fix": "add the file, covering the no-order, failure and success paths"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/refund.ts",
+          "line": 4,
+          "location": "src/features/orders/refund.ts:4",
+          "item": "defaults #16 dead code (#8 no consumer)",
+          "trigger": null,
+          "finding": "exported `Refund` interface with no importer anywhere in `src`",
+          "fix": "delete it"
+        }
+      ],
+      "spec": {
+        "missing": "T1's \"a screen reader announces it\" — no `role=\"alert\"` on the message (`OrderActions.tsx:26`); T2's \"`busy` … false on every path out of it, including the one where there is no order yet\" — two of three paths leave it true (`useCancelOrder.ts:12`, `:13`)",
+        "extra": "the `Refund` interface (`refund.ts:4`), which no task names and nothing imports",
+        "misunderstood": "—",
+        "unclaimed": "`'declined'`, the third member of `RefundState` (`refund.ts:2`), is in no `Acceptance:` clause — T4 names `requested` and `approved` only; and the `### Invariants & failure modes` clause \"a failed call … puts the reason on the page\" has no acceptance clause covering `cancel`, which exposes no error surface at all.\n\nNote: neither `OrderActions` nor `useCancelOrder` has a call site in `src` — nothing renders them and `src/features/orders/index.ts` does not export them (grep). No task ordered the wiring, so this is not counted Missing; it is why the suite is green over both blockers below."
+      },
+      "words": {
+        "spec": 155,
+        "standards": 269,
+        "coverage": 63
+      },
+      "checks": [
+        "- test: `npm test` → 5 files, 13 tests passed",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → clean"
+      ],
+      "turns": 2,
+      "cost": 0.86887,
+      "seconds": 230
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# id: ll-230
+# fixture: snippets
+# package: h4
+# kind: behavioral
+# item: L8
+# line: src/CsvParser.php:13
+# anchor: throw new \InvalidArgumentException(
+# trigger: Should identify L8 (Resource Lifecycle Hazard): `fopen` acquires a file handle resource. The `fclose($handle)` call only appears on the happy path — when all rows have exactly 3 columns. When a malformed row triggers `throw new InvalidArgumentException(...)`, the exception unwinds the stack without executing `fclose`. PHP does not automatically close file handles when they go out of scope (unlike 
+# what: logic-lens case #230 (php-fopen-resource-leak-exception-L8), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/src/CsvParser.php b/src/CsvParser.php
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/CsvParser.php
+@@ -0,0 +1,23 @@
++<?php
++// src/CsvParser.php
++
++function parseCsv(string $path): array {
++    $handle = fopen($path, 'r');
++    if ($handle === false) {
++        throw new \RuntimeException("Cannot open: $path");
++    }
++
++    $rows = [];
++    while (($cols = fgetcsv($handle)) !== false) {
++        if (count($cols) !== 3) {
++            throw new \InvalidArgumentException(
++                "Row must have 3 columns, got " . count($cols)
++            );
++            // file handle never closed
++        }
++        $rows[] = $cols;
++    }
++
++    fclose($handle);
++    return $rows;
++}

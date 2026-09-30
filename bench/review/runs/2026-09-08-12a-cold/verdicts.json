@@ -1,0 +1,877 @@
+{
+  "runAt": "2026-09-08T14:21:50.577Z",
+  "only": null,
+  "packages": [
+    {
+      "id": "p1",
+      "copyDir": "copies/p1",
+      "base": "96753a3",
+      "head": "ed1e081",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "dev-api.test.ts",
+        "dev-api.ts",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/summary.ts",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/OrdersSummary.tsx",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l4-mutating-sort": 21,
+        "w-bare-fetch": 8,
+        "w-literal-query-key": 11
+      },
+      "exit": 0,
+      "verdict": "NEEDS_WORK",
+      "counts": {
+        "blockers": 0,
+        "majors": 8,
+        "minors": 0
+      },
+      "findings": [
+        {
+          "sev": "major",
+          "file": "src/features/orders/summary.ts",
+          "line": 8,
+          "location": "src/features/orders/summary.ts:8",
+          "item": "lint `no-restricted-globals`",
+          "trigger": null,
+          "finding": "raw `fetch`, hard-coded `/api` prefix, un-encoded `status`; the lint gate is red",
+          "fix": "`request<Order[]>(`/orders?status=${encodeURIComponent(status)}`)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/summary.ts",
+          "line": 9,
+          "location": "src/features/orders/summary.ts:9",
+          "item": "rules/api-error-propagation.md",
+          "trigger": null,
+          "finding": "a non-OK response is parsed and cast to `Order[]`, so the `{error:{code,message}}` envelope becomes data — no `ApiError`, no `status`/`code`",
+          "fix": "go through `request()`, which throws `ApiError`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/model.ts",
+          "line": 21,
+          "location": "src/features/orders/model.ts:21",
+          "item": "L4 state mutation",
+          "trigger": "any caller passing the list query's array, as the design's \"reads the same collection as the list\" intends: `orders.data` is reordered in place and `OrderList` then renders in total order",
+          "finding": "`orders.sort()` mutates its argument",
+          "fix": "`[...orders].sort(...)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrdersSummary.tsx",
+          "line": 11,
+          "location": "src/features/orders/ui/OrdersSummary.tsx:11",
+          "item": "rules/query-key-factory.md",
+          "trigger": null,
+          "finding": "literal `['orders','summary',status]` at the call site, while `keys.summary` added by this diff at `api.ts:20` has no reader",
+          "fix": "`queryKey: keys.summary(status)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/summary.ts",
+          "line": 7,
+          "location": "src/features/orders/summary.ts:7",
+          "item": "defaults row 17 (dead code), row 8 (≥2 callers)",
+          "trigger": null,
+          "finding": "`fetchSummaryOrders` has no caller anywhere",
+          "fix": "wire it into `OrdersSummary` or delete the module"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/summary.test.ts",
+          "line": null,
+          "location": "src/features/orders/summary.test.ts",
+          "item": "CLAUDE.md \"a test sits beside the file it covers\"",
+          "trigger": null,
+          "finding": "T1 claims no `Tests:` exemption and the file has no test beside it",
+          "fix": "add the test, `fetch` stubbed per rules/test-mocking-boundary.md"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/model.ts",
+          "line": 20,
+          "location": "src/features/orders/model.ts:20",
+          "item": "plan T2 (no `Tests:` exemption) · decision 0022",
+          "trigger": null,
+          "finding": "`topByTotal` ships untested; `model.test.ts` is untouched and the suite is still 17",
+          "fix": "cover \"largest first\", `count` truncation, and that the input is not reordered"
+        }
+      ],
+      "spec": {
+        "missing": "T3's acceptance — \"the line shows the count and the total for the current filter\" — is met by no path: `OrdersSummary` is rendered nowhere. `grep -rn OrdersSummary src` returns only its own file; `OrdersPage.tsx:12-27` does not mount it and `index.ts:5-9` does not export it, so the `ui` recipe at `/orders` cannot see the line. T2's `topByTotal` likewise has no caller.",
+        "extra": "—",
+        "misunderstood": "Design/Modules and Interfaces make `summary.ts` \"the request the summary makes\" (`fetchSummaryOrders`); the component instead calls `listOrders` (`OrdersSummary.tsx:3,12`), leaving T1's module unwired at `summary.ts:7`.\n\n**T3 `Tests:` exemption — major (decision 0022):** the line claims \"visual … no branch\", but `OrdersSummary.tsx:14` adds `if (!orders.data) return null;` — a branch, and the one T3's own acceptance names (\"renders nothing before the data arrives\"). The exemption does not hold; the branch is untested.",
+        "unclaimed": "the failure half of that same branch (`OrdersSummary.tsx:14`) — `data` is undefined because the request threw, not because it is pending — is in no `Acceptance:` clause. The invariant \"A failed request leaves the list alone … the list's own error surface stays the one the page shows\" is named by no task's acceptance criterion either."
+      },
+      "coverage": "Not reviewed: `dev-api.ts`, `vite.config.ts`, `src/lib/**` and the other features — untouched by this diff. The `ui` verify recipe (`/orders`) was not run: no browser here, and per the Spec finding above the summary line cannot render at that route regardless. The package carries no `## Callers` section, consistent with the grep above finding no caller for any of the three new exports.",
+      "words": {
+        "spec": 191,
+        "standards": 209,
+        "coverage": 62
+      },
+      "checks": [
+        "- test: `npm test` → 17 passed (4 files); head commit adds no test file, so this is the base suite unchanged",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → **1 error** — `src/features/orders/summary.ts:8` `no-restricted-globals`: \"Unexpected use of 'fetch'. Call the network through request() in src/lib/http.ts\""
+      ],
+      "turns": 2,
+      "cost": 0.8181435,
+      "seconds": 188
+    },
+    {
+      "id": "p2",
+      "copyDir": "copies/p2",
+      "base": "0b1391f",
+      "head": "291cd4a",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "dev-api.test.ts",
+        "dev-api.ts",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useStatusParam.ts",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l2-type-contract": 8,
+        "w-api-error-shape": 26,
+        "w-barrel-bypass": 3
+      },
+      "exit": 0,
+      "verdict": "NEEDS_WORK",
+      "counts": {
+        "blockers": 0,
+        "majors": 5,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useStatusParam.ts",
+          "line": 8,
+          "location": "src/features/orders/ui/useStatusParam.ts:8",
+          "item": "L2 type-contract breach",
+          "trigger": "`/orders?status=bogus`; also `/orders?status=` — `get` returns `''`, so `??` never fires",
+          "finding": "the cast hands back a value outside `StatusFilter`; the fallback branch does not exist",
+          "fix": "check membership of the union, return `'all'` otherwise"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/home/ui/HomePage.tsx",
+          "line": 3,
+          "location": "src/features/home/ui/HomePage.tsx:3",
+          "item": "rules/feature-barrel-imports.md",
+          "trigger": null,
+          "finding": "`'../../orders/model'` is a deep import across a feature boundary; the barrel already exports `useOrdersFilter` (`src/features/orders/index.ts:7`), and the plan's `### Dependency direction` asks for the public surface",
+          "fix": "`import { useOrdersFilter } from '../../orders';`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/api.ts",
+          "line": 26,
+          "location": "src/features/orders/api.ts:26",
+          "item": "rules/api-error-propagation.md",
+          "trigger": "a 404 from `/api/orders`: the `ApiError` becomes a plain `Error`, so `orders.error` at `src/features/orders/ui/OrdersPage.tsx:10` has no `code`/`status`",
+          "finding": "the catch invents a new error type at the boundary the rule reserves for `ApiError`",
+          "fix": "re-throw the caught `ApiError`, or carry the wording as its `message`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useStatusParam.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useStatusParam.test.ts",
+          "item": "CLAUDE.md conventions — a test sits beside the file it covers",
+          "trigger": null,
+          "finding": "new module with a branch and no test file; T1's acceptance is unproven",
+          "fix": "add the file: known status, unknown status, absent param"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/api.ts",
+          "line": 22,
+          "location": "src/features/orders/api.ts:22",
+          "item": "CLAUDE.md conventions — test beside the file; defaults #11",
+          "trigger": null,
+          "finding": "the added catch path is uncovered; T3's only new test (`src/lib/http.test.ts:37`) asserts the `accept` header — the `### Refactor in scope` extra, not T3's acceptance",
+          "fix": "assert the message a failed list request produces"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/ui/useStatusParam.ts",
+          "line": 6,
+          "location": "src/features/orders/ui/useStatusParam.ts:6",
+          "item": "defaults #8, #17",
+          "trigger": null,
+          "finding": "the ordered hook has zero consumers, so the URL half changes no behaviour",
+          "fix": "wire it into `OrdersPage`, or drop it"
+        }
+      ],
+      "spec": {
+        "missing": "T1's acceptance \"an unknown one falls back to `all`\" — `src/features/orders/ui/useStatusParam.ts:8` casts rather than validates, so an unknown status is returned unchanged.",
+        "extra": "—",
+        "misunderstood": "T2 — `src/features/home/ui/HomePage.tsx:6` names the *zustand* filter (`useOrdersFilter`), the shape the plan's `### Architecture alternatives` identifies as the pre-task state that \"cannot be linked to, which is the goal\". `useStatusParam` has no caller anywhere in `src` (grep: only its own declaration), so no page names the URL's filter.",
+        "unclaimed": "the `### Invariants & failure modes` clause \"*falls back to `all` rather than rendering an empty list with no explanation*\" — the rendering half is in no `Acceptance:` clause; no task names a page that reads the URL status, and none does."
+      },
+      "coverage": "Not reviewed: files the diff does not touch — `dev-api.ts`, `vite.config.ts`, `eslint.config.js`, `src/App.tsx`. The `ui` browser recipe in `.claude/hodos/config.json` was not run; the home page's new line and the URL fallback were checked by reading only. `defaults.md` read at the dispatched path.",
+      "words": {
+        "spec": 117,
+        "standards": 233,
+        "coverage": 42
+      },
+      "checks": [
+        "- test: `npm test` → 18 passed (4 files)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → 0 problems",
+        "- (package carries no `Mutation:` header line — no ledger comparison, per `FORMATS.md §8`)"
+      ],
+      "turns": 2,
+      "cost": 0.8258834999999999,
+      "seconds": 211
+    },
+    {
+      "id": "p3",
+      "copyDir": "copies/p3",
+      "base": "3333d27",
+      "head": "af27bed",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "dev-api.test.ts",
+        "dev-api.ts",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/refund.test.ts",
+        "src/features/orders/refund.ts",
+        "src/features/orders/ui/OrderActions.test.tsx",
+        "src/features/orders/ui/OrderActions.tsx",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useCancelOrder.ts",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l5-control-flow-escape": 12,
+        "s-unclaimed-refund-state": 2,
+        "w-error-role-alert": 26,
+        "w-test-mocking-boundary": 6
+      },
+      "exit": 0,
+      "verdict": "NEEDS_WORK",
+      "counts": {
+        "blockers": 0,
+        "majors": 6,
+        "minors": 2
+      },
+      "findings": [
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 26,
+          "location": "src/features/orders/ui/OrderActions.tsx:26",
+          "item": "rules/error-role-alert.md",
+          "trigger": null,
+          "finding": "error surface is `<p>{error}</p>`, silent to a screen reader; precedents at `OrdersPage.tsx:25`, `OrderDetailPage.tsx:11`",
+          "fix": "`<p role=\"alert\">`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 17,
+          "location": "src/features/orders/ui/OrderActions.tsx:17",
+          "item": "rules/api-error-propagation.md",
+          "trigger": null,
+          "finding": "the caught `ApiError` is reduced to a string, dropping `code` and `status`",
+          "fix": "keep the `ApiError` in state, or branch on `code`, and read `.message` at render"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.test.tsx",
+          "line": 6,
+          "location": "src/features/orders/ui/OrderActions.test.tsx:6",
+          "item": "rules/test-mocking-boundary.md",
+          "trigger": null,
+          "finding": "`vi.mock('../../../lib/http')` replaces a project module; the rule stubs `fetch` only, and no `vi.mock` of a project module exists in the repo",
+          "fix": "`vi.stubGlobal('fetch', …)` per `src/lib/http.test.ts:15`, with `vi.unstubAllGlobals()`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useCancelOrder.ts",
+          "line": 11,
+          "location": "src/features/orders/ui/useCancelOrder.ts:11",
+          "item": "L5 control-flow escape",
+          "trigger": "`cancel()` pressed while the detail query is pending, so `order === undefined`",
+          "finding": "`setBusy(true)` runs, then `return` skips `setBusy(false)`; the flag latches true until remount",
+          "fix": "check `!order` before `setBusy(true)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useCancelOrder.ts",
+          "line": 13,
+          "location": "src/features/orders/ui/useCancelOrder.ts:13",
+          "item": "L6 callee-contract mismatch",
+          "trigger": "cancel against a missing order (`/orders/o-9`) or an unreachable server: `request()` throws `ApiError` (`src/lib/http.ts:17-19`)",
+          "finding": "no `catch`/`finally`, so `setBusy(false)` is skipped and the returned promise rejects unhandled",
+          "fix": "`try { … } finally { setBusy(false) }`, and surface the `ApiError`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useCancelOrder.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useCancelOrder.test.ts",
+          "item": "conventions (CLAUDE.md \"a test sits beside the file it covers\")",
+          "trigger": null,
+          "finding": "the hook carrying the plan's busy invariant has no test file; both defects above ship green",
+          "fix": "add the test beside it, covering the no-order and throwing paths"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderList.test.tsx",
+          "line": 23,
+          "location": "src/features/orders/ui/OrderList.test.tsx:23",
+          "item": "plan: `Refactor in scope`",
+          "trigger": null,
+          "finding": "the `Ada` link-href assertion was deleted; scope permits the list's tests to *gain* the totals case only, `OrderList.tsx:15` still renders the link, and the test's name now claims a route check it no longer makes",
+          "fix": "restore the assertion"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 14,
+          "location": "src/features/orders/ui/OrderActions.tsx:14",
+          "item": "rules/network-through-request.md",
+          "trigger": null,
+          "finding": "the path segment is interpolated raw, where the rule's example and `api.ts:25` encode it; same at `useCancelOrder.ts:13`",
+          "fix": "`encodeURIComponent(orderId)`; declare the call in `api.ts` beside `getOrder`"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/refund.ts",
+          "line": 1,
+          "location": "src/features/orders/refund.ts:1",
+          "item": "defaults #9 (comment accuracy)",
+          "trigger": null,
+          "finding": "\"The detail page reads it for its badge\" — nothing in `src` imports `refundLabel` or `RefundState`, and the barrel does not export them",
+          "fix": "drop the claim or wire the badge"
+        }
+      ],
+      "spec": {
+        "missing": "T2 — `busy` is not false on every path out of `cancel`; the no-order path the acceptance names by hand latches it true (`useCancelOrder.ts:11-12`), and no test declaration covers the hook at all. T1 — \"where a screen reader announces it\" is unmet: the message renders in a bare `<p>` (`OrderActions.tsx:26`).",
+        "extra": "—",
+        "misunderstood": "—",
+        "unclaimed": "- `'declined'` — the third member of `RefundState`, added at `src/features/orders/refund.ts:2`; T4's acceptance names only `requested` and `approved`.\n- the throw path of `request()` at `src/features/orders/ui/useCancelOrder.ts:13`; T2's acceptance names only the no-order path.\n- `### Invariants & failure modes` — \"A failed call leaves the order as it was\"; no `Acceptance:` clause names it."
+      },
+      "coverage": "No `Mutation:` header line in the package, so no ledger comparison was made.\nOne check outside the diff: `grep -rn` over `src` for consumers of `OrderActions`, `useCancelOrder`, `refundLabel`, `RefundState` — none outside the new files. Whether the three modules were meant to be wired into `OrderDetailPage` is not answerable from the diff; no task orders it.\nNot reviewed: files the diff does not touch — `OrdersPage.tsx`, `model.ts`, `dev-api.ts`, `vite.config.ts`, `eslint.config.js` (frozen by project decision).",
+      "words": {
+        "spec": 111,
+        "standards": 313,
+        "coverage": 74
+      },
+      "checks": [
+        "- test: `npm test` → 22 passed (6 files)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → 0 problems"
+      ],
+      "turns": 2,
+      "cost": 0.8526610000000002,
+      "seconds": 226
+    },
+    {
+      "id": "p4",
+      "copyDir": "copies/p4",
+      "base": "342e0f3",
+      "head": "e54e481",
+      "files": [
+        ".gitignore",
+        "eslint.config.js",
+        "package-lock.json",
+        "package.json",
+        "src/errors.js",
+        "src/http/respond.js",
+        "src/main.js",
+        "src/routes.js",
+        "src/server.js",
+        "src/services/orders.js",
+        "src/store/orders.js",
+        "test/routes.test.js",
+        "test/server.test.js",
+        "test/services.test.js",
+        "tsconfig.json"
+      ],
+      "anchors": {
+        "a-plain-error": 15,
+        "a-route-not-in-table": 32,
+        "b-l3-boundary": 62,
+        "s-unclaimed-page-limit": 61
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 2,
+        "majors": 2,
+        "minors": 3
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/services/orders.js",
+          "line": 62,
+          "location": "src/services/orders.js:62",
+          "item": "L3 boundary",
+          "trigger": "`page(o,0,1)` → `[]`; `page(o,0,2)` → 1 row; `page(o,0,3)` → 2 rows",
+          "finding": "`slice(offset, offset + limit - 1)` returns `limit - 1` rows, breaking plan invariant \"a page of `limit` rows holds `limit` rows\" and both T2 criteria",
+          "fix": "`slice(offset, offset + limit)`"
+        },
+        {
+          "sev": "blocker",
+          "file": "src/services/orders.js",
+          "line": 15,
+          "location": "src/services/orders.js:15",
+          "item": "plan `### Invariants & failure modes`; errors.js:2 Convention 3",
+          "trigger": "`GET /orders?min=abc` → `500 {\"code\":\"internal\"}`",
+          "finding": "plain `Error`, not `AppError`, so `fail()` returns 500 `internal` instead of a 400 the client can read",
+          "fix": "`throw new AppError('invalid_min', 400, …)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/server.js",
+          "line": 31,
+          "location": "src/server.js:31",
+          "item": "plan `### Dependency direction` (\"a liveness endpoint … is a row in the route table like every other route\"); routes.js:11 Convention 1",
+          "trigger": null,
+          "finding": "`/health` is answered before `matchRoute`, so a reachable route exists outside the one table that answers \"what does this API do\"",
+          "fix": "add a `routes` row with a `health` handler"
+        },
+        {
+          "sev": "major",
+          "file": "src/server.js",
+          "line": 31,
+          "location": "src/server.js:31",
+          "item": "L5 control-flow escape",
+          "trigger": "`POST /health` → `200 {\"status\":\"ok\"}`, body never read, while `POST /orders/o-1` → 404",
+          "finding": "the early `return` skips the method match, `readBody` and the `.catch(fail)` envelope",
+          "fix": "route it through the table"
+        },
+        {
+          "sev": "minor",
+          "file": "src/services/orders.js",
+          "line": 14,
+          "location": "src/services/orders.js:14",
+          "item": "L2 type-contract breach",
+          "trigger": null,
+          "finding": "`Number.isNaN(Number(min))` accepts `''`, `'  '` and `'Infinity'`: `?min=` silently means no filter, `?min=Infinity` returns `[]`",
+          "fix": "guard with `Number.isFinite`"
+        },
+        {
+          "sev": "minor",
+          "file": "src/services/orders.js",
+          "line": 60,
+          "location": "src/services/orders.js:60",
+          "item": "defaults.md catalogue row 8",
+          "trigger": null,
+          "finding": "`page` has zero callers in `src` — nothing wires offset/limit to a route, so the off-by-one is invisible until it is",
+          "fix": "wire it or drop it"
+        },
+        {
+          "sev": "minor",
+          "file": "test/services.test.js",
+          "line": 12,
+          "location": "test/services.test.js:12",
+          "item": "defaults.md catalogue row 11",
+          "trigger": null,
+          "finding": "the only added declaration covers T3; `min` and `page` ship with no green test to prove",
+          "fix": "add the T1 rejection and T2 page cases"
+        }
+      ],
+      "spec": {
+        "missing": "T1's rejection criterion — \"a `min` that is not a number is rejected with the code the client reads and a 400\" — is unmet: `src/services/orders.js:15` throws a plain `Error`, which `src/http/respond.js:21` maps to 500 `internal`. T2's two criteria are unmet (see blocker 1). Neither task's criteria are covered by a test declaration: the diff adds `min` and `page` and adds only T3's `all` case.",
+        "extra": "`src/server.js:31-34` — the `/health` short-circuit. No task lists `src/server.js` in `Files:`.",
+        "misunderstood": "T2 — `offset + limit - 1` reads `limit` as an inclusive last index, a reading the plan's \"a page of `limit` rows holds `limit` rows\" does not support.",
+        "unclaimed": "`page`'s `limit <= 0` → `[]` failure path (`src/services/orders.js:61`) — no `Acceptance:` clause names it. The `/health` success path (`src/server.js:32`) — no task, and so no acceptance clause, exercises it. The design clause \"every failure this service reports is an `AppError`\" is claimed only for T1's `min` case; the `/health` path added carries no failure envelope at all."
+      },
+      "coverage": "Not reviewed: `node_modules`, `package-lock.json`; `test/routes.test.js` and `test/server.test.js` beyond confirming they pass untouched.\n\nNo `.claude/rules/` directory exists at the dispatched path — only `.claude/hodos/config.json`. Conventions were therefore judged against the plan's design fields, `defaults.md`, and the in-repo convention comments (`eslint.config.js:12,25`, `routes.js:11`, `errors.js:2`, `respond.js:4`), with no project rule precedents available.\n\nThe package carries no `Mutation:` line, no `## Callers` list and no `## Projects` section: the mutation comparison is skipped per `FORMATS.md §8`, and callers were checked by grep here (`list` → `src/routes.js:14`, tests; `page` → none).",
+      "words": {
+        "spec": 167,
+        "standards": 266,
+        "coverage": 85
+      },
+      "checks": [
+        "- test: `npm test` → 16 passed, 0 failed (3 suites), exit 0",
+        "- typecheck: `npm run typecheck` → 0 errors, exit 0",
+        "- lint: `npm run lint` → clean, exit 0",
+        "- Note: the suite is green and covers neither blocker below — no test declaration exercises `page` or `min`. Both defects were reproduced directly (`page(o,0,1)` → `[]`; `GET /orders?min=abc` → `500 {\"code\":\"internal\"}`)."
+      ],
+      "turns": 2,
+      "cost": 0.8187277500000001,
+      "seconds": 218
+    },
+    {
+      "id": "p5",
+      "copyDir": "copies/p5",
+      "base": "cb252c2",
+      "head": "e11aa1b",
+      "files": [
+        ".gitignore",
+        "eslint.config.js",
+        "package-lock.json",
+        "package.json",
+        "src/errors.js",
+        "src/http/respond.js",
+        "src/main.js",
+        "src/routes.js",
+        "src/server.js",
+        "src/services/orders.js",
+        "src/store/orders.js",
+        "test/routes.test.js",
+        "test/server.test.js",
+        "test/services.test.js",
+        "tsconfig.json"
+      ],
+      "anchors": {
+        "a-nongoal-config-knob": 8,
+        "a-service-imports-http": 2,
+        "b-l9-time-locale": 48
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 1,
+        "majors": 4,
+        "minors": 0
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/services/orders.js",
+          "line": 48,
+          "location": "src/services/orders.js:48",
+          "item": "L9 time and locale",
+          "trigger": "POST an order, then `GET /orders?since=2026-12-31`: `'9/8/2026' >= '2026-12-31'` is `true`, so today's order is returned as at-or-after a future date; under `de-DE` it is stamped `8.9.2026`",
+          "finding": "`new Date().toLocaleDateString()` stamps a locale- and TZ-dependent format while the seeds are ISO `2026-01-05`, breaking the plan's invariant \"`createdAt` is one format everywhere it is written or compared\" and the `>=` string compare at :15",
+          "fix": "`new Date().toISOString().slice(0, 10)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/services/orders.js",
+          "line": 15,
+          "location": "src/services/orders.js:15",
+          "item": "L3 boundary blindspot",
+          "trigger": "`GET /orders?since=` returns `''` from `query.get`, not `null`, so every order passes; `?since=03/30/2026` matches nothing and returns `[]`",
+          "finding": "`since` is compared unvalidated; a bad value silently disables the filter or silently empties it, where `status` throws a 400 `AppError`",
+          "fix": "reject a `since` that is not `YYYY-MM-DD` with an `AppError`, as `status` does"
+        },
+        {
+          "sev": "major",
+          "file": "src/server.js",
+          "line": 8,
+          "location": "src/server.js:8, src/server.js:32",
+          "item": "plan `### Non-goals` (defaults row 14)",
+          "trigger": null,
+          "finding": "a CORS header and a `CORS_ORIGIN` env var nobody asked for, on every response including 404s",
+          "fix": "remove both lines"
+        },
+        {
+          "sev": "major",
+          "file": "src/services/orders.js",
+          "line": 56,
+          "location": "src/services/orders.js:56",
+          "item": "plan `### Dependency direction`",
+          "trigger": null,
+          "finding": "`createInto` writes the response from the service layer — \"writing a response stays `src/http/respond.js`'s job, and only its\"; it has no caller, so it is also dead on arrival",
+          "fix": "delete `createInto` and the `respond.js` import"
+        },
+        {
+          "sev": "major",
+          "file": "src/services/orders.js",
+          "line": 2,
+          "location": "src/services/orders.js:2",
+          "item": "lint (no-restricted-imports)",
+          "trigger": null,
+          "finding": "`npm run lint` is red: the service imports `../http/respond.js`, which eslint's Convention 4 block forbids",
+          "fix": "delete the import with `createInto`"
+        }
+      ],
+      "spec": {
+        "missing": "T2 — \"`since` returns exactly the orders at or after it — seeded and created alike\" holds for seeded orders only; a created order is stamped in a different format (blocker below). No test in the diff exercises `since` or `createdAt`, so neither T1's nor T2's acceptance criterion has a check behind it; the only test added is T3's.",
+        "extra": "`src/server.js:8` `CORS_ORIGIN` env var and `src/server.js:32` the `access-control-allow-origin` header — `## Non-goals` names both (\"no new environment variables, no CORS\"), and `src/server.js` is in no task's `Files:`. `src/services/orders.js:56` `createInto` — in no task, with no caller anywhere in the tree.",
+        "misunderstood": "—",
+        "unclaimed": "the failure path of the `since` branch added at `src/services/orders.js:15` — an empty or non-ISO `since` — is named by no `Acceptance:` clause; the sibling `status` parameter throws on a bad value, this one does not."
+      },
+      "coverage": "`.claude/rules/` holds no files in this copy — only `.claude/hodos/config.json` exists — so the convention pass ran against the plan's design fields, `defaults.md`, and the conventions encoded in `eslint.config.js` and the `Convention N` comments in `src/routes.js` and `src/http/respond.js`. The package carries no `Mutation:` header, so no ledger comparison was made. Not reviewed: `node_modules`, `package-lock.json`, and code outside the diff apart from one grep for callers of `createInto`, `since` and `createdAt`.",
+      "words": {
+        "spec": 140,
+        "standards": 230,
+        "coverage": 70
+      },
+      "checks": [
+        "- test: `npm test` → 16 passed, 0 failed (3 suites)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → 1 error, command exits non-zero (`src/services/orders.js:2` no-restricted-imports)"
+      ],
+      "turns": 2,
+      "cost": 0.8014135000000001,
+      "seconds": 189
+    },
+    {
+      "id": "p6",
+      "copyDir": "copies/p6",
+      "base": "d2c9230",
+      "head": "7eaef3e",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "dev-api.test.ts",
+        "dev-api.ts",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrderRefresh.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useOrdersByStatus.ts",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l6-callee-contract": 22,
+        "b-l7-race": 11,
+        "w-refactor-out-of-scope": 12,
+        "w-silenced-rule": 9
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 1,
+        "majors": 7,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/ui/useOrdersByStatus.ts",
+          "line": 10,
+          "location": "src/features/orders/ui/useOrdersByStatus.ts:10-12",
+          "item": "L7 concurrency and async",
+          "trigger": "select `open`, then `paid` before `open`'s response lands; `open` resolves last",
+          "finding": "no cleanup or generation guard, so the stale `setOrders` wins and the rows shown are the status the user left — the exact invariant `### Invariants & failure modes` names",
+          "fix": "`let live = true` + cleanup, or `useQuery({ queryKey: keys.list(status), queryFn: () => listOrders(status) })`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.tsx",
+          "line": 10,
+          "location": "src/features/orders/ui/OrderRefresh.tsx:10",
+          "item": "rules/network-through-request.md",
+          "trigger": null,
+          "finding": "raw `fetch('/api/orders')` in feature code; `request()` is the application's only fetch and prefixes `/api` itself",
+          "fix": "call `listOrders(status)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.tsx",
+          "line": 9,
+          "location": "src/features/orders/ui/OrderRefresh.tsx:9",
+          "item": "defaults row 7 (+ CLAUDE.md: `eslint.config.js` is not to be weakened)",
+          "trigger": null,
+          "finding": "`eslint-disable-next-line no-restricted-globals` takes a silent exception to the project's own check; a rule that does not fit is a `Gap:` for the chat",
+          "fix": "delete the disable with the fetch"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.tsx",
+          "line": 10,
+          "location": "src/features/orders/ui/OrderRefresh.tsx:10-11",
+          "item": "L6 callee-contract mismatch",
+          "trigger": "press Refresh when `/api/orders` 404s — `dev-api.ts:59` answers `{error:{code,message}}`",
+          "finding": "`fetch` does not reject on a non-OK status and `response.ok` is never checked: the error envelope is stored as the order array, `orders.length` is `undefined` and the label renders `Refresh ()`; no `ApiError` is produced (rules/api-error-propagation.md). A non-JSON body rejects `response.json()` unhandled",
+          "fix": "go through `request()`, which throws `ApiError`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/api.ts",
+          "line": 22,
+          "location": "src/features/orders/api.ts:22-23",
+          "item": "plan `### Data & scale`, defaults row 14",
+          "trigger": "`listOrders(status)` at `OrdersPage.tsx:10` now requests `&limit=25`",
+          "finding": "a default nobody asked for: `dev-api.ts:45-49` ignores `limit`, so it is inert here, and against an API that honours it the one existing caller silently caps at 25 against \"the same few hundred rows\"; `keys.list(status)` does not carry it, so two limits share one cache entry",
+          "fix": "drop the parameter, or add it to `keys.list` and pass it explicitly"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.test.tsx",
+          "line": null,
+          "location": "src/features/orders/ui/OrderRefresh.test.tsx",
+          "item": "CLAUDE.md: a test sits beside the file it covers",
+          "trigger": null,
+          "finding": "no test beside the new component; T1's acceptance (the count changes with the orders) is unverified",
+          "fix": "add it, `fetch` stubbed at the boundary"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useOrdersByStatus.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useOrdersByStatus.test.ts",
+          "item": "CLAUDE.md: a test sits beside the file it covers",
+          "trigger": null,
+          "finding": "no test beside the new hook; T2's acceptance is unverified, which is why the race above shipped green",
+          "fix": "add it with two stubs resolving out of order"
+        },
+        {
+          "sev": "major",
+          "file": "src/lib/http.ts",
+          "line": 11,
+          "location": "src/lib/http.ts:11-12,17,22-23",
+          "item": "plan `### Refactor in scope`, `## Non-goals`",
+          "trigger": null,
+          "finding": "the shared client gained an 8s abort; the plan bars behaviour change in `src/lib` in either direction. The timer is also cleared once headers arrive, so `await response.json()` at `:26` is outside the budget",
+          "fix": "revert `http.ts` to base"
+        },
+        {
+          "sev": "minor",
+          "file": "src/lib/http.ts",
+          "line": 18,
+          "location": "src/lib/http.ts:18",
+          "item": "L1 shadow override",
+          "trigger": "`request(path, { signal })` — the exported `init?: RequestInit` accepts one",
+          "finding": "`...init` is spread after `signal: controller.signal`, so a caller's own signal replaces the timeout's and the 8s abort silently applies to nothing",
+          "fix": "spread `...init` first, or merge the signals"
+        }
+      ],
+      "spec": {
+        "missing": "T2's acceptance — \"changing the status twice in quick succession leaves the rows for the status that was selected last\". Nothing in `useOrdersByStatus.ts:10-12` orders the responses, and no test exercises it.",
+        "extra": "the `limit = 25` parameter (`src/features/orders/api.ts:22`), which no task asks for; the abort timeout in `src/lib/http.ts:4,11-12,17,22-23`, barred twice — `### Refactor in scope` (\"no file there changes behaviour, in either direction\") and `## Non-goals` (\"Changing the shared HTTP client\").",
+        "misunderstood": "T1. \"Pressing it reloads the orders\" is built as a fetch into the control's own `useState` (`OrderRefresh.tsx:6,11`); the page's list and cache are untouched, so nothing on screen reloads. `### Architecture alternatives` declined `refetch()` because the control must work from anywhere and before the list query exists — `queryClient.invalidateQueries({ queryKey: orderKeys.all })` satisfies both and refreshes the list.",
+        "unclaimed": "the timeout-abort failure path added at `src/lib/http.ts:12`, surfacing through the `catch` at `:20` as `ApiError('network', 0, 'the request did not reach the server')` — no task's `Acceptance:` names it; no task names `http.ts` at all.\n\nT3 is met (`src/lib/errors.ts:21-22`). No `Mutation:` header, so no count comparison."
+      },
+      "coverage": "Not reviewed: `dev-api.ts` and `vite.config.ts` beyond one check of `answer()` for whether `limit` is honoured; the `ui` browser recipe (`/`, `/orders`, `/orders/:id`) was not run.\n\nCannot verify from diff: nothing imports `OrderRefresh` or `useOrdersByStatus` (grep over `src`, `vite.config.ts`), and neither is on the orders barrel, so T1's \"pressing it\" cannot be exercised in the running app — whether wiring belongs to this task is the orchestrator's call.",
+      "words": {
+        "spec": 178,
+        "standards": 435,
+        "coverage": 67
+      },
+      "checks": [
+        "- test: `npm test` → 17 passed (4 files); no test file is added by this diff",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → 0 problems (clean only because `OrderRefresh.tsx:9` disables the rule that would have fired)"
+      ],
+      "turns": 2,
+      "cost": 0.9132765,
+      "seconds": 236
+    }
+  ]
+}

@@ -885,6 +885,21 @@ test('the append-only records are not scanned for references', () => {
   }
 });
 
+// --- the CLI's own guards ----------------------------------------------------
+
+test('--project with a path exits 2, because it reads the current directory', () => {
+  // The path was silently ignored: `lint.mjs --project <copy>` linted the
+  // engine repository and printed `clean — 1 files`, which is this repo's own
+  // CLAUDE.md and says nothing about <copy>. Stage 11d-2's review caught it in
+  // a report line that could not reproduce. A guard, not a new argument form:
+  // the engine only ever runs this from inside a project.
+  const out = spawnSync(process.execPath, [LINT, '--project', '/tmp/somewhere'], { encoding: 'utf8' });
+
+  assert.equal(out.status, 2, 'a path with --project is a bad invocation');
+  assert.match(out.stderr, /--project takes no path/);
+  assert.match(out.stderr, /run it inside the project/);
+});
+
 // --- maxTurns: the dispatch bound lives in the definition (decision 0044) ----
 
 const bounded = (turns) => `---
@@ -1456,4 +1471,163 @@ test('--rules says where in the rule each rot lives', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// --- `## Not covered` in a verify.md (decision 0096). A report that leaves the
+// block out reads as if the run had covered everything, and the residue line is
+// fixed text for the same reason: paraphrased, it stops being a statement about
+// this engine and becomes this run's opinion of itself.
+
+const RESIDUE =
+  'the first cross-feature interaction before a neighbor is pinned, aesthetics and product fit, and usability as a person means it';
+
+/** A verify.md with the table above and the block below, both substitutable. */
+function verifyFile({ rows = null, block = null } = {}) {
+  const table =
+    rows ??
+    [
+      '| # | Claim (from plan) | Command / action | Evidence | Status |',
+      '|---|---|---|---|---|',
+      '| 1 | T1 totals | `npx vitest run` | 3 passed | pass |',
+      '| 2 | perf | — | skip: plan did not declare perf | skip |',
+    ].join('\n');
+  const covered =
+    block ??
+    [
+      '## Not covered',
+      '- matrix: routes 1 × states 2 → 2 rows, of 2 in the product',
+      '- skips: 2 — plan did not declare perf',
+      `- residue: ${RESIDUE}`,
+    ].join('\n');
+  return `# Verify 1 — orders-summary\nVerdict: PASS · claims 2 · pass 1 · fail 0 · skip 1\n\n${table}\n\n${covered}\n`;
+}
+
+/** A project holding one task's verify.md, and `--project` run over it. */
+function lintVerify(text) {
+  const root = tree({
+    '.git/HEAD': 'ref: refs/heads/main\n',
+    '.claude/hodos/config.json': JSON.stringify({ version: 1 }),
+    '.claude/hodos/tasks/orders-summary/verify.md': text,
+  });
+  try {
+    return spawnSync(process.execPath, [LINT, '--project'], { cwd: root, encoding: 'utf8' });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('--project accepts a verify.md whose block carries its three lines', () => {
+  const out = lintVerify(verifyFile());
+  assert.equal(out.status, 0, out.stdout);
+  assert.doesNotMatch(out.stdout, /unknown artifact/);
+});
+
+test('--project rejects a verify.md with no ## Not covered block', () => {
+  const out = lintVerify(verifyFile({ block: '' }));
+  assert.equal(out.status, 1);
+  // The message, not the heading: `carries three lines … \`matrix:\` is missing`
+  // also matches a pattern that only names the block, so the absent branch was
+  // unpinned — mutating its guard away left the suite green (review 1, 11d-2).
+  assert.match(out.stdout, /error: no `## Not covered` block/);
+});
+
+test('--project names the line of the block that is missing', () => {
+  for (const [missing, expected] of [
+    ['matrix', /matrix:/],
+    ['skips', /skips:/],
+    ['residue', /residue:/],
+  ]) {
+    const block = ['## Not covered', '- matrix: routes 1 → 1 row, of 1 in the product', '- skips: 2 — plan did not declare perf', `- residue: ${RESIDUE}`]
+      .filter((line) => !line.startsWith(`- ${missing}:`))
+      .join('\n');
+    const out = lintVerify(verifyFile({ block }));
+    assert.equal(out.status, 1, missing);
+    assert.match(out.stdout, expected, missing);
+  }
+});
+
+test('--project rejects a residue line that has been reworded', () => {
+  const block = [
+    '## Not covered',
+    '- matrix: routes 1 → 1 row, of 1 in the product',
+    '- skips: 2 — plan did not declare perf',
+    '- residue: cross-feature interactions, aesthetics, and usability',
+  ].join('\n');
+  const out = lintVerify(verifyFile({ block }));
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /residue line is fixed text/);
+});
+
+test('--project rejects a skips line that leaves a skip row out', () => {
+  const rows = [
+    '| # | Claim (from plan) | Command / action | Evidence | Status |',
+    '|---|---|---|---|---|',
+    '| 1 | T1 totals | `npx vitest run` | 3 passed | pass |',
+    '| 2 | perf | — | skip: plan did not declare perf | skip |',
+    '| 3 | /orders at 375 | — | skip: not run — unit red | skip |',
+  ].join('\n');
+  const out = lintVerify(verifyFile({ rows }));
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /skip rows? 3 (?:is|are) not named/);
+});
+
+test('--project rejects a skips line naming a row that did not skip', () => {
+  const block = [
+    '## Not covered',
+    '- matrix: routes 1 → 1 row, of 1 in the product',
+    '- skips: 1, 2 — plan did not declare perf',
+    `- residue: ${RESIDUE}`,
+  ].join('\n');
+  const out = lintVerify(verifyFile({ block }));
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /row 1 did not skip/);
+});
+
+test('--project rejects a skip named with no reason', () => {
+  const block = [
+    '## Not covered',
+    '- matrix: routes 1 → 1 row, of 1 in the product',
+    '- skips: 2',
+    `- residue: ${RESIDUE}`,
+  ].join('\n');
+  const out = lintVerify(verifyFile({ block }));
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /names no reason/);
+});
+
+test('--project rejects an em dash on the skips line while the table skipped', () => {
+  const block = ['## Not covered', '- matrix: —', '- skips: —', `- residue: ${RESIDUE}`].join('\n');
+  const out = lintVerify(verifyFile({ block }));
+  assert.equal(out.status, 1);
+  assert.match(out.stdout, /skip rows? 2 (?:is|are) not named/);
+});
+
+test('--project accepts an em dash on both lines where nothing skipped and nothing swept', () => {
+  const rows = [
+    '| # | Claim (from plan) | Command / action | Evidence | Status |',
+    '|---|---|---|---|---|',
+    '| 1 | T1 totals | `npx vitest run` | 3 passed | pass |',
+  ].join('\n');
+  const block = ['## Not covered', '- matrix: —', '- skips: —', `- residue: ${RESIDUE}`].join('\n');
+  const out = lintVerify(verifyFile({ rows, block }));
+  assert.equal(out.status, 0, out.stdout);
+});
+
+test('--project reads several skips in one segment and several segments', () => {
+  const rows = [
+    '| # | Claim (from plan) | Command / action | Evidence | Status |',
+    '|---|---|---|---|---|',
+    '| 1 | T1 totals | `npx vitest run` | 3 passed | pass |',
+    '| 2 | perf | — | skip: plan did not declare perf | skip |',
+    '| 3 | /orders | — | skip: not run — unit red | skip |',
+    '| 4 | /orders/:id | — | skip: not run — unit red | skip |',
+  ].join('\n');
+  const block = [
+    '## Not covered',
+    '- matrix: routes 2 × widths 2 → 4 rows, of 4 in the product',
+    '- skips: 2 — plan did not declare perf; 3, 4 — not run: unit red',
+    `- residue: ${RESIDUE}`,
+  ].join('\n');
+  const out = lintVerify(verifyFile({ rows, block }));
+  assert.equal(out.status, 0, out.stdout);
 });

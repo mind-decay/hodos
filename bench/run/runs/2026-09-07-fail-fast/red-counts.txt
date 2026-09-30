@@ -1,0 +1,8 @@
+kernel tool uses: 21
+  review-input.md: 0 read, 0 mentioned
+  review.md: 0 read, 0 mentioned
+  dispatches: 1
+    hodos:hodos-verifier x1
+  browser operations: 0
+    of them in the kernel: 0
+  git diff in a kernel command: 4

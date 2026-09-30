@@ -1,6 +1,6 @@
 ---
 name: task
-description: Session 1 of a hodos task — route the request, research what is unknown, grill the design into a plan, get it approved, hand off to /hodos:run. The developer runs it as /hodos:task <description>; the campaign skill invokes it as <campaign>/<node> to open one node of a map. Opening a task is the developer's decision, so it is not invoked on your own reading of a request.
+description: Session 1 of a hodos task — route the request, research what is unknown, grill the design into a plan, get it approved, hand off to /hodos:run. A change no program reads is carried through its commit and one review here instead. The developer runs it as /hodos:task <description>; the campaign skill invokes it as <campaign>/<node> to open one node of a map. Opening a task is the developer's decision, so it is not invoked on your own reading of a request.
 argument-hint: "<description> | <campaign>/<node>"
 allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
@@ -9,15 +9,15 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 
 # task
 
-Decide what will be built and why, and write it down so session 2 can build it without this conversation. Each phase's procedure is read on entering that phase from `${CLAUDE_PLUGIN_ROOT}/skills/task/references/<name>.md` — a reference that cannot be read stops the run with the reason, and is never reconstructed from memory.
+Decide what will be built and why, and write it down so session 2 can build it without this conversation. An `inert` verdict is the exception, and its whole flow runs here (step 2i). Each phase's procedure is read on entering that phase from `${CLAUDE_PLUGIN_ROOT}/skills/task/references/<name>.md` — a reference that cannot be read stops the run with the reason, and is never reconstructed from memory.
 
 ## Invariants
 
-- No code is written here. This session produces `brief.md`, `research.md`, `plan.md`, a ledger and a branch; the first line of implementation belongs to `/hodos:run`.
+- No code is written here. This session produces `brief.md`, `research.md`, `plan.md`, a ledger and a branch; the first line of implementation belongs to `/hodos:run`. The one exception is a verdict the developer confirmed as `quick` with `Shape: inert`: that task's whole flow runs here, from `references/inert.md` (decision **0183**).
 - The router spends ≤5 evidence calls before its verdict — the searches and reads that fill the checklist; the digest, the config lookup and this reference are procedure. What it wanted to look up is the research phase's job, and "this needs research" is itself a verdict.
-- Facts are dispatched, decisions are asked. An Explore subagent fetches what the repository knows; every fork the plan does not settle goes to the developer, in one round, numbered, each with a recommended answer.
+- Facts are dispatched, decisions are asked. An Explore subagent fetches what the repository knows; every fork the plan does not settle goes to the developer, in one round through `AskUserQuestion`, each with a recommended answer (decision **0178**).
 - Nothing is assumed silently. `## Open questions` is empty at approval, or the plan is not approved.
-- Test-first is what a task with no `Tests:` line means. A task deviates only as `Tests: <reason> — <one line> · verified by <what>`, `<reason>` one of `visual`, `glue`, `infra`, `no-harness`.
+- Test-first is what a task with no `Tests:` line means. A task deviates only as `Tests: <reason> — <one line> · verified by <what>`, `<reason>` one of `visual`, `glue`, `infra`, `no-harness`. An `inert` task's `done` carries `--inert` instead, which the ledger accepts only under that shape.
 - Every event reaches the ledger through `ledger.mjs`. `brief.md`, `research.md` and `plan.md` are written directly; `ledger.md` and `state.json` never are.
 - The path ratchets one way. A task upgrades mid-flight — `ledger.mjs add "Upgrade: <from>→<to> — <why>"` — and never downgrades.
 
@@ -28,6 +28,7 @@ Decide what will be built and why, and write it down so session 2 can build it w
 | 0 | Config | — | `config.mjs find` returned a config |
 | 1 | Route | `references/route.md` | nine rows with evidence, a verdict from the rules, confirmed by the developer |
 | 2 | Open | — | every verdict but `campaign`: `ledger.mjs init` printed the slug; `brief.md` written |
+| 2i | Inert | `references/inert.md`, which runs `run`'s `references/review-loop.md` and `references/finish.md` | a `quick` verdict confirmed with `Shape: inert`: `Finish: report delivered`, or an `Upgrade: inert→quick` line that returns the task to step 6 |
 | 3 | Campaign | *Campaign*, below | a campaign verdict hands the description to the `campaign` skill |
 | 4 | Question | *Question*, below | the answer is delivered with sources and the ledger ends with `Finish` |
 | 4b | Reproduce | `references/reproduce.md` | type `bug` whose red-loop candidates are not commands that fail today: a red-capable command in `brief.md`, or a `Ruling:` that says it is not reproducible here |
@@ -36,7 +37,7 @@ Decide what will be built and why, and write it down so session 2 can build it w
 | 7 | Plan review | — | `deep` only: `plan-review.md` folded, then deleted |
 | 8 | Approve | *Approval*, below | `state.phase == approved` and the handoff line printed |
 
-Step 4b runs only for a `bug` the router left with no command that fails today (`references/route.md §7`), and its second exit ends the session: a symptom nothing here can contradict is not a `bug` the red loop can carry, and re-routing it is the developer's call. Step 4 is an exit: it ends the session on its own terms. Step 3 is a handoff — the `campaign` skill takes over in this session and may invoke this one back for a node. Step 5 runs when the path is `deep`, and whenever grilling hits a fact — a question about what the code or a library already does, rather than about what to build.
+Step 2i replaces steps 4–8 for the one shape that carries no behaviour: the edit, its commands, one commit and one fresh reviewer run in this session, and no second session follows. Step 4b runs only for a `bug` the router left with no command that fails today (`references/route.md §7`), and its second exit ends the session: a symptom nothing here can contradict is not a `bug` the red loop can carry, and re-routing it is the developer's call. Step 4 is an exit: it ends the session on its own terms. Step 3 is a handoff — the `campaign` skill takes over in this session and may invoke this one back for a node. Step 5 runs when the path is `deep`, and whenever grilling hits a fact — a question about what the code or a library already does, rather than about what to build.
 
 ## Step 0 — config
 
@@ -79,7 +80,7 @@ Three of the mandatory stops of `DESIGN.md §4.4` fall in this session: the rout
 
 `state.phase == approved`, the handoff line printed, and every artifact the path calls for on disk: `brief.md` on every path that opens a task; `research.md` where research ran; `plan.md` with ten non-empty design fields and an empty `## Open questions` — on a `spike`, with the question, the timebox and the exit in place of its tasks.
 
-Step 4 completes on its own terms: a delivered answer and a `Finish` line. Step 3 completes when the `campaign` skill has been invoked with the confirmed verdict; what happens after that is that skill's own completion criterion, and this one writes nothing.
+Step 2i completes on its own terms: `Finish: report delivered` after one reviewer and no verifier, or the upgrade that hands the task back to step 6. Step 4 completes on its own terms: a delivered answer and a `Finish` line. Step 3 completes when the `campaign` skill has been invoked with the confirmed verdict; what happens after that is that skill's own completion criterion, and this one writes nothing.
 
 ## Anti-pattern
 

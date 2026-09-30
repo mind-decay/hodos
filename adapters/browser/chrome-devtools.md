@@ -20,4 +20,5 @@ gotchas:
 - lighthouse_audit excludes performance by design; a budget claim is performance_start_trace, and its accessibility category is axe underneath
 - lighthouse never returns "incomplete"; the checks it does not automate are the same ten scoreDisplayMode manual audits every run, so they are a count in the row, not skips — a skip is runtimeError, the whole route
 - resize_page sets the window size and nothing else; a claim about a phone needs emulate {viewport: "390x844x3,mobile,touch"}, which carries the pixel ratio and the touch surface with it
+- the presentation detectors are two calls: `evaluate` runs the collector `detectors.mjs source` prints, and `emulate {networkConditions}` is what kills and throttles the network for the attack list
 - initScript runs before the page's own scripts, so a project whose API is not served in dev reaches its states by stubbing `window.fetch` there — the same boundary its tests stub, and never the module the claim is about

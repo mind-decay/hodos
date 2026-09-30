@@ -1,0 +1,15 @@
+diff --git a/config/loader.py b/config/loader.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/config/loader.py
+@@ -0,0 +1,9 @@
++# config/loader.py
++import json
++
++def load_config(path: str) -> dict:
++    with open(path, encoding='utf-8') as f:
++        return json.load(f)
++
++def load_all_configs(paths: list[str]) -> list[dict]:
++    return [load_config(p) for p in paths]

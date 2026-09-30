@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { activeTask, findConfig, readState, sessionOf } from './config.mjs';
+import { declinedLine, findConfig, readState, resolveTask, sessionOf } from './config.mjs';
 
 const USAGE = `Usage: node scripts/git-guard.mjs
 
@@ -173,13 +173,15 @@ function readStdin() {
 }
 
 /**
- * The phase of the task this session is on — the session's, not the project's:
- * `blockCommitOnFailedReview` used to deny a commit on whatever task `active`
- * happened to name (decision 0047).
+ * `{ phase, others }`: the phase of the task this session is on — the
+ * session's, not the project's, because `blockCommitOnFailedReview` used to
+ * deny a commit on whatever task `active` happened to name (decision 0047) —
+ * and how many other sessions hold a task, which is what the line saying why
+ * the gate stayed open counts (decision 0171).
  */
 function activePhase(projectRoot, payload) {
-  const slug = activeTask(projectRoot, sessionOf(payload));
-  return slug ? (readState(projectRoot, slug)?.phase ?? null) : null;
+  const { slug, others } = resolveTask(projectRoot, sessionOf(payload));
+  return { phase: slug ? (readState(projectRoot, slug)?.phase ?? null) : null, others };
 }
 
 function main() {
@@ -207,7 +209,7 @@ function main() {
     const rel = relative(tasksDir, abs).split(sep).join('/');
     return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
   };
-  const phase = blockCommit ? activePhase(found.projectRoot, payload) : null;
+  const { phase, others } = blockCommit ? activePhase(found.projectRoot, payload) : { phase: null, others: 0 };
 
   for (const segment of segments(command)) {
     const tokens = stripAssignments(words(segment));
@@ -224,6 +226,11 @@ function main() {
         })}\n`,
       );
       return 0;
+    }
+    // Said only where the gate would have read a task: another session's fix
+    // is not this commit's reason to be denied (decision 0171).
+    if (others > 0 && tokens[0] === 'git' && subcommandOf(tokens.slice(1)) === 'commit') {
+      process.stderr.write(`${declinedLine(others, 'the commit gate')}\n`);
     }
   }
   return 0;

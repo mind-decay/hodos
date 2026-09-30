@@ -1,0 +1,38 @@
+# id: ll-101
+# fixture: snippets
+# package: h1
+# kind: behavioral
+# item: L6
+# line: orders/service.py:7
+# anchor: tx_id = result['transaction_id']
+# trigger: Should identify L6 (Callee Contract Mismatch) across file boundaries: payments/gateway.py:charge can return None when order.amount == 0, but orders/service.py:process_order unconditionally subscripts result['transaction_id']. On a zero-amount order this raises TypeError: 'NoneType' object is not subscriptable. The trace must cross file boundaries: start in service.py, step into gateway.py to obser
+# what: logic-lens case #101 (deep-cross-file-callee-contract-L6), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/orders/service.py b/orders/service.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/orders/service.py
+@@ -0,0 +1,9 @@
++# orders/service.py
++from payments.gateway import charge
++
++def process_order(order):
++    # assume charge always returns dict with 'transaction_id'
++    result = charge(order)
++    tx_id = result['transaction_id']
++    order.mark_paid(tx_id)
++    return order
+diff --git a/payments/gateway.py b/payments/gateway.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/payments/gateway.py
+@@ -0,0 +1,7 @@
++# payments/gateway.py
++def charge(order):
++    if order.amount == 0:
++        # zero-amount orders skip payment; nothing to return
++        return None
++    # ... talk to payment provider ...
++    return {'transaction_id': 'tx_' + str(order.id), 'status': 'ok'}

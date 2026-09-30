@@ -1,0 +1,38 @@
+# id: ll-280
+# fixture: snippets
+# package: h6
+# kind: behavioral
+# item: L7
+# line: control/beam.cpp:16
+# anchor: if (!electron_mode && !beam_filter_in_place) {
+# trigger: L7/OV Critical (atomicity + ordering): the operator and beam threads share two flags but no synchronization enforces that `electron_mode = false` and `beam_filter_in_place = false` become visible together. If the operator presses X-ray then quickly presses fire, beam_thread can observe `electron_mode = false` (just flipped) AND `beam_filter_in_place = true` (filter not yet retracted) — neither bra
+# what: logic-lens case #280 (therac25-style-race-mode-flag-L7-L4), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/control/beam.cpp b/control/beam.cpp
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/control/beam.cpp
+@@ -0,0 +1,22 @@
++// Two threads share these flags.
++bool electron_mode = true;   // false = X-ray mode
++bool beam_filter_in_place = true;
++
++void operator_thread() {
++    if (user_pressed_xray()) {
++        electron_mode = false;
++        // takes ~8 seconds for hardware to retract filter
++        retract_filter_async();
++        // also clears beam_filter_in_place when done
++    }
++}
++
++void beam_thread() {
++    if (user_pressed_fire()) {
++        if (!electron_mode && !beam_filter_in_place) {
++            fire_xray_beam();
++        } else if (electron_mode && beam_filter_in_place) {
++            fire_electron_beam();
++        }
++    }
++}

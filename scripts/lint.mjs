@@ -37,6 +37,7 @@ const ARTIFACTS = [
   { kind: 'adapter', cap: 30, re: /^\.claude\/hodos\/adapters\/[^/]+\/[^/]+\.md$/, project: true },
   { kind: 'CLAUDE.md', cap: 60, re: /^CLAUDE\.md$/ },
   { kind: 'plan', cap: Infinity, re: /^\.claude\/hodos\/tasks\/[^/]+\/plan\.md$/ },
+  { kind: 'verify', cap: Infinity, re: /^\.claude\/hodos\/tasks\/[^/]+\/verify\.md$/ },
 ];
 
 // A reference below skills/<kernel>/references/ — one level deep is the rule.
@@ -59,6 +60,13 @@ const RULE_KEYS = ['paths'];
 const TEST_EXEMPTIONS = ['visual', 'glue', 'infra', 'no-harness'];
 const EXEMPTION_FORM = '<reason> — <justification> · verified by <what>';
 
+// FORMATS.md §10, decision 0096. The residue is fixed text: paraphrased, it
+// stops being a statement about what this engine does not check and becomes
+// this run's opinion of itself, which is the thing the line exists to replace.
+const RESIDUE =
+  'the first cross-feature interaction before a neighbor is pinned, aesthetics and product fit, and usability as a person means it';
+const COVERED_LINES = ['matrix', 'skips', 'residue'];
+
 // FORMATS.md §5: plan size is advisory. A plan squeezed to fit loses the detail
 // the executor needs, so this warns and never fails.
 const PLAN_ADVISORY = 250;
@@ -76,7 +84,8 @@ reference is named by its kernel, and that file:line citations resolve.
               With no paths, scans skills/ agents/ adapters/ sources/ of the
               plugin root.
   --project   check the current project instead: CLAUDE.md (or its managed
-              block), .claude/rules/ and .claude/skills/.
+              block), .claude/rules/, .claude/skills/, and each task's
+              plan.md and verify.md.
   --hook      read a PostToolUse payload on stdin and report on the file it
               names, as hookSpecificOutput.additionalContext. Always exits 0.
   --rules     report the project's rules as facts, for /hodos:status --prune:
@@ -362,6 +371,7 @@ export function lintFile(absPath, root) {
   // A plan is the user's document, not an authored artifact: no cap, no
   // frontmatter, one rule — the test strategy of its tasks.
   if (artifact.kind === 'plan') return planFindings(text, relPath);
+  if (artifact.kind === 'verify') return verifyFindings(text, relPath);
 
   const measured = measure(text, artifact.kind);
   if (measured.count > artifact.cap) {
@@ -710,6 +720,91 @@ function planFindings(text, relPath) {
   return findings;
 }
 
+/**
+ * The numbered rows of `verify.md`'s table, as `{ n, status }`. A row is a line
+ * that begins a cell with an integer; the status is its last cell.
+ */
+function tableRows(lines) {
+  const rows = [];
+  lines.forEach((line, index) => {
+    if (!line.startsWith('|')) return;
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+    if (cells.length < 2 || !/^\d+$/.test(cells[0])) return;
+    rows.push({ n: Number(cells[0]), status: cells[cells.length - 1].toLowerCase(), line: index + 1 });
+  });
+  return rows;
+}
+
+/**
+ * `## Not covered` — the block, its three lines, every skip named with its
+ * reason, and the residue verbatim (`FORMATS.md §10`, decision 0096).
+ *
+ * The block is what makes a run's blind spots countable, so what is checked is
+ * the arithmetic between it and the table above it: a skip row nobody named is
+ * a gap the reader cannot see, and a number named that did not skip is a claim
+ * about the table that the table does not carry.
+ */
+function verifyFindings(text, relPath) {
+  const findings = [];
+  const lines = text.split('\n');
+  const error = (line, message) => findings.push({ file: relPath, line, severity: 'error', message });
+  const heading = lines.findIndex((line) => line.trim() === '## Not covered');
+  if (heading < 0) {
+    error(lines.length, 'no `## Not covered` block — the block says what the run did not cover, and a report without it reads as if it had (FORMATS.md §10)');
+    return findings;
+  }
+  const body = lines.slice(heading + 1);
+  const end = body.findIndex((line) => line.startsWith('## '));
+  const block = (end < 0 ? body : body.slice(0, end)).filter((line) => line.trim() !== '');
+  const valueOf = (name) => {
+    const found = block.find((line) => line.trim().startsWith(`- ${name}:`));
+    return found === undefined ? null : found.trim().slice(`- ${name}:`.length).trim();
+  };
+
+  for (const name of COVERED_LINES) {
+    if (valueOf(name) === null) {
+      error(heading + 1, `\`## Not covered\` carries three lines and always all three: \`${name}:\` is missing (FORMATS.md §10)`);
+    }
+  }
+  const residue = valueOf('residue');
+  if (residue !== null && residue !== RESIDUE) {
+    error(
+      heading + 1 + block.findIndex((line) => line.trim().startsWith('- residue:')) + 1,
+      `the residue line is fixed text: it reads "${RESIDUE}"`,
+    );
+  }
+
+  const skips = valueOf('skips');
+  if (skips === null) return findings;
+  const skipsLine = heading + 1 + block.findIndex((line) => line.trim().startsWith('- skips:')) + 1;
+  const skipped = tableRows(lines).filter((row) => row.status.startsWith('skip')).map((row) => row.n);
+  const named = [];
+  if (skips !== '—') {
+    for (const segment of skips.split(';').map((part) => part.trim()).filter(Boolean)) {
+      const [numbers, ...reason] = segment.split('—');
+      const parsed = numbers.split(',').map((part) => part.trim()).filter(Boolean);
+      if (reason.join('—').trim() === '') {
+        error(skipsLine, `the skip \`${segment}\` names no reason — every skip carries one (FORMATS.md §10)`);
+      }
+      for (const number of parsed) {
+        if (!/^\d+$/.test(number)) {
+          error(skipsLine, `\`${number}\` is not a row of the table — a skip is named by its row number`);
+          continue;
+        }
+        named.push(Number(number));
+      }
+    }
+  }
+  const missing = skipped.filter((n) => !named.includes(n));
+  if (missing.length > 0) {
+    error(skipsLine, `skip ${missing.length === 1 ? 'row' : 'rows'} ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not named on the \`skips:\` line`);
+  }
+  for (const n of named) {
+    if (!skipped.includes(n)) error(skipsLine, `row ${n} did not skip, and the \`skips:\` line names it`);
+  }
+  return findings;
+}
+
 /** The roots --project checks: what init and /hodos:rule write into a project. */
 const PROJECT_TARGETS = [
   'CLAUDE.md',
@@ -718,15 +813,15 @@ const PROJECT_TARGETS = [
   join('.claude', 'hodos', 'adapters'),
 ];
 
-/** Every plan.md of the project's task directories. */
-function planFiles(root) {
+/** The named file of every task directory the project holds, where it exists. */
+function taskFiles(root, name) {
   const tasks = join(root, '.claude', 'hodos', 'tasks');
   if (!existsSync(tasks)) return [];
   const out = [];
   for (const entry of readdirSync(tasks, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const plan = join(tasks, entry.name, 'plan.md');
-    if (existsSync(plan)) out.push(plan);
+    const file = join(tasks, entry.name, name);
+    if (existsSync(file)) out.push(file);
   }
   return out;
 }
@@ -735,12 +830,14 @@ function lintProject(cwd) {
   const found = findConfig(cwd);
   const root = found.notFound ? repoRoot(cwd) : found.projectRoot;
   const targets = PROJECT_TARGETS.map((t) => join(root, t)).filter((t) => existsSync(t));
-  // Only plan.md is linted under tasks/: the rest of a task directory is
-  // machine state, and scanning it would report ledger.md as an unknown artifact.
+  // Only plan.md and verify.md are linted under tasks/: the rest of a task
+  // directory is machine state, and scanning it would report ledger.md as an
+  // unknown artifact.
   // The cross-reference pass guards the engine's own specification against
   // renumbering; a project's `DOC.md §N` resolves against the project's docs,
   // which need not number their headings at all. Engine mode only.
-  return { root, ...lint([...targets, ...planFiles(root)], root, { crossRefs: false }) };
+  const task = [...taskFiles(root, 'plan.md'), ...taskFiles(root, 'verify.md')];
+  return { root, ...lint([...targets, ...task], root, { crossRefs: false }) };
 }
 
 /**
@@ -898,6 +995,14 @@ function main(argv) {
 
   if (mode === 'hook') return lintHook();
   if (mode === 'rules') return lintRules(process.cwd());
+
+  // `--project` reads the current directory, so a path beside it is a caller
+  // who thinks it reads that path instead. It used to be dropped in silence,
+  // which printed this repository's own count for somebody else's copy.
+  if (mode === 'project' && paths.length > 0) {
+    process.stderr.write(`lint: --project takes no path — run it inside the project\n${USAGE}\n`);
+    return 2;
+  }
 
   // Explicit paths are the caller's; classification is then relative to the
   // current directory, so `cd <checkout> && lint skills/run/SKILL.md` works.

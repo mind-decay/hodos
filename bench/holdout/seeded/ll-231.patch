@@ -1,0 +1,25 @@
+# id: ll-231
+# fixture: snippets
+# package: h5
+# kind: behavioral
+# item: L3
+# line: search/vector_utils.cpp:5
+# anchor: for (size_t i = nums.size() - 1; i >= 0; i--) {
+# trigger: Should identify L3 (Boundary Blindspot): the loop variable `i` is declared as `size_t`, which is an unsigned integer type. When the loop reaches `i == 0` and executes `i--`, unsigned underflow occurs: `i` wraps around to the maximum value of `size_t` (typically 2^64-1 on 64-bit systems). The condition `i >= 0` is always true for an unsigned type — a signed comparison warning that many compilers em
+# what: logic-lens case #231 (cpp-size-t-underflow-infinite-loop-L3), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/search/vector_utils.cpp b/search/vector_utils.cpp
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/search/vector_utils.cpp
+@@ -0,0 +1,9 @@
++// search/vector_utils.cpp
++#include <vector>
++
++int findLastNegative(const std::vector<int>& nums) {
++    for (size_t i = nums.size() - 1; i >= 0; i--) {
++        if (nums[i] < 0) return nums[i];
++    }
++    return 0;   // no negative found
++}

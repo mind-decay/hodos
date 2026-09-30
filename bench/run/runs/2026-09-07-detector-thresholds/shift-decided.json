@@ -1,0 +1,26 @@
+{
+  "route": "/shift",
+  "width": 1200,
+  "omitted": 0,
+  "hits": [
+    {
+      "detector": "overflow",
+      "route": "/shift",
+      "ref": "div[6]",
+      "detail": "content is 352px wider than the box (overflow-x: visible)"
+    },
+    {
+      "detector": "clipped",
+      "route": "/shift",
+      "ref": "div[8]",
+      "detail": "text is cut 34px short (overflow-y: hidden, no ellipsis)"
+    },
+    {
+      "detector": "overlap",
+      "route": "/shift",
+      "ref": "button[10]",
+      "detail": "overlaps button[11] by 20×20px"
+    }
+  ],
+  "allowed": []
+}

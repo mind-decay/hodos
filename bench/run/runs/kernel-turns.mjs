@@ -23,6 +23,11 @@ function main(argv) {
   }
 
   const uses = [];
+  // Every tool use in the stream, kernel and sidechain alike. The counts below
+  // read `kernel` where they mean the kernel's own; the browser counter of
+  // decision 0111 reads the whole list, because every browser operation is the
+  // verifier's and the kernel filter is exactly what drops them.
+  const all = [];
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     if (line.trim() === '') continue;
     let event;
@@ -31,11 +36,13 @@ function main(argv) {
     } catch {
       continue;
     }
-    if (event.type !== 'assistant' || event.parent_tool_use_id != null) continue;
+    if (event.type !== 'assistant') continue;
+    const kernel = event.parent_tool_use_id == null;
     for (const block of event.message?.content ?? []) {
       if (block.type !== 'tool_use') continue;
       const text = JSON.stringify(block.input ?? {});
-      uses.push({ name: block.name, text });
+      all.push({ name: block.name, text, kernel });
+      if (kernel) uses.push({ name: block.name, text });
     }
   }
 
@@ -67,6 +74,21 @@ function main(argv) {
   }
   process.stdout.write(`  dispatches: ${dispatches.length}\n`);
   for (const [type, n] of [...byAgent].sort()) process.stdout.write(`    ${type} x${n}\n`);
+
+  // Decision 0111: the fail-fast gate. A red command stage means the sweep did
+  // not happen, and what says so is the browser operations nobody made — zero
+  // against N. A kernel that drives the browser itself is a separate finding
+  // (`DESIGN.md §7.4`: the claims are run by a fresh agent), so it is printed
+  // rather than folded in.
+  const browser = all.filter((u) => u.name.startsWith('mcp__chrome-devtools__'));
+  const byOperation = new Map();
+  for (const u of browser) {
+    const operation = u.name.replace('mcp__chrome-devtools__', '');
+    byOperation.set(operation, (byOperation.get(operation) ?? 0) + 1);
+  }
+  process.stdout.write(`  browser operations: ${browser.length}\n`);
+  process.stdout.write(`    of them in the kernel: ${browser.filter((u) => u.kernel).length}\n`);
+  for (const [operation, n] of [...byOperation].sort()) process.stdout.write(`    ${operation} x${n}\n`);
 
   const diffs = uses.filter((u) => u.name === 'Bash' && /git diff/.test(u.text));
   process.stdout.write(`  git diff in a kernel command: ${diffs.length}\n`);

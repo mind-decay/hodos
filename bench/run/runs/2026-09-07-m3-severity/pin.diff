@@ -1,0 +1,20 @@
+diff --git a/.claude/hodos/config.json b/.claude/hodos/config.json
+index b3e8cf5..1408abe 100644
+--- a/.claude/hodos/config.json
++++ b/.claude/hodos/config.json
+@@ -35,7 +35,14 @@
+           "/orders/:id",
+           "/shift"
+         ],
+-        "when": "ui"
++        "when": "ui",
++        "checks": [
++          {
++            "route": "/orders",
++            "evaluate": "document.querySelector('h1').nextElementSibling.nextElementSibling.textContent",
++            "expect": "3 orders · 61.50"
++          }
++        ]
+       }
+     ]
+   },

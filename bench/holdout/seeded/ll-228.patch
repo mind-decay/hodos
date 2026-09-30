@@ -1,0 +1,45 @@
+# id: ll-228
+# fixture: snippets
+# package: h4
+# kind: behavioral
+# item: L1
+# line: lib/payment/service.rb:8
+# anchor: @logger = Logger.new   # which Logger?
+# trigger: Should identify L1 (Shadow Override): inside the `Payment` module, the constant lookup for `Logger` resolves to `Payment::Logger` before falling through to `::Logger` (the stdlib class). `Payment::Logger` only defines `#log`, not `#info`. Calling `@logger.info` raises `NoMethodError: undefined method 'info' for #<Payment::Logger>`. The `require 'logger'` line loads the stdlib but the constant reso
+# what: logic-lens case #228 (ruby-class-shadows-stdlib-logger-L1), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/lib/payment/logger.rb b/lib/payment/logger.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/lib/payment/logger.rb
+@@ -0,0 +1,8 @@
++# lib/payment/logger.rb
++module Payment
++  class Logger
++    def log(msg)
++      $stdout.puts "[PAY] #{msg}"
++    end
++  end
++end
+diff --git a/lib/payment/service.rb b/lib/payment/service.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/lib/payment/service.rb
+@@ -0,0 +1,15 @@
++# lib/payment/service.rb
++require_relative 'logger'
++require 'logger'   # stdlib Logger
++
++module Payment
++  class Service
++    def initialize
++      @logger = Logger.new   # which Logger?
++    end
++
++    def process(amount)
++      @logger.info "Processing #{amount}"
++    end
++  end
++end

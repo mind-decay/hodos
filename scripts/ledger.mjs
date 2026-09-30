@@ -35,6 +35,12 @@ const SLUG_MAX = 40;
 // Test-first is the default for every task; a task deviates only for one of
 // these four reasons, written in the plan and repeated here (decision 0022).
 const TEST_EXEMPTIONS = ['visual', 'glue', 'infra', 'no-harness'];
+// A shape adds no path (FORMATS.md §3): `mechanical` is one of `refactor`, and
+// `inert` one of `quick` for a change with no behaviour (decision 0183).
+const SHAPES = ['inert', 'mechanical'];
+// The ratchet's rungs. `inert` sits below `quick`, so leaving it is an upgrade
+// and entering it is not.
+const UPGRADE_RUNGS = ['inert', ...PATHS];
 
 /** Options whose value is a count the stored form renders as a number. */
 const COUNT_OPTIONS = ['net', 'tasks'];
@@ -42,16 +48,17 @@ const COUNT_OPTIONS = ['net', 'tasks'];
 const GRAMMAR = `Ledger grammar (FORMATS.md §6) — the CLI forms:
 
   init <slug> --path <quick|standard|deep> --type <feature|bug|refactor|question|spike|upgrade>
-       [--campaign <c/n>]
-  add "Route: <path> <type>"
+       [--shape <inert|mechanical>] [--campaign <c/n>]
+  add "Route: <path> <type> [<shape>]"
   add "Plan: approved" --tasks <n> --branch <name>
   add "Task <n>: started"
   add "Task <n>: test red"
-  add "Task <n>: done" --sha <sha> [--tests <visual|glue|infra|no-harness>]
+  add "Task <n>: mutation" --tests <k>
+  add "Task <n>: done" --sha <sha> [--tests <visual|glue|infra|no-harness> | --inert]
   add "Task <n>: red-check attempt <k>/3 — <text>"
   add "Ruling: <what> — <why> — <cost if wrong>"
   add "Gap: <what the plan lacked> — <resolution>"
-  add "Upgrade: <from>→<to> — <why>"
+  add "Upgrade: <from>→<to> — <why>"      (<from> may be inert)
   add "Simplify: done" --sha <sha> --net <n>
   add "Review <k>: <ACCEPT|NEEDS_WORK|REJECT> <b>/<m>/<mi>"
   add "Fix <k>: done" --sha <sha>
@@ -66,12 +73,14 @@ const USAGE = `Usage: node scripts/ledger.mjs <command> [options]
 
 The one writer of ledger.md and state.json for a hodos task.
 
-  init <slug>   create the task directory, write .claude/hodos/active, and
+  init <slug>   create the task directory, claim it as claim does, and
                 record Init. Normalizes the slug and appends -2, -3 on
                 collision; prints the final slug.
-                --path, --type required; --campaign <campaign/node> optional.
+                --path, --type required; --shape <inert|mechanical> and
+                --campaign <campaign/node> optional.
   claim <slug> point this session at an existing task: write
-                .claude/hodos/sessions/<session-id> and .claude/hodos/active.
+                .claude/hodos/sessions/<session-id>, or .claude/hodos/active
+                where no session id is reachable (decision 0171).
                 Used by the run kernel when it takes up a task.
   sessions      list .claude/hodos/sessions/<id> and the task each names;
                 --gc deletes a pointer whose task directory is gone or whose
@@ -79,12 +88,14 @@ The one writer of ledger.md and state.json for a hodos task.
   add "<line>"  validate a ledger line, append it with an ISO-8601 timestamp,
                 and re-derive state.json.
                 --sha, --tasks, --branch, --net fill the script's parts;
-                --tests <reason> records the plan's test-first exemption;
+                --tests is a whole number of new tests on a mutation row and
+                the plan's test-first exemption on done; --inert marks the
+                done of a task whose shape is inert (decision 0183);
                 --slug <slug> overrides the session's own task.
 
-The task a session is on is .claude/hodos/sessions/<session-id> first and
-.claude/hodos/active second (decision 0047), so two terminals on one project
-do not take each other's ledger.
+The task a session is on is .claude/hodos/sessions/<session-id>, and
+.claude/hodos/active only while no session holds a pointer (decisions 0047,
+0171), so two terminals on one project do not take each other's ledger.
   --help        print this and exit 0.
 
 ${GRAMMAR}
@@ -101,12 +112,13 @@ const RULES = [
   {
     id: 'init',
     cli: null,
-    re: /^Init: (quick|standard|deep) (feature|bug|refactor|question|spike|upgrade)$/,
+    re: /^Init: (quick|standard|deep) (feature|bug|refactor|question|spike|upgrade)(?: (inert|mechanical))?$/,
     phase: () => 'plan',
   },
   {
     id: 'route',
-    cli: /^Route: (quick|standard|deep) (feature|bug|refactor|question|spike|upgrade)$/,
+    cli: /^Route: (quick|standard|deep) (feature|bug|refactor|question|spike|upgrade)(?: (inert|mechanical))?$/,
+    check: (m) => (m[3] ? shapeRefusal(m[1], m[2], m[3]) : null),
     stored: (line) => line,
     phase: () => 'plan',
   },
@@ -121,11 +133,29 @@ const RULES = [
   { id: 'task-started', cli: /^Task (\d+): started$/, stored: (line) => line, phase: () => 'execute' },
   { id: 'test-red', cli: /^Task (\d+): test red$/, stored: (line) => line, phase: () => 'execute' },
   {
+    id: 'mutation',
+    cli: /^Task (\d+): mutation$/,
+    needs: ['tests'],
+    // One flag, two types, told apart by the event (decision 0122): a count
+    // here, the plan's exemption on `done`. The check is per rule for that
+    // reason — a global count list would reject the exemption as a number.
+    check: (m, o) =>
+      /^\d+$/.test(o.tests)
+        ? null
+        : `--tests on a mutation row takes a whole number of new tests, not ${JSON.stringify(o.tests)}`,
+    stored: (line, o) => `${line} (${o.tests} tests)`,
+    re: /^Task (\d+): mutation \((\d+) tests\)$/,
+    phase: () => 'execute',
+  },
+  {
     id: 'task-done',
     cli: /^Task (\d+): done$/,
     needs: ['sha'],
-    stored: (line, o) => (o.tests ? `${line} (${o.sha}, tests: ${o.tests})` : `${line} (${o.sha})`),
-    re: /^Task (\d+): done \(([^,)]+)(?:, tests: [a-z-]+)?\)$/,
+    stored: (line, o) => {
+      if (o.inert) return `${line} (${o.sha}, inert)`;
+      return o.tests ? `${line} (${o.sha}, tests: ${o.tests})` : `${line} (${o.sha})`;
+    },
+    re: /^Task (\d+): done \(([^,)]+)(?:, tests: [a-z-]+|, inert)?\)$/,
     phase: () => 'execute',
   },
   {
@@ -138,11 +168,11 @@ const RULES = [
   { id: 'gap', cli: /^Gap: (.+) — (.+)$/, stored: (line) => line, phase: () => null },
   {
     id: 'upgrade',
-    cli: /^Upgrade: (quick|standard|deep)→(quick|standard|deep) — (.+)$/,
+    cli: /^Upgrade: (inert|quick|standard|deep)→(inert|quick|standard|deep) — (.+)$/,
     // The ratchet of DESIGN.md §4.1 is one-way; a downgrade is a rejected line,
     // not a silent state change.
     check: (m) =>
-      PATHS.indexOf(m[2]) > PATHS.indexOf(m[1])
+      UPGRADE_RUNGS.indexOf(m[2]) > UPGRADE_RUNGS.indexOf(m[1])
         ? null
         : `Upgrade goes one way: ${m[1]}→${m[2]} is not an upgrade (DESIGN.md §4.1)`,
     stored: (line) => line,
@@ -161,7 +191,11 @@ const RULES = [
     cli: /^Review (\d+): (ACCEPT|NEEDS_WORK|REJECT) (\d+)\/(\d+)\/(\d+)$/,
     stored: (line, o, ctx, m) => `Review ${m[1]}: ${m[2]} (${m[3]}/${m[4]}/${m[5]})`,
     re: /^Review (\d+): (ACCEPT|NEEDS_WORK|REJECT) \((\d+)\/(\d+)\/(\d+)\)$/,
-    phase: (m) => (m[2] === 'ACCEPT' ? 'verify' : 'fix'),
+    // An inert task has no verifier to hand over to (decision 0183).
+    phase: (m, ctx) => {
+      if (m[2] !== 'ACCEPT') return 'fix';
+      return ctx.shape() === 'inert' ? 'finish' : 'verify';
+    },
   },
   {
     id: 'fix-done',
@@ -182,10 +216,11 @@ const RULES = [
     id: 'breaker',
     cli: /^Breaker: (review|verify) — (accept|manual|rollback T(\d+))$/,
     stored: (line) => line,
-    phase: (m) => {
+    phase: (m, ctx) => {
       if (m[2] === 'manual') return 'manual';
       if (m[3] !== undefined) return 'execute'; // rollback T<n>
-      return m[1] === 'review' ? 'verify' : 'finish'; // accept: on as if it had passed
+      // accept: on as if it had passed, which for an inert task's review is finish
+      return m[1] === 'review' && ctx.shape() !== 'inert' ? 'verify' : 'finish';
     },
   },
   { id: 'compact', cli: /^Compact: session compacted$/, stored: (line) => line, phase: () => null },
@@ -193,6 +228,24 @@ const RULES = [
 ];
 
 const STORED_RE = (rule) => rule.re ?? rule.cli;
+
+/** Why `shape` cannot ride on this path and type, or null when it can. */
+function shapeRefusal(path, type, shape) {
+  if (!SHAPES.includes(shape)) return `--shape must be one of ${SHAPES.join(', ')}`;
+  if (shape === 'inert' && path !== 'quick') {
+    return `the inert shape is a shape of a quick verdict, and this one is ${path} (decision 0183)`;
+  }
+  // A bug opens with a red loop, which a change no program reads cannot have;
+  // a question and a spike commit nothing; an upgrade edits a version a
+  // program reads. What is left is a feature or a refactor.
+  if (shape === 'inert' && type !== 'feature' && type !== 'refactor') {
+    return `the inert shape rides on type feature or refactor, and this one is ${type} (decision 0183)`;
+  }
+  if (shape === 'mechanical' && type !== 'refactor') {
+    return `the mechanical shape is a shape of type refactor, and this one is ${type} (FORMATS.md §3)`;
+  }
+  return null;
+}
 
 // Milliseconds are kept: state.updatedAt is the key stop-gate.mjs uses to tell
 // "the task moved" from "the same stop again", and two events inside one second
@@ -253,6 +306,7 @@ export function deriveState(events, stamps, seed) {
     slug: seed.slug,
     path: seed.path ?? null,
     type: seed.type ?? null,
+    shape: seed.shape ?? null,
     phase: 'plan',
     campaign: seed.campaign ?? null,
     branch: null,
@@ -268,7 +322,9 @@ export function deriveState(events, stamps, seed) {
   };
 
   // A rollback breaker restarts the task count from T<n>: everything before it
-  // is history, so the counters read only the events after it (§7).
+  // is history, so the counters read only the events after it (§7). The upgrade
+  // out of `inert` restarts it from T1: its edit is reverted and rebuilt
+  // test-first, and judged on fresh loop bounds (decision 0184).
   let from = 0;
   let rollback = null;
   events.forEach((event, i) => {
@@ -276,6 +332,9 @@ export function deriveState(events, stamps, seed) {
     if (m) {
       from = i + 1;
       rollback = Number(m[1]);
+    } else if (/^Upgrade: inert→/.test(event)) {
+      from = i + 1;
+      rollback = null;
     }
   });
 
@@ -288,7 +347,7 @@ export function deriveState(events, stamps, seed) {
     if (!hit) return; // an unknown line cannot move state; `add` never writes one
     const { rule, m } = hit;
 
-    const phase = rule.phase(m, { lastVerdictKind: () => verdictKindBefore(events, i) });
+    const phase = rule.phase(m, { lastVerdictKind: () => verdictKindBefore(events, i), shape: () => state.shape });
     if (phase) state.phase = phase;
 
     switch (rule.id) {
@@ -296,6 +355,7 @@ export function deriveState(events, stamps, seed) {
       case 'route':
         state.path = m[1];
         state.type = m[2];
+        state.shape = m[3] ?? null;
         break;
       case 'plan-approved':
         state.base = m[1];
@@ -304,6 +364,8 @@ export function deriveState(events, stamps, seed) {
         break;
       case 'upgrade':
         state.path = m[2];
+        // `inert` exists only on `quick`: any step up the ratchet leaves it.
+        if (state.shape === 'inert') state.shape = null;
         break;
       case 'task-done':
       case 'fix-done':
@@ -361,6 +423,42 @@ function testFirstRefusal(taskDir, n, tests) {
   return `"Task ${n}: done" needs "Task ${n}: test red" before it, or --tests <${TEST_EXEMPTIONS.join('|')}> naming the exemption the plan gave this task (decision 0022)`;
 }
 
+// An inert task's edit has no line a test could pin, and the developer said so
+// at the verdict (decision 0183). The shape is read from the ledger, not taken
+// from the caller: a flag the model can pass on any task would be a fifth
+// exemption by another name.
+function inertRefusal(taskDir, n, options) {
+  if (options.tests !== undefined) {
+    return `--inert and --tests are two records: a change is inert or its task is exempt, not both (decision 0183)`;
+  }
+  const { events, stamps } = readLedger(taskDir);
+  const { shape } = deriveState(events, stamps, { slug: null });
+  if (shape === 'inert') return null;
+  return `"Task ${n}: done" --inert needs a task whose confirmed verdict carries Shape: inert, and this one carries ${shape ?? 'no shape'} (decision 0183)`;
+}
+
+/**
+ * The ratchet as the ledger holds it, which a line alone cannot show. An
+ * upgrade starts at the task's own rung, so a step out of `inert` is always
+ * written as one and is the reset of decision 0184. `inert` is chosen at the
+ * verdict and never again, so a `Route:` cannot bring it back.
+ */
+function ratchetRefusal(taskDir, id, m) {
+  const { events, stamps } = readLedger(taskDir);
+  if (id === 'upgrade') {
+    const state = deriveState(events, stamps, { slug: null });
+    const rung = state.shape === 'inert' ? 'inert' : state.path;
+    if (rung && m[1] !== rung) {
+      return `an upgrade starts where the task is, and this one is ${rung}: write "Upgrade: ${rung}→${m[2]} — <why>" (DESIGN.md §4.1)`;
+    }
+    return null;
+  }
+  if (m[3] === 'inert' && events.some((e) => e.startsWith('Plan: approved') || e.startsWith('Upgrade: '))) {
+    return 'the inert shape is confirmed at the verdict, and this task is past its verdict: nothing returns to inert (decision 0184)';
+  }
+  return null;
+}
+
 /**
  * A ledger this script could not read (decision 0101). Carried as its own error
  * so that main turns it into a refusal with a message, and never into a stack.
@@ -381,7 +479,10 @@ class UnreadableLedger extends Error {
  * a rename is atomic, so a reader sees the old state or the new one.
  */
 function writeAtomic(target, text) {
-  const tmp = `${target}.tmp`;
+  // One temporary name per process: two writers sharing `<target>.tmp` meet
+  // at the rename, and the second finds its file already moved (ENOENT) after
+  // its ledger line has landed — 12 to 15 of 40 concurrent adds at 12d-1.
+  const tmp = `${target}.${process.pid}.tmp`;
   writeFileSync(tmp, text);
   renameSync(tmp, target);
 }
@@ -406,28 +507,44 @@ function readLedger(taskDir) {
 function seedOf(taskDir, fallback) {
   try {
     const prev = JSON.parse(readFileSync(join(taskDir, 'state.json'), 'utf8'));
-    return { slug: prev.slug, path: prev.path, type: prev.type, campaign: prev.campaign };
+    return { slug: prev.slug, path: prev.path, type: prev.type, shape: prev.shape, campaign: prev.campaign };
   } catch {
     return fallback;
   }
 }
 
+/** Passes of derive-and-check before a write gives up waiting for the ledger to settle. */
+const DERIVE_PASSES = 5;
+
 // The read comes first so that a refusal happens before anything is written:
 // with the append first, the line is already on disk when the read that would
 // derive the state from it fails (decision 0101).
-function append(taskDir, stored, seed) {
-  const before = readLedger(taskDir);
-  const stamp = now();
-  appendFileSync(join(taskDir, 'ledger.md'), `${stamp} ${stored}\n`);
-  const events = [...before.events, stored];
-  const stamps = [...before.stamps, stamp];
-  const state = deriveState(events, stamps, seedOf(taskDir, seed));
-  writeAtomic(join(taskDir, 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+//
+// The state is then derived from the ledger **on disk**, not from the events
+// this process read before appending: two terminals on one task each append,
+// and a state derived from the earlier read drops the other's line while
+// ledger.md holds it. A re-read alone still lets the earlier writer's state
+// land last, so the ledger is read once more after the write, and a ledger
+// that grew in between is derived again — the last writer of state.json then
+// checked after every append that preceded it (Stage 12d-1, deliverable 1).
+// `io` exists so a test can place the other process's write in either gap.
+export function append(taskDir, stored, seed, io = {}) {
+  const { appendLine = appendFileSync, writeState = writeAtomic } = io;
+  readLedger(taskDir);
+  appendLine(join(taskDir, 'ledger.md'), `${now()} ${stored}\n`);
+  const fallback = seedOf(taskDir, seed);
+  let state;
+  for (let pass = 0; pass < DERIVE_PASSES; pass += 1) {
+    const { events, stamps } = readLedger(taskDir);
+    state = deriveState(events, stamps, fallback);
+    writeState(join(taskDir, 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+    if (readLedger(taskDir).events.length === events.length) break;
+  }
   return state;
 }
 
 /** Options that take no value; everything else needs one. */
-const BOOLEAN_OPTIONS = new Set(['gc']);
+const BOOLEAN_OPTIONS = new Set(['gc', 'inert']);
 
 function parseOptions(argv) {
   const options = {};
@@ -453,18 +570,26 @@ function parseOptions(argv) {
 }
 
 
-// --- claiming a task (decision 0047)
+// --- claiming a task (decisions 0047, 0171)
 //
 // `.claude/hodos/active` is one pointer per project, and two terminals on one
-// repository is the normal mode: the loser of the race gets another task's
-// ledger line, Stop block or denied commit, silently. The pointer is now per
-// session, and `active` stays as the single-session path and the fallback.
+// repository is the normal mode: with one pointer, the loser of the race gets
+// another task's ledger line, Stop block or denied commit, silently. The
+// pointer is per session, and `active` is the path of a claim made with no
+// id — written only by one, and read only while no session holds a pointer
+// (config.mjs, `resolveTask`). That isolates hodos's own state and not the git
+// working tree the terminals share (DESIGN.md §5.1).
 
 function claimFor(projectRoot, slug) {
   const dir = hodosDir(projectRoot);
-  writeAtomic(join(dir, 'active'), `${slug}\n`);
   const session = sessionOf();
-  if (!session) return; // no id reachable: `active` alone, which is the old behaviour
+  // `active` is written only by a claim that has no id to key a pointer by:
+  // written by every claim, it named whoever claimed last, and a session with
+  // no pointer of its own read a stranger's task through it (decision 0171).
+  if (!session) {
+    writeAtomic(join(dir, 'active'), `${slug}\n`);
+    return;
+  }
   mkdirSync(join(dir, 'sessions'), { recursive: true });
   writeAtomic(join(dir, 'sessions', session), `${slug}\n`);
 }
@@ -584,6 +709,10 @@ function cmdInit(options, rest, projectRoot) {
   if (!raw) return { code: 2, err: `ledger: init needs a slug\n${USAGE}` };
   if (!PATHS.includes(options.path)) return { code: 1, err: `ledger: --path must be one of ${PATHS.join(', ')}` };
   if (!TYPES.includes(options.type)) return { code: 1, err: `ledger: --type must be one of ${TYPES.join(', ')}` };
+  if (options.shape !== undefined) {
+    const refusal = shapeRefusal(options.path, options.type, options.shape);
+    if (refusal) return { code: 1, err: `ledger: ${refusal}` };
+  }
 
   const base = normalizeSlug(raw);
   if (base === '') return { code: 1, err: `ledger: "${raw}" normalizes to an empty slug` };
@@ -595,10 +724,12 @@ function cmdInit(options, rest, projectRoot) {
   const taskDir = join(tasksDir, slug);
   mkdirSync(taskDir, { recursive: true });
   claimFor(projectRoot, slug);
-  append(taskDir, `Init: ${options.path} ${options.type}`, {
+  const shape = options.shape ? ` ${options.shape}` : '';
+  append(taskDir, `Init: ${options.path} ${options.type}${shape}`, {
     slug,
     path: options.path,
     type: options.type,
+    shape: options.shape ?? null,
     campaign: options.campaign ?? null,
   });
   return { code: 0, out: slug };
@@ -635,11 +766,13 @@ function cmdAdd(options, rest, projectRoot) {
       return { code: 1, err: `ledger: --${key} takes a whole number of 0 or more, not ${got}` };
     }
   }
-  const invalid = rule.check?.(m);
+  const invalid = rule.check?.(m, options);
   if (invalid) return { code: 1, err: `ledger: ${invalid}` };
+  const unratcheted = rule.id === 'upgrade' || rule.id === 'route' ? ratchetRefusal(taskDir, rule.id, m) : null;
+  if (unratcheted) return { code: 1, err: `ledger: ${unratcheted}` };
 
   if (rule.id === 'task-done') {
-    const refusal = testFirstRefusal(taskDir, m[1], options.tests);
+    const refusal = options.inert ? inertRefusal(taskDir, m[1], options) : testFirstRefusal(taskDir, m[1], options.tests);
     if (refusal) return { code: 1, err: `ledger: ${refusal}` };
   }
 
@@ -663,6 +796,9 @@ function cmdAdd(options, rest, projectRoot) {
       slug,
       path: state.path,
       type: state.type,
+      // Only where there is one, so a line for a task with no shape is the line
+      // it always was (decision 0183).
+      ...(state.shape ? { shape: state.shape } : {}),
       upgrades: events.filter((e) => e.startsWith('Upgrade: ')).length,
       reviewIterations: state.review.iteration,
       verifyIterations: state.verify.iteration,

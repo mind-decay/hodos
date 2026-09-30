@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
@@ -37,6 +37,24 @@ function project({ gate = true, state = {} } = {}) {
 }
 
 const run = (root) => spawnSync(process.execPath, [GATE], { cwd: root, encoding: 'utf8' });
+
+/** The Stop hook with a chosen payload and no inherited session id. */
+function stopAs(root, payload) {
+  const env = { ...process.env };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  return spawnSync(process.execPath, [GATE], {
+    cwd: root,
+    encoding: 'utf8',
+    env,
+    input: payload ? JSON.stringify({ cwd: root, ...payload }) : '',
+  });
+}
+
+/** Another session holds a pointer to the open task. */
+function heldElsewhere(root) {
+  mkdirSync(join(root, '.claude', 'hodos', 'sessions'), { recursive: true });
+  writeFileSync(join(root, '.claude', 'hodos', 'sessions', 'sess-a'), 'orders-summary\n');
+}
 
 test('the gate is off by default', () => {
   const { root } = project({ gate: false });
@@ -175,4 +193,35 @@ test('a session with no pointer still blocks on the active task', () => {
 
   assert.equal(out.status, 2);
   assert.match(out.stderr, /orders-summary \[execute\]/);
+});
+
+// --- decision 0171: a session with no pointer of its own is not gated on
+// another session's task, and the Stop says why it did not block.
+
+test('a caller with no id is not blocked on a task another session holds, and says why', () => {
+  const { root, taskDir } = project();
+  heldElsewhere(root);
+
+  const out = stopAs(root, null);
+
+  assert.equal(out.status, 0);
+  assert.match(out.stderr, /1 other session holds a task/);
+  assert.equal(existsSync(join(taskDir, 'stop-count')), false, 'the other task\'s count is not this session\'s');
+});
+
+test('a session whose id names no pointer is not blocked on another session\'s task', () => {
+  const { root } = project();
+  heldElsewhere(root);
+
+  const out = stopAs(root, { session_id: 'sess-stranger' });
+
+  assert.equal(out.status, 0);
+  assert.match(out.stderr, /1 other session holds a task/);
+});
+
+test('a claim made with no id still blocks through active while no session holds a pointer', () => {
+  const { root } = project();
+
+  assert.equal(stopAs(root, null).status, 2);
+  assert.equal(stopAs(root, { session_id: 'sess-stranger' }).status, 2);
 });

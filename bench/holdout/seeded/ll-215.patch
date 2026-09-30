@@ -1,0 +1,31 @@
+# id: ll-215
+# fixture: snippets
+# package: h4
+# kind: behavioral
+# item: L3
+# line: network/checksum.rs:5
+# anchor: sum = sum + byte;   // plain addition
+# trigger: Should identify L3 (Boundary Blindspot): Rust's integer overflow behavior differs between debug and release builds. In debug mode, `u8` arithmetic overflow panics at runtime — a safety feature. In release mode (`--release`), overflow silently wraps modulo 256 (two's complement). The test suite uses non-overflowing inputs (`[10, 20, 30]`, sum=60 fits in u8), so both modes agree and tests pass. The 
+# what: logic-lens case #215 (rust-integer-overflow-release-L3), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/network/checksum.rs b/network/checksum.rs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/network/checksum.rs
+@@ -0,0 +1,15 @@
++// network/checksum.rs
++pub fn compute_checksum(data: &[u8]) -> u8 {
++    let mut sum: u8 = 0;
++    for &byte in data {
++        sum = sum + byte;   // plain addition
++    }
++    sum
++}
++
++pub fn validate_packet(packet: &[u8]) -> bool {
++    if packet.is_empty() { return false; }
++    let payload  = &packet[..packet.len() - 1];
++    let expected = packet[packet.len() - 1];
++    compute_checksum(payload) == expected
++}

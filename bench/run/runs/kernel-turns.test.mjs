@@ -79,3 +79,67 @@ test('kernel dispatches are counted by agent, and a subagent never dispatches', 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Decision 0111: the fail-fast gate is the browser operations a red arm did
+// not make. Every one of them is the verifier's, on the sidechain, so they are
+// exactly the turns the counts above drop — which is why this needs a counter
+// of its own rather than a grep of the same list.
+
+test('browser operations are counted on the sidechain, where the verifier makes them', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodos-turns-'));
+  try {
+    const file = join(dir, 'run.jsonl');
+    writeFileSync(
+      file,
+      [
+        use('Agent', { subagent_type: 'hodos:hodos-verifier', prompt: 'Verify orders-summary.' }),
+        use('mcp__chrome-devtools__navigate_page', { url: 'http://localhost:5173/orders' }, 'toolu_verifier'),
+        use('mcp__chrome-devtools__take_snapshot', {}, 'toolu_verifier'),
+        use('mcp__chrome-devtools__take_screenshot', { filePath: 'evidence/01.png' }, 'toolu_verifier'),
+        use('mcp__chrome-devtools__evaluate_script', { function: '() => 1' }, 'toolu_verifier'),
+        use('Bash', { command: 'npm test' }, 'toolu_verifier'),
+        use('Read', { file_path: '/tmp/c/verify.md' }),
+      ].join('\n') + '\n',
+    );
+    const out = run(file);
+
+    assert.match(out, /browser operations: 4/, 'the verifier Bash call and the kernel Read are not browser operations');
+    assert.match(out, /navigate_page x1/);
+    assert.match(out, /take_snapshot x1/);
+    assert.match(out, /kernel tool uses: 2/, 'the sidechain is still not the kernel');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a browser operation the kernel made itself is counted, and named as the kernel own', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodos-turns-'));
+  try {
+    const file = join(dir, 'run.jsonl');
+    writeFileSync(
+      file,
+      [
+        use('mcp__chrome-devtools__navigate_page', { url: 'http://localhost:5173/orders' }),
+        use('mcp__chrome-devtools__take_snapshot', {}, 'toolu_verifier'),
+      ].join('\n') + '\n',
+    );
+    const out = run(file);
+
+    assert.match(out, /browser operations: 2/);
+    assert.match(out, /of them in the kernel: 1/, 'a kernel that drives the browser itself is a finding, so it is visible');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a run with no browser operations says so rather than printing nothing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodos-turns-'));
+  try {
+    const file = join(dir, 'run.jsonl');
+    writeFileSync(file, `${STREAM}\n`);
+
+    assert.match(run(file), /browser operations: 0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

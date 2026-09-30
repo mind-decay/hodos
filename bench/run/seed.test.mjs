@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { countTasks, dropGapLines, exemptions, fillHeader, parseHeader, seed, slugOf, stripGapMarkers } from './seed.mjs';
+import { countTasks, dropGapLines, exemptions, fillHeader, parseHeader, seed, slugOf, stripGapMarkers , countTestDeclarations } from './seed.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLANS = join(HERE, 'plans');
@@ -132,6 +132,58 @@ test('a seeded copy is approved, on its branch, and carries no harness marker', 
   }
 });
 
+test('fillHeader fills the campaign, and an absent one is the em dash', () => {
+  const header = '# Plan — kit-badge\nPath: standard · Type: feature · Branch: {branch} · Campaign: {campaign} · Base: {base}\n';
+  assert.match(
+    fillHeader(header, { branch: 'feature/kit-badge', base: 'abc1234', campaign: 'badge-rollout/kit-badge' }),
+    /Campaign: badge-rollout\/kit-badge · Base: abc1234/,
+  );
+  assert.match(fillHeader(header, { branch: 'b', base: 'c' }), /Campaign: — · Base: c/);
+});
+
+test('--campaign reaches the ledger, the state and the plan header', () => {
+  // The finish phase reads `state.campaign` and nothing else to know it is
+  // closing a campaign node (`finish.md §4`), so the seeder has to set it.
+  const dir = bareProject();
+  try {
+    const out = seed({ plan: 'kit-badge', copy: dir, at: 'finish', campaign: 'badge-rollout/kit-badge' });
+    const taskDir = join(dir, '.claude/hodos/tasks', out.slug);
+    const state = JSON.parse(readFileSync(join(taskDir, 'state.json'), 'utf8'));
+    assert.equal(state.campaign, 'badge-rollout/kit-badge');
+    assert.equal(state.phase, 'finish');
+    assert.match(readFileSync(join(taskDir, 'plan.md'), 'utf8'), /Campaign: badge-rollout\/kit-badge/);
+    // The ledger's own `Init:` line carries the path and the type and not the
+    // campaign (`FORMATS.md §6`); `state.campaign` is where the node's name is
+    // read from, which is what `finish.md §4` looks at.
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--at finish takes the gap and the ruling from the plan's own events file", () => {
+  const dir = bareProject();
+  try {
+    const out = seed({ plan: 'kit-badge', copy: dir, at: 'finish', campaign: 'badge-rollout/kit-badge' });
+    const ledger = readFileSync(join(dir, '.claude/hodos/tasks', out.slug, 'ledger.md'), 'utf8');
+    assert.match(ledger, /^.*Gap: .*barrel/m);
+    assert.doesNotMatch(ledger, /summarizeOrders/); // orders-summary's ruling, not this plan's
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--at finish needs no evidence directory where the verify has no artifact', () => {
+  const dir = bareProject();
+  try {
+    const out = seed({ plan: 'kit-badge', copy: dir, at: 'finish', campaign: 'badge-rollout/kit-badge' });
+    const taskDir = join(dir, '.claude/hodos/tasks', out.slug);
+    assert.ok(existsSync(join(taskDir, 'verify.md')));
+    assert.equal(existsSync(join(taskDir, 'evidence')), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('every shipped plan parses, and its gap variant still holds every design field', () => {
   const fields = [
     '## Non-goals', '### Modules', '### Dependency direction', '### Interfaces',
@@ -202,6 +254,53 @@ test('--at review commits the implementation and leaves the copy at phase review
   }
 });
 
+test('countTestDeclarations counts the declarations a diff adds, and only added lines', () => {
+  // The seeder and the reviewer must agree by construction: the reviewer counts
+  // the test declarations the diff adds, so the seeder counts the same thing the
+  // same way. A count off by one is a spurious `major` on every bench package.
+  const diff = [
+    'diff --git a/src/a.test.ts b/src/a.test.ts',
+    '@@ -1,2 +1,6 @@',
+    "+it('counts', () => {",
+    '+  expect(1).toBe(1);',
+    '+});',
+    "+test('adds', () => {});",
+    "-it('a removed one', () => {});",
+    " it('an untouched one', () => {});",
+    '+describe("a group", () => {});',
+    '+// it("a commented one", () => {});',
+    '+#[test]',
+  ].join('\n');
+  // Two: the added `it` and the added `test`. Not the removed one, not the
+  // context line, not `describe`, not a commented-out one, and not the Rust
+  // attribute — this helper is the seeder's and the seeder only ever runs on
+  // this repository's TypeScript fixtures. The reviewer counts declarations in
+  // whatever language the diff it holds is written in.
+  assert.equal(countTestDeclarations(diff), 2);
+});
+
+test('--at review records the mutation count the task earned', () => {
+  const dir = bareProject();
+  try {
+    seed({ plan: 'orders-summary', copy: dir, at: 'review' });
+    const ledger = readFileSync(join(dir, '.claude/hodos/tasks/orders-summary/ledger.md'), 'utf8');
+    // T1 adds summary.test.ts with three `it` declarations, T2 adds three in
+    // OrdersPage.test.tsx, and T3 is the plan's `visual` exemption and adds
+    // none. The row is written for every task, `0` included (COMPONENTS.md
+    // §1.2) — a missing row is what the reviewer reads as the record missing
+    // (decision 0143), so an exempt task earning no row would be a finding
+    // about the seeder rather than about the code.
+    assert.match(ledger, /Task 1: mutation \(3 tests\)/);
+    assert.match(ledger, /Task 2: mutation \(3 tests\)/);
+    assert.match(ledger, /Task 3: mutation \(0 tests\)/);
+    // and it sits between the red phase and the commit, where the phase runs it
+    const order = [...ledger.matchAll(/Task 1: (test red|mutation|done)/g)].map((m) => m[1]);
+    assert.deepEqual(order, ['test red', 'mutation', 'done']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // The monorepo plan is the one case where the copy's own configs matter: two
 // workspaces with different test commands, and a change in each (decision 0076).
 test('the mono plan seeds a change two configs answer for', () => {
@@ -249,6 +348,121 @@ test('--defect lands inside the task commit, so the review sees it in base..HEAD
       execFileSync('git', ['status', '--short'], { cwd: dir, encoding: 'utf8' }),
       /OrderDetailPage/,
       'nothing is left uncommitted for the kernel to trip over',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The arm's own setup is not the task's work. Stage 11d-3's M3 registered
+// /shift in the ui routes with a commit on top of HEAD, and the run reported it
+// as a config edit made after the review closed — true of the harness and false
+// of anything the fixture was meant to say. A setup patch goes into the base.
+test('--setup lands before the base, so the arm setup is not in base..HEAD', () => {
+  // A real fixture copy, not `bareProject`: a setup patch edits the fixture's
+  // own committed config, so the context it needs is the fixture's.
+  const out = seed({ plan: 'orders-summary', at: 'review', setup: 'ui-sweeps-shift' });
+  const dir = out.copy;
+  try {
+    const reviewed = execFileSync('git', ['diff', `${out.base}..HEAD`], { cwd: dir, encoding: 'utf8' });
+    const base = execFileSync('git', ['show', `${out.base}:.claude/hodos/config.json`], { cwd: dir, encoding: 'utf8' });
+
+    assert.match(base, /"\/shift"/, 'the setup is not in the base the task branches from');
+    assert.doesNotMatch(reviewed, /hodos\/config\.json/, 'the setup reached the reviewed range');
+    assert.equal(
+      execFileSync('git', ['status', '--short'], { cwd: dir, encoding: 'utf8' }).trim(),
+      '',
+      'the setup left something uncommitted',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--setup names the directory it looked in when the id is not there', () => {
+  const dir = bareProject();
+  try {
+    assert.throws(
+      () => seed({ plan: 'orders-summary', copy: dir, at: 'review', setup: 'no-such-setup' }),
+      /no such setup: no-such-setup .*environment/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('two defects land in the same commit, so one arm can seed two surfaces', () => {
+  // Stage 11d-2's four-sources arm needs a presentation defect in the task's
+  // diff and a crash on a route no claim covers, and decision 0112 puts both
+  // in the diff: an attack runs on a route only when the diff reaches it, so a
+  // defect committed to the base is on no route the attacks see.
+  const dir = bareProject();
+  try {
+    const out = seed({
+      plan: 'orders-summary',
+      copy: dir,
+      at: 'verify',
+      defect: ['summary-clipped-line', 'orders-no-data-status'],
+    });
+    const diff = execFileSync('git', ['diff', `${out.base}..HEAD`], { cwd: dir, encoding: 'utf8' });
+
+    assert.match(diff, /whiteSpace: 'nowrap', overflow: 'hidden'/, "the first defect is in the reviewed range");
+    // The second defect *removes* the attribute T3's own clause claims, and
+    // OrderList.tsx is new in this range, so every line of it is an addition
+    // and the proof is the attribute's absence. `No orders match this filter.`
+    // would have proved nothing: it is in T3's tree either way.
+    assert.doesNotMatch(
+      diff,
+      /data-status=\{order\.status\}/,
+      'the second defect is in the reviewed range',
+    );
+    // The ledger and state.json move after the last commit at `--at verify`,
+    // and a real fixture gitignores the task directory (`webapp/.gitignore:5`).
+    // What has to be committed is the code both patches touched.
+    assert.doesNotMatch(
+      execFileSync('git', ['status', '--short'], { cwd: dir, encoding: 'utf8' }),
+      /src\//,
+      'a patched source file is left uncommitted for the kernel to trip over',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--defect given twice on the command line applies both', () => {
+  const dir = bareProject();
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        join(HERE, 'seed.mjs'),
+        'orders-summary',
+        '--copy',
+        dir,
+        '--at',
+        'verify',
+        '--defect',
+        'summary-clipped-line',
+        '--defect',
+        'orders-no-data-status',
+      ],
+      { encoding: 'utf8' },
+    );
+    const diff = execFileSync('git', ['diff', 'HEAD~3..HEAD'], { cwd: dir, encoding: 'utf8' });
+
+    assert.match(diff, /whiteSpace: 'nowrap', overflow: 'hidden'/, 'the first --defect was dropped');
+    assert.doesNotMatch(diff, /data-status=\{order\.status\}/, 'the second --defect was dropped');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('one unknown id among several is refused, and the message names that one', () => {
+  const dir = bareProject();
+  try {
+    assert.throws(
+      () => seed({ plan: 'orders-summary', copy: dir, at: 'verify', defect: ['summary-clipped-line', 'no-such'] }),
+      /no such defect: no-such/,
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });

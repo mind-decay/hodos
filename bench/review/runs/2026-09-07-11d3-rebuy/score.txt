@@ -1,0 +1,30 @@
+$ node bench/review/run.mjs --verdicts verdicts.json --measurements measurements.json
+| Axis | Found | Rate | Threshold | |
+|---|---|---|---|---|
+| recall, overall | 19/19 | 100.0% | 80.0% | PASS |
+| recall, convention | 12/12 | 100.0% | 80.0% | PASS |
+| recall, behavioral | 7/7 | 100.0% | 80.0% | PASS |
+| precision | 40/42 | 95.2% | 85.0% | PASS |
+| recall, spec | 2/2 | 100.0% | — | measurement |
+packages scored: 6 of 6
+Located by path alone: 5 of 42
+Miscategorised: b-l6-callee-contract as "plan `### Non-goals` / `### Data & scale`"
+Invalid (no line): p5 test/services.test.js:—
+False positive: p4 test/services.test.js:12 — decision 0022 test-first
+
+--- as dispatched, before the reader fix ---
+$ node bench/review/run.mjs --verdicts verdicts.as-dispatched.json --measurements measurements.json
+| Axis | Found | Rate | Threshold | |
+|---|---|---|---|---|
+| recall, overall | 19/19 | 100.0% | 80.0% | PASS |
+| recall, convention | 12/12 | 100.0% | 80.0% | PASS |
+| recall, behavioral | 7/7 | 100.0% | 80.0% | PASS |
+| precision | 40/42 | 95.2% | 85.0% | PASS |
+| recall, spec | 1/2 | 50.0% | — | measurement |
+packages scored: 6 of 6
+
+Missed: s-unclaimed-page-limit
+Located by path alone: 5 of 42
+Miscategorised: b-l6-callee-contract as "plan `### Non-goals` / `### Data & scale`"
+Invalid (no line): p5 test/services.test.js:—
+False positive: p4 test/services.test.js:12 — decision 0022 test-first

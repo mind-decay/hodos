@@ -1,0 +1,31 @@
+# id: ll-200
+# fixture: snippets
+# package: h1
+# kind: behavioral
+# item: L7
+# line: orders/processor.py:10
+# anchor: await asyncio.sleep(0.1)  # back off then proceed
+# trigger: Should identify L7 (Concurrency / Async Hazard): the limit is NOT enforced. When in_flight is already at the limit (5 of 5), every newly arriving coroutine reads `self.in_flight >= self.max_concurrent` as True, awaits `asyncio.sleep(0.1)`, and *yields control to the event loop*. Other coroutines can then run, also see in_flight at the limit, also enter sleep. When all wake up, each unconditionally
+# what: logic-lens case #200 (logic-review-asyncio-shared-state-across-await), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/orders/processor.py b/orders/processor.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/orders/processor.py
+@@ -0,0 +1,15 @@
++import asyncio
++
++class OrderProcessor:
++    def __init__(self):
++        self.in_flight = 0
++        self.max_concurrent = 5
++
++    async def process(self, order):
++        if self.in_flight >= self.max_concurrent:
++            await asyncio.sleep(0.1)  # back off then proceed
++        self.in_flight += 1
++        try:
++            await self._call_payment_api(order)
++        finally:
++            self.in_flight -= 1

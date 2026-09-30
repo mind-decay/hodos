@@ -16,12 +16,12 @@
 // and resolves against the project root, like every other file under it.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { findConfig, gitRoot } from './config.mjs';
+import { findConfig, gitRoot, sessionOf } from './config.mjs';
 
 const USAGE = `Usage: node scripts/env.mjs <command> [dir]
 
@@ -32,10 +32,16 @@ The verify environment a profile declares (FORMATS.md §2, decision 0074).
   up [dir]       raise the layers that are down, in the profile's order, each
                  waited out to its own timeout. The base URL it prints is the
                  one a layer that came up declares, and null when none did.
-  down [dir]     stop what hodos raised, and only that.
+  down [dir]     take this session off what hodos raised, and stop a layer
+                 only when no other session is still on it (decision 0169).
+  down --all     stop what hodos raised, whoever is still on it.
   status [dir]   what the profile declares, what is up, and what this machine
                  raised.
   --help         print this and exit 0.
+
+Several sessions share one layer: an up that finds a live raise attaches to it
+and starts nothing, and the session ids on a layer are the files under
+.claude/hodos/env/<layer>.users/. A caller with no session id is on no layer.
 
 Output is JSON on stdout, always: the caller is a kernel reading a result, not
 a person reading a table.
@@ -282,7 +288,7 @@ async function waitGreen(spec, cwd, logPath) {
  * next starts. A layer already up is left alone — the common case is a
  * developer's own morning, every probe green and nothing raised at all.
  */
-export async function up(cwd) {
+export async function up(cwd, { session = sessionOf() } = {}) {
   const { stop, found, profile, layers, root, raised } = preamble(cwd);
   if (stop) return stop;
   const projectRoot = found.projectRoot;
@@ -301,9 +307,13 @@ export async function up(cwd) {
       });
       continue;
     }
+    // Registered before anything is read, so a `down` that counts the users
+    // from here on counts this session too (decision 0169).
+    if (session) register(projectRoot, layer.name, session);
     const probed = await probeLayer(layer, root, raised);
+    const known = raised.get(layer.name);
     if (probed.state === 'up') {
-      out.push(probed);
+      out.push(known && !known.unreadable ? { ...probed, detail: raisedBy(known) } : probed);
       continue;
     }
     // A live record is this machine's own raise, still running: a layer proven
@@ -318,7 +328,7 @@ export async function up(cwd) {
     if (record && !record.unreadable && alive(record.pid)) {
       const proven = probed.state === 'up' || (probed.state === 'unprobed' && provenNow(layer.spec, logOf(projectRoot, layer.name)));
       if (proven) {
-        out.push({ ...probed, state: 'up', detail: `pid ${record.pid} is the raise this machine recorded` });
+        out.push({ ...probed, state: 'up', detail: raisedBy(record) });
         continue;
       }
       failed = {
@@ -343,19 +353,13 @@ export async function up(cwd) {
       continue;
     }
     mkdirSync(envDir(projectRoot), { recursive: true });
-    const logPath = logOf(projectRoot, layer.name);
-    const pid = spawnLayer(layer.spec, probed.cwd, logPath);
-    // Written before the wait, so a script killed mid-raise still leaves `down`
-    // something to stop. It is written once: what the raise achieved is read
-    // from the layer's own proof when a command next asks, not stored here.
-    writeRecord(projectRoot, layer.name, { pid, startedAt: new Date().toISOString(), cmd: layer.spec.up, stop: layer.spec.stop ?? null, cwd: probed.cwd, log: logPath });
-    const waited = await waitGreen(layer.spec, probed.cwd, logPath);
-    out.push({ ...probed, state: waited.ok ? 'raised' : 'failed', raisedByHodos: true, checks: waited.checks });
-    if (!waited.ok) {
+    const raise = await raiseOnce(layer, probed.cwd, projectRoot, session);
+    out.push({ ...probed, state: raise.state, raisedByHodos: true, checks: raise.checks, ...(raise.detail ? { detail: raise.detail } : {}) });
+    if (raise.state === 'failed') {
       failed = {
         layer: layer.name,
-        check: waited.checks.find((check) => !check.ok) ?? null,
-        output: lastLines(readLog(logPath)) || 'the layer printed nothing',
+        check: raise.checks.find((check) => !check.ok) ?? null,
+        output: lastLines(readLog(raise.logPath)) || raise.detail || 'the layer printed nothing',
       };
     }
   }
@@ -377,12 +381,117 @@ export async function up(cwd) {
  */
 const provenNow = (spec, logPath) => (spec.ready ? readLog(logPath).includes(spec.ready) : true);
 
-/** The record of one raise, on disk where the next command and `down` read it. */
-const writeRecord = (projectRoot, name, record) =>
-  writeFileSync(join(envDir(projectRoot), `${name}.json`), `${JSON.stringify(record, null, 2)}\n`);
+const recordPath = (projectRoot, name) => join(envDir(projectRoot), `${name}.json`);
+const recordText = (record) => `${JSON.stringify(record, null, 2)}\n`;
+
+/**
+ * Create the record of a raise, or report that one exists. The link of a
+ * finished temporary file is what makes it exclusive **and** whole: an
+ * `open(..., 'wx')` is exclusive, and a reader between its open and its write
+ * reads an empty file and calls the record unreadable.
+ */
+function createRecord(projectRoot, name, record) {
+  const target = recordPath(projectRoot, name);
+  const tmp = `${target}.${process.pid}.tmp`;
+  writeFileSync(tmp, recordText(record));
+  try {
+    linkSync(tmp, target);
+    return true;
+  } catch (error) {
+    if (error.code === 'EEXIST') return false;
+    throw error;
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+/** Replace a record by a rename, so a reader never sees half of it. */
+function replaceRecord(projectRoot, name, record) {
+  const target = recordPath(projectRoot, name);
+  const tmp = `${target}.${process.pid}.tmp`;
+  writeFileSync(tmp, recordText(record));
+  renameSync(tmp, target);
+}
+
+function readRecord(projectRoot, name) {
+  try {
+    return JSON.parse(readFileSync(recordPath(projectRoot, name), 'utf8'));
+  } catch (error) {
+    return error.code === 'ENOENT' ? null : { unreadable: true };
+  }
+}
+
+/**
+ * The sessions on a layer, one file each (decision 0169). A list rewritten by
+ * two processes at once loses one of them; a file created or removed is one
+ * atomic step, so two sessions attaching at the same moment are both counted.
+ */
+const usersDir = (projectRoot, name) => join(envDir(projectRoot), `${name}.users`);
+
+function register(projectRoot, name, session) {
+  mkdirSync(usersDir(projectRoot, name), { recursive: true });
+  writeFileSync(join(usersDir(projectRoot, name), session), '');
+}
+
+function unregister(projectRoot, name, session) {
+  rmSync(join(usersDir(projectRoot, name), session), { force: true });
+}
+
+function usersOf(projectRoot, name) {
+  try {
+    return readdirSync(usersDir(projectRoot, name)).sort();
+  } catch {
+    return [];
+  }
+}
+
+/** Whose raise a live record is, for the line a session that attached prints. */
+const raisedBy = (record) =>
+  `pid ${record.pid}, raised by ${record.session ? `session ${record.session}` : 'a caller with no session id'}`;
+
+/**
+ * Raise one layer — or, where another process holds its record, wait on that
+ * raise's own proof and attach to it. The record is created before the spawn,
+ * exclusively, so two sessions raising at once spawn one process: the loser
+ * spawns nothing, and never truncates the winner's log. A record whose pid is
+ * dead, or still null past the layer's own timeout, is a raise that crashed;
+ * it is removed and the raise tried once more (decision 0169).
+ */
+async function raiseOnce(layer, cwd, projectRoot, session) {
+  const { name, spec } = layer;
+  const logPath = logOf(projectRoot, name);
+  const fresh = { pid: null, startedAt: new Date().toISOString(), cmd: spec.up, stop: spec.stop ?? null, cwd, log: logPath, session: session ?? null };
+  const timeoutMs = (spec.timeout ?? LAYER_TIMEOUT) * 1000;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (createRecord(projectRoot, name, fresh)) {
+      const pid = spawnLayer(spec, cwd, logPath);
+      // Rewritten with the pid before the wait, so a script killed mid-raise
+      // still leaves `down` something to stop. What the raise achieved is read
+      // from the layer's own proof when a command next asks, not stored here.
+      replaceRecord(projectRoot, name, { ...fresh, pid });
+      const waited = await waitGreen(spec, cwd, logPath);
+      return { state: waited.ok ? 'raised' : 'failed', checks: waited.checks, logPath };
+    }
+    const other = readRecord(projectRoot, name);
+    const crashed =
+      !other ||
+      other.unreadable ||
+      (other.pid === null ? Date.now() - Date.parse(other.startedAt) > timeoutMs : !alive(other.pid));
+    if (crashed) {
+      rmSync(recordPath(projectRoot, name), { force: true });
+      continue;
+    }
+    const theirLog = other.log ?? logPath;
+    const waited = await waitGreen(spec, cwd, theirLog);
+    const now = readRecord(projectRoot, name) ?? other;
+    return { state: waited.ok ? 'up' : 'failed', checks: waited.checks, detail: raisedBy(now), logPath: theirLog };
+  }
+  return { state: 'failed', checks: [], detail: 'the record of this layer was replaced while it was being raised', logPath };
+}
 
 /** Is this process still there? A pid nothing answers for is a stale record. */
 function alive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -397,21 +506,35 @@ function alive(pid) {
  * leaves a developer's own containers exactly as it found them. Teardown that
  * depends on the session still remembering what it started is the failure
  * decision 0074 names.
+ *
+ * And only when no other session is on it (decision 0169). This session comes
+ * off first, then the rest are counted: a layer another session still uses is
+ * left running and named, `--all` stops it anyway, and a caller with no id —
+ * on no layer itself — stops only a layer nobody is on, which is what every
+ * record was before sessions shared one.
  */
-export async function down(cwd) {
+export async function down(cwd, { all = false, session = sessionOf() } = {}) {
   const { stop, found, profile, layers, root, raised } = preamble(cwd);
   if (stop) return stop;
   const out = [];
   let failed = false;
   for (const layer of layers) {
     const record = raised.get(layer.name);
+    if (session) unregister(found.projectRoot, layer.name, session);
     if (!record) {
       out.push({ name: layer.name, state: 'not-raised' });
+      continue;
+    }
+    const users = usersOf(found.projectRoot, layer.name);
+    if (!all && !record.unreadable && users.length > 0) {
+      const who = `session${users.length === 1 ? '' : 's'} ${users.join(', ')}`;
+      out.push({ name: layer.name, state: 'in-use', users, detail: `still used by ${who} — down --all stops it` });
       continue;
     }
     const file = join(envDir(found.projectRoot), `${layer.name}.json`);
     if (record.unreadable) {
       rmSync(file, { force: true });
+      rmSync(usersDir(found.projectRoot, layer.name), { recursive: true, force: true });
       out.push({ name: layer.name, state: 'stale', detail: 'the record could not be read' });
       continue;
     }
@@ -426,11 +549,15 @@ export async function down(cwd) {
         state: ok ? 'stopped' : 'failed',
         detail: ok ? stopCmd : lastLines(`${result.stdout ?? ''}${result.stderr ?? ''}`) || `${stopCmd} exited ${result.status}`,
       });
-      if (ok) rmSync(file, { force: true });
+      if (ok) {
+        rmSync(file, { force: true });
+        rmSync(usersDir(found.projectRoot, layer.name), { recursive: true, force: true });
+      }
       continue;
     }
     if (!alive(record.pid)) {
       rmSync(file, { force: true });
+      rmSync(usersDir(found.projectRoot, layer.name), { recursive: true, force: true });
       out.push({ name: layer.name, state: 'stale', detail: `pid ${record.pid} is gone` });
       continue;
     }
@@ -440,6 +567,7 @@ export async function down(cwd) {
       process.kill(-record.pid, 'SIGTERM');
       out.push({ name: layer.name, state: 'stopped', detail: `pid ${record.pid}` });
       rmSync(file, { force: true });
+      rmSync(usersDir(found.projectRoot, layer.name), { recursive: true, force: true });
     } catch (error) {
       failed = true;
       out.push({ name: layer.name, state: 'failed', detail: `pid ${record.pid}: ${error.code ?? error.message}` });
@@ -459,7 +587,16 @@ async function main(argv) {
     process.stderr.write(`env: unknown command: ${command}\n${USAGE}\n`);
     return 2;
   }
-  const { result, code } = await commands[command](argv[1] ?? process.cwd());
+  const rest = argv.slice(1);
+  const flags = rest.filter((arg) => arg.startsWith('--'));
+  const allowed = command === 'down' ? ['--all'] : [];
+  const unknown = flags.find((flag) => !allowed.includes(flag));
+  if (unknown) {
+    process.stderr.write(`env: ${command} takes no ${unknown}\n${USAGE}\n`);
+    return 2;
+  }
+  const dir = rest.find((arg) => !arg.startsWith('--')) ?? process.cwd();
+  const { result, code } = await commands[command](dir, { all: flags.includes('--all') });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   // `status` reports; it does not judge. `probe` answers whether the
   // environment is up, which is a question with an exit code.

@@ -27,11 +27,13 @@ one. Every scorer's `--json` goes through it.
 # the sets are self-consistent — no model call, runs in npm test
 node bench/router/run.mjs --check-labels
 node bench/review/run.mjs --check-key
+node bench/holdout/run.mjs --check-key
 node bench/noop/run.mjs   --check-scenarios
 
 # the scored runs — these call the model
 node bench/router/invoke.mjs --out <dir> --concurrency 5
 node bench/review/invoke.mjs --out <dir>
+node bench/holdout/invoke.mjs --out <dir>
 node bench/noop/run.mjs --invoke --out <dir>
 
 # scoring what a run wrote — no model call
@@ -97,12 +99,17 @@ meets code nobody wrote for it.
 **Question.** Does `hodos-reviewer` find a seeded defect, and does it stay quiet
 where there is nothing to find?
 
-Nineteen defects — twelve convention, seven behavioral across seven of the nine
-`L` codes — and six correctly changed files, grouped into six review packages,
-so the reviewer sees a task-shaped diff rather than one defect (decision 0037).
-The nineteenth is the arm that measures `## Callers` (decision **0100**): its
-only evidence is a call site outside the changed files, and the section is the
-one place the reviewer is shown it.
+Twenty-two defects — twelve convention, seven behavioral across seven of the
+nine `L` codes, two of the `spec` kind and one of the `test-floor` kind — and six correctly changed files,
+grouped into six review packages, so the reviewer sees a task-shaped diff rather
+than one defect (decision 0037). The nineteenth is the arm that measures
+`## Callers` (decision **0100**): its only evidence is a call site outside the
+changed files, and the section is the one place the reviewer is shown it. The
+last two are the arms that measure the **Unclaimed** word (decisions **0092**,
+**0096**) and are scored on the Spec section rather than on a row:
+`s-unclaimed-refund-state`, whose diff adds a three-member union its plan claims
+two of, and `s-unclaimed-page-limit`, whose diff adds a branch whose failure
+path no clause names. Both defects are in the claim set and not in the code.
 
 | Axis | Threshold | Kind |
 |---|---|---|
@@ -110,16 +117,128 @@ one place the reviewer is shown it.
 | recall, convention | ≥80% | gate |
 | recall, behavioral | ≥80% | gate |
 | precision | ≥85% | gate |
+| recall, spec | — | measurement |
+| recall, test-floor | — | measurement |
 | dispatches, cost, turns | — | measurement |
+
+`recall, spec` carries no threshold, and Stage 11d-3's Start settled that it
+stays that way (decision **0117**). The four gates were bought on the two kinds
+that existed when they were set, and a third class entering their denominator
+would move a threshold with no decision behind it. Nor can the class carry one
+of its own yet: **two** seeded defects cannot bear an 80% bar, where a single
+miss reads as 50% — the gate would either fail a stage on one row or be a number
+chosen to fit two cases. Both were authored by the sessions that wrote the word
+they measure, which is the same reason the four gates are read as seeded numbers
+rather than as generalisation. Stage 12c-3's hold-out set, where such a
+denominator was to come from, holds no `spec` defect. Its two pilot defects
+that the review named only in `## Spec` are reported apart from recall
+(`bench/holdout/runs/2026-09-30/`), so the class still has no denominator
+worth a threshold.
+
+The Spec section's **precision** is measured nowhere, and nothing here should be
+read as measuring it: `precision` counts the Standards rows, and an Unclaimed
+entry is not one, so a wrong entry — a member or a clause a claim does name —
+costs nothing in any number this bench prints. It is decision **0015**'s
+admission by name, carried to Stage 11d-3's *Every axis a bench reads is
+measured* criterion.
+
+The **twenty-second** defect was authored at Stage 12a by decision **0121**:
+`t-deleted-list-assertion`, a diff that deletes the assertion pinning a row's
+link and leaves the suite green — the shape no mechanism in the engine reads,
+since mutation proves a test that **exists** and the reviewer's step 1 reports a
+suite with a switched-off case green. Its first run was scored against the
+package **as it stands**, and whether the reviewer caught it cold is what
+decided whether a mechanism was bought for it. Its number is a **measurement**,
+for `recall, spec`'s reason at n=1 (decision **0117**): one seeded case cannot
+carry an 80% bar.
+
+**It was caught cold, twice: 1/1 in each of two runs.** The first
+(`bench/review/runs/2026-09-08-12a-baseline`, 6 dispatches, $4.91) had its
+answer key edited **after** the dispatches went out — `names` read `getByRole`,
+the matcher, where the kind's rule is that a token is the thing itself, so it
+became `href` — and review 1 of Stage 12a proved that edit decision-determining:
+re-scored with the pre-run key the scorer prints `recall, test-floor 0/1`, which
+is 0121's *miss* branch. The number was therefore re-bought rather than argued
+(`bench/review/runs/2026-09-08-12a-cold`, 6 dispatches, **$5.03**), with the key
+already committed, the package shape specified, and `defaults.md` row 12 held
+out of the tree so the run measured the cold catch and not the mechanism. A
+fresh reviewer instance again filed it as a `major`: *"the `Ada` link-**href**
+assertion was deleted; scope permits the list's tests to gain the totals case
+only, `OrderList.tsx:15` still renders the link, and the test's name now claims
+a route check it no longer makes"*. Two independent dispatches reached for the
+same word for the same thing, which is the check the first run's post-run edit
+could not supply about itself.
+
+So decision 0121's computed section on `## Callers` was **not** bought, and what
+it cost instead is `defaults.md` **row 12** and this paragraph. Two things still
+bound the claim: at n=2 both instances read the same authored patch, so decision
+**0117**'s reasoning does not improve — the number carries no threshold either
+way — and the whole-review net can credit an incidental mention of a token.
+Stage 12c-3 looked for a third instance and found none. No source the hold-out
+set draws on deletes a test, and where it was looked for is in
+`docs/stages/12c3-plan.md`, T17, so the count stays at n=2.
+
+That first run also found a defect in this bench rather than in the engine, and
+it is worth recording because it deflated one number: a file `clean.json` names
+**and** a seeded patch edits is not clean on the lines that patch changed, and
+the reviewer's correct catch was scored a false positive against it — precision
+printed 97.7% before the rule was narrowed and 100% after. The scorer now
+exempts only the seeded patch's own hunk, so the clean set is still six files
+and a finding about the clean change itself still costs precision. The cold run
+prints **97.7% (42/43)** on a false positive of its own, unrelated to any of
+this: p4 filed `test/services.test.js:12` against catalogue row 11, in a clean
+file no seeded patch touches.
 
 **This is a *seeded* gate, and its recall number proves the loop runs, not that
 the reviewer generalises.** Eighteen of the defects and the reviewer's prompt
-were authored in the same stage by the same session, and the nineteenth was
-authored two stages later beside the section it measures: either way the bench
-knows what the prompt was told to look for. A recall of 19/19 says the dispatch, the package, the
-answer key and the scorer work end to end — it says nothing about a defect
-nobody seeded. The hold-out measurement is Stage 12's, built from the pilot's
-own findings on a repository this engine has never seen.
+were authored in the same stage by the same session, the nineteenth was authored
+two stages later beside the section it measures, and the two `spec` ones at
+Stages 11d-1 and 11d-2 by the sessions that wrote the word they measure: either
+way the bench knows what the prompt was told to look for. A recall of 19/19 on
+the gated kinds says the dispatch, the package, the answer key and the scorer
+work end to end — it says nothing about a defect nobody seeded.
+
+The `test-floor` defect is the one partial exception, and only in one direction:
+it too was authored by the session that measured it, so its **selection** is
+seeded like every other, but no sentence of the reviewer's prompt named the
+shape when it ran, so its **catch** was not. That is a weaker claim than
+hold-out and a stronger one than the rest of this set makes, and it is the whole
+of what decided decision 0121. The hold-out measurement ran at Stage 12c-3,
+on logic-lens's cases and on the pilot's own findings. The result is in the
+next section.
+
+## The hold-out set — `bench/holdout/`
+
+**Question.** Does `hodos-reviewer` find a defect nobody on the authoring side chose, and stay quiet on correct code that looks like a hit?
+
+A **measurement** and never a gate (decision **0154**). The set lives in its own directory with its own answer key, so no case of it can enter the review bench's four gated denominators. Its report is `bench/report.mjs`'s `measurementReport`, which refuses a gate, and its `--check-key` holds it to its own contract and not to the review bench's minimums.
+
+| Axis | Kind |
+|---|---|
+| recall, overall; recall per source (logic-lens, pilot) | measurement |
+| L code agreement, of the behavioral defects found | measurement |
+| false positives on the six correct files | measurement |
+| dispatches, cost, turns | measurement |
+
+It has two sources, which are never averaged into one number:
+- **logic-lens's 36-case subset** (`hyhmrright/logic-lens` at `0ea7f9b`, MIT). It holds 30 defects and 6 cases that logic-lens itself grades as correct: idiomatic code that reads like an L4, L7 or L8 hit, and the *plausible but correct* half the Stage 12 row asks for. The code is imported verbatim, comments included, and several comments point at their own defect. So this half measures recall under logic-lens's own conditions, not on a harder set.
+- **The pilot's own findings**: four defects Stage 12c-2's reviews found on `ariadne_v2` and its fix passes repaired. Each is reviewed from the very package its first reviewer received. The pilot's licence is not MIT, so its cases are keyed by sha and line hash, and they run only where the checkout and the gitignored cache are. Re-finding them measures reproducibility on real defects, not recall on defects never met.
+
+**The first run** is `bench/holdout/runs/2026-09-30/`. It covers nine dispatches over two invocations, a probe of two packages and then the other seven, scored as one set. The cost was **5.17M tokens, $8.90**.
+
+| Measurement | Value |
+|---|---|
+| recall, logic-lens | **29/30** — `ll-232` missed as a row, named in `## Spec` |
+| recall, pilot | **2/4** — both `pilot-outline` defects named only in `## Spec`, at their own lines |
+| L code agreement, found behavioral defects | **25/30**, 1 hedged (`L5 / L8`) |
+| false positives on the six correct files | 1 L-coded, 1 other |
+| findings without a location, an item or a trigger | 0 |
+
+- **What the misses have in common.** All three are the review naming the defect in Spec and not in a Standards row. The review bench's rule reads rows only, so they count as missed, and `named only in ## Spec` reports them beside recall rather than in it.
+- **The code disagreements.** Two `L5` defects were filed `L6`. An `L2` was filed `L3`. An `L3`, an N+1 query, was filed under the plan field `### Data & scale`, which is the move `b-l6-callee-contract` makes (`BACKLOG.md`).
+- **The L-coded false positive.** It sits on `store/cache.go:25`, logic-lens's #250, which grades the `defer` on every path as correct. The reviewer filed something else, and it holds on the code: the fields are unexported and there is no constructor, so a `Store` built outside the package has `maxSize` 0 and every `Set` returns `cache full`. It is scored as the key says. That the key grades one property of the file, and not the whole file, is a limit of the case, not of the reviewer.
+
+`bench/holdout/README.md` has the layout, the provenance of every case, and what each number does not prove.
 
 ## The no-op bench — `bench/noop/`
 
@@ -188,6 +307,54 @@ event, so a copy arrives at its phase through the same script that would have
 written it live (decision 0036). It scores nothing and carries neither gate nor
 measurement (decision 0033); Stages 5 to 10b used it to seed the inputs their
 criteria were run against.
+
+## The two-repository pair — `bench/scripts/pair-seed.mjs`
+
+Not a bench either, and not a fixture: an arrangement of two of them. It seeds
+the workspace Stage 9b is exercised against — `mono/` as the home repository
+where the map lives, `kit/` as the external one, and a bare clone of each as its
+`origin` — and prints the four paths as JSON.
+
+```
+node bench/scripts/pair-seed.mjs [--into <dir>] [--no-modules]
+```
+
+The names are fixed, because a node's `repo: kit` resolves to the repository
+root's own directory name (decision **0134**). The three properties decision
+**0040** refused `kit` for are what the seed supplies (decision **0077**): the
+map on `main` is written and committed by a teammate before any session opens
+the pair; the claim on `mono-lint-badge` is committed by that teammate on
+`feature/mono-lint-badge`; and that branch exists **only in the bare origin**,
+so a session sees the claim after a `git fetch` and not before. The two a
+fixture imitates rather than reproduces — a foreign owner who is a person, and a
+race two people settle — are named as unmeasured in `docs/stages/09b-report.md`
+and answered by Stage 12.
+
+## The assertion instrument — `bench/scripts/assert-audit.mjs`
+
+Not a bench, and not a harness either: an **instrument**. It measures a project,
+not the engine, so it scores nothing and carries neither gate nor measurement.
+
+```
+node bench/scripts/assert-audit.mjs [<repository root>]   # --help states the definition
+```
+
+It prints `<bare>\t<total>\t<file>` for every file under
+`<root>/crates/**/tests/**.rs` with at least one bare assertion, worst first,
+then `bare <n> of <m> in <k> files`. A call is `assert!`, `assert_eq!` or
+`assert_ne!` reached as a whole macro name, and it is **bare** when its argument
+list holds no message argument. Comments, strings, char literals and raw strings
+are skipped by one shared reader, and arguments split at top-level commas only —
+a turbofish comma included, since `assert!(HashMap::<K, V>::new().is_empty())`
+is bare and reading it as two arguments would score it as carrying a message.
+
+Stage 12c-1 uses it to pick the pilot's second `quick` family, because that
+family had first been read out of the project rule that also targets those files
+and a measurement may not take its own sample from the treatment (decision
+**0155**). Its output on the pilot is in `docs/PILOT.md §3` with the two limits
+the header states. `node --test bench/scripts/assert-audit.test.mjs` is its
+nineteen cases; twenty mutants die against them, and the two that survive are
+argued equivalent in `docs/stages/12c1-report.md` rather than fitted with a test.
 
 ## What every run here is exposed to
 

@@ -20,7 +20,7 @@ Hold work that is bigger than one mergeable unit, longer than one session, or sh
 - **Campaign decisions change here.** A node that wants a different `D` comes back to the map; a node that changes one silently leaves the map lying.
 - **The map is written once the developer has approved it**, and every later change to a node line goes through `campaigns.mjs` — a hand-edited node line is machine state written by hand.
 - **An empty frontier is not "done".** Name the wait and its owner, and propose one of: nudge the external party, pull a node out of the fog, declare it out of scope.
-- **One repository.** A map that reaches into another — `repo:`, `path:`, a metric with `· repo:`, or `config.campaigns.external[]` — stops with `cross-repository campaigns are Stage 9b`.
+- **One home repository, however many the work spans.** The map lives in the home repository; a node names where its work sits with `repo:` and `path:`, a metric row with ` · repo:`, and `config.campaigns.external[]` is how a session in another checkout finds the map at all. A `repo:` name is that repository's own directory name (decision **0134**), and a `finish` in another repository edits the home map and asks for the commit (decision **0137**).
 
 ## Phases
 
@@ -57,4 +57,4 @@ Two of the mandatory stops of `DESIGN.md §4.4` fall here: the map itself, which
 
 ## Anti-pattern
 
-Cutting fog into nodes so the map looks complete. A map that retells a task's plan. Resolving two nodes in one session. Writing the map before the developer has seen the metrics, which turns an approval into a review of something already done. Proposing a node the frontier reported as held — the dependency is open, and the status that says otherwise is the thing to fix.
+Cutting fog into nodes so the map looks complete. A map that retells a task's plan. Resolving two nodes in one session. Writing the map before the developer has seen the metrics, which turns an approval into a review of something already done. Proposing a node the frontier reported as held — the dependency is open, and the status that says otherwise is the thing to fix — or one it reported as claimed, which is a node somebody else has taken on their own branch. Passing `--force` to a claim `campaigns.mjs` refused, on anything but the developer's word that the person it named agreed (decision **0170**).

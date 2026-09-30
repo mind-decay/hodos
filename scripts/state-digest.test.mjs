@@ -2,10 +2,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, utimesSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, utimesSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { digest, compactLine } from './state-digest.mjs';
@@ -172,13 +172,56 @@ test('--full carries one frontier block per map, for status', () => {
   assert.match(text, /^wait: the backend — @them, asked 2026-08-27$/m);
 });
 
-test('a cross-repository map says so instead of breaking the digest', () => {
+test('a node naming another repository is reported like any other (Stage 9b)', () => {
   const root = project();
   campaign(root, 'state-migration');
   const path = join(root, '.claude', 'hodos', 'campaigns', 'state-migration.md');
   writeFileSync(path, readFileSync(path, 'utf8').replace('· metric: —', '· metric: — · repo: api'));
   const text = digest(findConfig(root));
-  assert.match(text, /state-migration — cross-repository \(Stage 9b\)/);
+  assert.match(text, /state-migration — frontier 1 ready \/ 1 blocked \/ 1 fog/);
+  assert.doesNotMatch(text, /Stage 9b/);
+});
+
+test("a map in another repository is a row of this project's digest", () => {
+  const away = project({ campaigns: { external: ['../home/.claude/hodos/campaigns'] } });
+  // The two are siblings, which is what `externalEntry` in the pair seed
+  // produces and what `FORMATS.md §2`'s repo-relative path means.
+  const home = join(away, '..', 'home');
+  mkdirSync(join(home, '.git'), { recursive: true });
+  campaign(home, 'badge-rollout', { ready: 2, blocked: 0, fog: 1 });
+
+  const text = digest(findConfig(away), { full: true });
+  assert.match(text, /- campaigns: badge-rollout — frontier 2 ready \/ 1 fog/);
+  assert.match(text, /^badge-rollout: 2 ready \/ 0 blocked \/ 1 fog$/m);
+});
+
+test('a node another branch holds is a claimed segment of the row (decision 0135)', () => {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready: 2, blocked: 0, fog: 0 });
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', '-c', 'commit.gpgsign=false', ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  const rel = join('.claude', 'hodos', 'campaigns', 'badge-rollout.md');
+  git('init', '-b', 'main');
+  git('add', '--', '.');
+  git('commit', '-m', 'chore: the map');
+  git('checkout', '--quiet', '-b', 'feature/ready-1');
+  writeFileSync(
+    join(root, rel),
+    readFileSync(join(root, rel), 'utf8').replace(
+      '- [ready] ready-1 — ready node 1 · deps: — · owner: — · branch: —',
+      '- [active] ready-1 — ready node 1 · deps: — · owner: @ada · branch: feature/ready-1',
+    ),
+  );
+  git('commit', '--quiet', '-a', '-m', 'chore: claim ready-1');
+  git('checkout', '--quiet', 'main');
+
+  const text = digest(findConfig(root), { full: true });
+  assert.match(text, /- campaigns: badge-rollout — frontier 1 ready \/ 1 claimed/);
+  assert.match(text, /^claimed: ready-1 — ready node 1 · owner: @ada · branch: feature\/ready-1$/m);
 });
 
 test('the campaign line stays inside the digest cap', () => {
@@ -186,6 +229,108 @@ test('the campaign line stays inside the digest cap', () => {
   for (let i = 0; i < 12; i += 1) campaign(root, `campaign-number-${i}`, { ready: 3, blocked: 2, fog: 4 });
   const text = digest(findConfig(root));
   assert.ok(text.length <= CAP_CHARS, `digest is ${text.length} chars, cap ${CAP_CHARS}`);
+});
+
+// ── The fetch (decisions 0080, 0138) ───────────────────────────────────────
+
+/**
+ * A project whose `origin` is a bare clone that has gained a branch since the
+ * copy was made — the claim of `map.md §6` step 4, committed by somebody else
+ * and pushed. Only a fetch brings it into this repository's refs.
+ */
+function withOrigin({ ready = 2 } = {}) {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready, blocked: 0, fog: 0 });
+  const rel = join('.claude', 'hodos', 'campaigns', 'badge-rollout.md');
+  const git = (cwd, ...args) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', '-c', 'commit.gpgsign=false', ...args], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  git(root, 'init', '-b', 'main');
+  git(root, 'add', '--', '.');
+  git(root, 'commit', '-m', 'chore: the map');
+
+  // A directory of its own: two tests in this file seed a pair, and one of
+  // them removes its origin.
+  const bare = join(realpathSync(mkdtempSync(join(tmpdir(), 'hodos-origin-'))), 'origin.git');
+  git(root, 'clone', '--quiet', '--bare', root, bare);
+  git(root, 'remote', 'add', 'origin', bare);
+
+  // The claim is made in a clone of the origin, so this copy holds neither the
+  // commit nor a remote-tracking ref for it until it fetches.
+  const clone = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-claimer-')));
+  git(clone, 'clone', '--quiet', bare, clone);
+  git(clone, 'checkout', '--quiet', '-b', 'feature/ready-1');
+  writeFileSync(
+    join(clone, rel),
+    readFileSync(join(clone, rel), 'utf8').replace(
+      '- [ready] ready-1 — ready node 1 · deps: — · owner: — · branch: —',
+      '- [active] ready-1 — ready node 1 · deps: — · owner: @ada · branch: feature/ready-1',
+    ),
+  );
+  git(clone, 'commit', '--quiet', '-a', '-m', 'chore: claim ready-1');
+  git(clone, 'push', '--quiet', 'origin', 'feature/ready-1');
+  return { root, bare, refs: () => git(root, 'for-each-ref', '--format=%(refname)').trim() };
+}
+
+test('--fetch updates the refs, changes nothing else, and the claim is reported', () => {
+  const { root, refs } = withOrigin();
+  const before = refs();
+  const out = run(root, '--full', '--fetch');
+
+  assert.equal(out.status, 0);
+  assert.match(out.stdout, /claimed: ready-1 — ready node 1 · owner: @ada · branch: feature\/ready-1/);
+  assert.match(out.stdout, /- campaigns: badge-rollout — frontier 1 ready \/ 1 claimed/);
+  assert.doesNotMatch(out.stdout, /fetch failed/);
+
+  assert.notEqual(refs(), before);
+  assert.match(refs(), /refs\/remotes\/origin\/feature\/ready-1/);
+  // The fetch updates remote-tracking refs and nothing else (decision 0080).
+  assert.equal(
+    execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }),
+    '',
+  );
+});
+
+test('a fetch that cannot run says the map is as of the last pull, and reports it anyway', () => {
+  const { root, bare } = withOrigin();
+  rmSync(bare, { recursive: true, force: true });
+  const out = run(root, '--full', '--fetch');
+
+  assert.equal(out.status, 0);
+  assert.match(out.stdout, /^- fetch failed — the map is as of your last pull/m);
+  assert.match(out.stdout, /- campaigns: badge-rollout — frontier 2 ready/);
+  assert.match(out.stdout, /^ready: ready-1 — ready node 1$/m);
+});
+
+test('a repository with no remote at all says the same thing (decision 0080)', () => {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready: 1, blocked: 0, fog: 0 });
+  execFileSync('git', ['init', '-b', 'main'], { cwd: root, encoding: 'utf8' });
+  const out = run(root, '--full', '--fetch');
+  assert.equal(out.status, 0);
+  assert.match(out.stdout, /fetch failed — the map is as of your last pull/);
+});
+
+test('without the flag nothing reaches the network, and no ref moves', () => {
+  const { root, refs } = withOrigin();
+  const before = refs();
+  const out = run(root);
+
+  assert.equal(out.status, 0);
+  assert.equal(refs(), before);
+  assert.doesNotMatch(out.stdout, /origin/);
+  assert.doesNotMatch(out.stdout, /fetch/);
+  assert.match(out.stdout, /- campaigns: badge-rollout — frontier 2 ready/);
+});
+
+test('--help names the flag, and an unknown one is still exit 2', () => {
+  const help = run(project(), '--help');
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /--fetch/);
+  assert.equal(run(project(), '--nonsense').status, 2);
 });
 
 // ── The offer line (FORMATS.md §12, decisions 0081 and 0082) ────────────────
@@ -259,6 +404,26 @@ test('a stale task offers the handoff its own row does not carry', () => {
   const text = digest(findConfig(root));
 
   assert.match(text, /^- stale: users-export \(21 days\) — \/hodos:status to fold or delete$/m);
+  assert.match(text, /^- offer: handoff — users-export has been open 21 days — \/hodos:handoff users-export$/m);
+});
+
+// Decision 0179: the offer says *open*, and a done task is not open. Its
+// directory is still named by the stale row, whose "fold or delete" is right.
+test('a stale task that is done gets its stale row and no handoff offer', () => {
+  const root = project();
+  task(root, 'api-surface-diff-caps', { phase: 'done', lastEvent: 'Finish: report delivered' }, 19);
+  const text = digest(findConfig(root));
+
+  assert.match(text, /^- stale: api-surface-diff-caps \(19 days\) — \/hodos:status to fold or delete$/m);
+  assert.doesNotMatch(text, /offer: handoff/);
+});
+
+test('with a done stale task first, the handoff offer names the open one', () => {
+  const root = project();
+  task(root, 'a-done-task', { phase: 'done', lastEvent: 'Finish: report delivered' }, 30);
+  task(root, 'users-export', { phase: 'execute', lastEvent: 'Task 1: started' }, 21);
+  const text = digest(findConfig(root));
+
   assert.match(text, /^- offer: handoff — users-export has been open 21 days — \/hodos:handoff users-export$/m);
 });
 
@@ -421,4 +586,36 @@ test('two homes of one path in one rule are two rots, not one', () => {
   const text = digest(findConfig(root));
 
   assert.match(text, /^- offer: prune — 2 rule precedents have rotted — \/hodos:status --prune$/m);
+});
+
+// The digest log is gone — decision 0141. It measured the share of session
+// starts whose digest was byte-identical to that project's previous one:
+// 6 of 27 comparable starts on the pilot, 22.2 %, under the one half at which
+// suppression was to be built. So nothing is built, and the instrument goes
+// with its measurement recorded in docs/PILOT.md §7.
+
+const logPath = (root) => join(root, '.claude', 'hodos', '.digest-log');
+
+test('a bare emission writes no log (decision 0141, below its half)', () => {
+  const root = project();
+  task(root, 'orders-summary', { phase: 'execute', lastEvent: 'Task 1: done (d4e5f6a)' });
+  const out = spawnSync(process.execPath, [DIGEST], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, CLAUDE_CODE_SESSION_ID: 'aaaa1111-bbbb-2222-cccc-333344445555' },
+  });
+
+  assert.equal(out.status, 0);
+  assert.match(out.stdout, /orders-summary/);
+  assert.equal(existsSync(logPath(root)), false);
+});
+
+test('a log a pilot project still carries is left exactly as it was', () => {
+  const root = project();
+  mkdirSync(join(root, '.claude', 'hodos'), { recursive: true });
+  const before = 'abc\t2026-09-20T10:00:00.000Z\ts1\n';
+  writeFileSync(logPath(root), before);
+
+  assert.equal(run(root).status, 0);
+  assert.equal(readFileSync(logPath(root), 'utf8'), before);
 });

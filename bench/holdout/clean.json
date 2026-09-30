@@ -1,0 +1,46 @@
+{
+  "files": [
+    {
+      "package": "h1",
+      "fixture": "snippets",
+      "file": "utils/cache.py",
+      "patch": "clean/ll-249.patch",
+      "source": "logic-lens #249 python-none-sentinel-no-bug"
+    },
+    {
+      "package": "h2",
+      "fixture": "snippets",
+      "file": "store/cache.go",
+      "patch": "clean/ll-250.patch",
+      "source": "logic-lens #250 go-defer-unlock-all-paths-no-bug"
+    },
+    {
+      "package": "h3",
+      "fixture": "snippets",
+      "file": "ui/buttons.js",
+      "patch": "clean/ll-251.patch",
+      "source": "logic-lens #251 js-let-loop-closure-no-bug"
+    },
+    {
+      "package": "h4",
+      "fixture": "snippets",
+      "file": "config/loader.py",
+      "patch": "clean/ll-252.patch",
+      "source": "logic-lens #252 python-with-statement-no-bug"
+    },
+    {
+      "package": "h5",
+      "fixture": "snippets",
+      "file": "db/orders.py",
+      "patch": "clean/ll-253.patch",
+      "source": "logic-lens #253 sql-parameterized-query-no-bug"
+    },
+    {
+      "package": "h6",
+      "fixture": "snippets",
+      "file": "cache/lru.py",
+      "patch": "clean/ll-284.patch",
+      "source": "logic-lens #284 coverity-bessey-style-clean-cache-no-bug"
+    }
+  ]
+}

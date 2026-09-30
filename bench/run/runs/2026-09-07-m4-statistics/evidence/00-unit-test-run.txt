@@ -1,0 +1,14 @@
+$ npm test
+> webapp-fixture@0.1.0 test
+> vitest run
+
+ Test Files  5 passed (5)
+      Tests  19 passed (19)
+   Start at  22:07:42
+   Duration  486ms
+
+$ npx vitest run src/features/orders/ui/OrderDetailPage.test.tsx --reporter=verbose
+ ✓ OrderDetailPage > names the order it is loading while the request is pending 49ms
+ ✓ OrderDetailPage > renders no heading when no order was named 4ms
+ Test Files  1 passed (1)
+      Tests  2 passed (2)

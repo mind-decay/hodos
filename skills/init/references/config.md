@@ -21,8 +21,10 @@ Everything else is an answer copied down. These four are derived, and each is wr
 | `language` | the interview language, two letters |
 | `stack[]` | the scan's stack tokens, lowercase |
 | `commands` | `test` · `typecheck` · `lint` · `build`: a string or `null`; `dev`: `{ cmd, url, ready }` |
-| `verify.recipes[]` | `{ name, kind, when, … }`; `kind` is `command` · `browser` · `http` · `a11y` · `viewport`; `when` is `always` · `ui` · `api` · `perf` · a glob. `viewport` carries `widths[]` in CSS pixels |
+| `verify.recipes[]` | `{ name, kind, when, … }`; `kind` is `command` · `browser` · `http` · `a11y` · `viewport`; `when` is `always` · `ui` · `api` · `perf` · a glob. `viewport` carries `widths[]` in CSS pixels. A recipe whose command **cannot run in a session** — one gated behind a corpus download, a device, a paid account — is written with `unrun: true` on the approval that says so, and `check` warns about it by name (decision **0148**). That is the only route: a command recorded unrun and unmarked is the anti-pattern below |
 | `verify.profile` · `profiles` · `layers` | the environment stack of decision **0074**; `check[].kind` is `tcp` · `cmd` · `http`, `timeout` is **seconds**, `access.grant` is `permissions` · `one-time`. Omit all three where `commands.dev` is the whole environment |
+| `verify.recipes[].checks[]` | the pins of decision **0094**, on a `browser` recipe only: `{route, evaluate, expect}` each. **`init` never writes one** — `finish` does, on the developer's approval of a proved claim — and `--refresh` prunes one whose route is gone. A predicate reaching for a class or an id, a walk to an element rather than a query for it, or a bare expression where the adapter runs a function is a `check` **warning** (decisions **0118**, **0129**, **0130**) |
+| `verify.detectors.allow[]` | `"<detector>:<route glob>"` entries silencing an intended presentation defect — `overflow` · `clipped` · `overlap` · `focus` · `axe`, or `*` for all five (decision **0107**). Omit it: a route earns an entry when a hit on it turns out to be the design |
 | `conventions.commit` | `conventional` · `ticket-prefix` · `custom:<pattern>` |
 | `conventions.branch` | the project's pattern, `{slug}` for the task's slug |
 | `models.*` | `review` · `planReview` · `verify` · `preparer` · `research` · `initScan`; a model name each. No key for plan or execute, which run in the session |
@@ -52,4 +54,4 @@ Decision **0095**: a project that has a `browser` recipe is offered these two be
 
 ## Anti-pattern
 
-A command recorded unrun. A `null` where the developer was never asked. A key invented for a feature that has no reader — `check` reports it, and the capability it names is off in silence.
+A command recorded unrun **and unmarked** — `unrun: true` is what a command that cannot run in a session gets, and it is written on its own approval. A `null` where the developer was never asked. A key invented for a feature that has no reader — `check` reports it, and the capability it names is off in silence.

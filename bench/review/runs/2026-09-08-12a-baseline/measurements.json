@@ -1,0 +1,43 @@
+{
+  "runAt": "2026-09-08T13:20:35.538Z",
+  "dispatches": 6,
+  "cost": 4.909479,
+  "turns": [
+    {
+      "id": "p1",
+      "turns": 2,
+      "seconds": 259,
+      "cost": 0.879862
+    },
+    {
+      "id": "p2",
+      "turns": 2,
+      "seconds": 198,
+      "cost": 0.750102
+    },
+    {
+      "id": "p3",
+      "turns": 2,
+      "seconds": 184,
+      "cost": 0.7677365
+    },
+    {
+      "id": "p4",
+      "turns": 2,
+      "seconds": 180,
+      "cost": 0.69528225
+    },
+    {
+      "id": "p5",
+      "turns": 2,
+      "seconds": 199,
+      "cost": 0.8139067499999999
+    },
+    {
+      "id": "p6",
+      "turns": 2,
+      "seconds": 269,
+      "cost": 1.0025895
+    }
+  ]
+}

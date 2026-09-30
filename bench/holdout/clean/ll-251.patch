@@ -1,0 +1,22 @@
+diff --git a/ui/buttons.js b/ui/buttons.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/ui/buttons.js
+@@ -0,0 +1,16 @@
++// ui/buttons.js
++
++function createButtons(labels) {
++    const buttons = [];
++    for (let i = 0; i < labels.length; i++) {
++        buttons.push({
++            label: labels[i],
++            onClick: () => alert(`Clicked: ${labels[i]}`)
++        });
++    }
++    return buttons;
++}
++
++const btns = createButtons(['Home', 'About', 'Contact']);
++btns[0].onClick();  // Should alert 'Clicked: Home'
++btns[2].onClick();  // Should alert 'Clicked: Contact'

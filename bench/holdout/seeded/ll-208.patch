@@ -1,0 +1,24 @@
+# id: ll-208
+# fixture: snippets
+# package: h2
+# kind: behavioral
+# item: L5
+# line: api/handler.py:4
+# anchor: return _unauthorized()
+# trigger: Should identify L5 (Control Flow Escape): the spec mandates audit_log.record runs for every served request, but two early exit paths skip it. (1) `return _unauthorized()` when authorization fails — audit not recorded. (2) `raise BadRequest('malformed payload')` when the payload is malformed — audit not recorded. Only the happy-path success branch reaches audit_log.record. Trace must enumerate the 
+# what: logic-lens case #208 (logic-review-skip-audit-on-early-return-L5), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/api/handler.py b/api/handler.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/api/handler.py
+@@ -0,0 +1,8 @@
++# api/handler.py
++def serve_request(req, audit_log):
++    if not req.is_authorized():
++        return _unauthorized()
++    if not req.is_well_formed():
++        raise BadRequest('malformed payload')
++    audit_log.record(req)
++    return _process(req)

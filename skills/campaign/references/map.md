@@ -1,6 +1,6 @@
 # Campaign map — the procedure
 
-Sections: 1 inputs and outputs · 2 grilling · 3 writing the map · 4 the frontier · 5 proposing one node · 6 starting it · 7 advance · 8 decision and research nodes · 8a the lines a close leaves behind · 9 closing · completion · anti-pattern · bound.
+Sections: 1 inputs and outputs · 2 grilling · 3 writing the map · 4 the frontier · 5 proposing one node · 6 starting it · 7 advance · 8 decision and research nodes · 8a the lines a close leaves behind · 8b a gist, and a rename · 9 closing · completion · anti-pattern · bound.
 
 ## 1. Inputs and outputs
 
@@ -21,6 +21,15 @@ Campaign-level grilling, in one pass, with the developer answering. Each part be
 **Architecture direction — `D1..Dn`.** The decisions binding every node: what replaces what, which layer owns which state, what the migration shape is (expand–contract, per-feature, strangler). Each row is the decision and why. A node may not contradict a `D`; a node that wants to comes back here.
 
 **Decomposition.** Nodes, each a mergeable unit — a branch that could be reviewed and merged on its own. Tracer bullets where the shape is new (each node ends with something running end to end); expand–contract where an existing shape is being replaced (add the new path, move callers, delete the old). Three nodes is the floor: fewer than three means this is a task, and the router said otherwise.
+
+**A published package's release is its own node.** Where a node's work lands in a repository the campaign consumes as a **package** — a component library beside the application that imports it — `[done]` at merge is not yet consumable: the dependent needs a release. Write the release as a node of its own and make the consumer depend on it, which is what `deps:` is for and needs no new field:
+
+```
+- [ready] kit-release — publish 0.2.0 · deps: kit-component · owner: — · branch: — · ref: — · metric: — · repo: kit
+- [ready] web-uses-badge — the basket shows the badge · deps: kit-release · owner: — · branch: — · ref: — · metric: —
+```
+
+The consumer is held by the frontier until the release node is `done` (§4), which is the wait made visible instead of discovered at integration.
 
 **The fog.** Everything the campaign will have to face that cannot be stated precisely now. Each fog item is one line naming the question, not a plan for answering it. The fog list is where honesty about a campaign lives — a map with no fog is a map that has not been thought about.
 
@@ -48,11 +57,13 @@ Then run `node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs measure <slug>`. Ever
 
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs frontier <slug>`.
 
-It prints the counts, then one line per node: `ready`, `held`, `blocked`, `fog`, `active`, and the waits. **A `held` line is a disagreement between a status and a dependency** — the node says ready, the dependency is not done. Read it out and fix the map rather than proposing the node: either the dependency is genuinely open, and the node is `blocked`, or the dependency is finished and its own line is stale.
+It prints the counts, then one line per node: `ready`, `claimed`, `held`, `blocked`, `fog`, `active`, and the waits. **A `held` line is a disagreement between a status and a dependency** — the node says ready, the dependency is not done. Read it out and fix the map rather than proposing the node: either the dependency is genuinely open, and the node is `blocked`, or the dependency is finished and its own line is stale.
+
+**A `claimed` line is somebody else's node** — this map calls it `ready` and another branch calls it `active`, which is where a claim is committed (`DESIGN.md §9`). Read out the owner and the branch and leave the node alone: races are resolved socially, and the person named is who to ask. The claim is as fresh as the last fetch, and `/hodos:status` is the one command that fetches (decision **0080**).
 
 ## 5. Proposing one node
 
-One node, with the reason it is first, from the ready list. The reason is one of: it is the tracer bullet the rest hangs off, it unblocks the most nodes, it is the smallest thing that moves a done-metric, or the developer asked for it.
+One node, with the reason it is first, from the ready list — which is what the frontier prints as `ready`, and never a `held` or `claimed` line. The reason is one of: it is the tracer bullet the rest hangs off, it unblocks the most nodes, it is the smallest thing that moves a done-metric, or the developer asked for it.
 
 Put it with `AskUserQuestion`: the proposed node, the two next-best from the ready list, and — where the ready list is thin — pulling one item out of the fog. On any answer but the proposal, the chosen node is the one that starts.
 
@@ -60,8 +71,8 @@ Put it with `AskUserQuestion`: the proposed node, the two next-best from the rea
 
 1. The branch name comes from `config.conventions.branch` with the node's name substituted; the owner from `git config user.name` as `@<name>`, confirmed in the same question as the node.
 2. Call the Skill tool with `task` and the argument `<slug>/<node>`. That session routes the node, opens the task, and prints the slug `ledger.mjs init` gave it — which is the node's name unless the project already had a task by that name.
-3. `node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs claim <slug> <node> <owner> <branch> --ref task:<the slug from step 2>`.
-4. Commit the map: `git add .claude/hodos/campaigns/<slug>.md`, one commit whose subject names the node claimed. A claim nobody pushed is a claim nobody can see, and races are resolved socially.
+3. `node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs claim <slug> <node> <owner> <branch> --ref task:<the slug from step 2>`. A claim any other ref carries for another owner or another branch is refused, and each one is named (decision **0170**). Read each owner, branch and ref out, and put another node to the developer. `--force` is for a race the developer has settled with the person named, and it is used only on their word.
+4. Commit the map: `git add .claude/hodos/campaigns/<slug>.md`, one commit in `config.conventions.commit` whose subject names the node claimed. A claim nobody pushed is a claim nobody can see, and races are resolved socially.
 
 The `task` session ends on its own handoff (`/clear`, `/hodos:run <slug>`). This session ends there too: one node per session.
 
@@ -102,6 +113,18 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs set <slug> <node> --status read
 
 A node still waiting on something else keeps its status and loses only the finished name from its `by:`. A node whose last reason is gone becomes `ready`. Either way the write goes through the script: `set` exists so that correcting a map is never a hand edit (decision 0056).
 
+## 8b. Correcting a gist, and renaming a node
+
+`set --gist "<the sentence>"` rewrites what a node says it is — free text, one line, and refused when it carries ` · `, which would forge a field. Use it when the node's sentence turned out to be wrong, which is what a pulled fog item usually leaves behind.
+
+**A node is renamed by being replaced** (decision **0136**), and there is no `set --name`. A name is a reference target: other nodes' `deps:`, a `by:` sentence, the `ref: task:<slug>` and the task directory it names, and the branch `config.conventions.branch` derived from it — a command that rewrote the map's mentions would still leave the branch and the task directory under the old name and report the rename as done. So:
+
+1. `campaigns.mjs set <slug> <old> --status dropped` and a `D` row saying why the name was wrong.
+2. The new node line, written in this session on the developer's approval, the way §3 wrote the list — a **new** line is the skill's to add; the fields of an existing one are `set`'s.
+3. Every `deps:` that named the old node moves to the new one with `set … --deps`, which is the list `node-done` would otherwise print as stale.
+
+The `[dropped]` line stays. It is the map's own history, and a name silently swapped is a map that disagrees with the merge requests under it.
+
 ## 9. Closing
 
 Every node `done` or `dropped`, every metric at its target, and the developer confirms → set `Status: done` in the header and commit. The file stays for the team; deleting it is the developer's own action, never this skill's.
@@ -112,7 +135,7 @@ The map on disk in the shape of `FORMATS.md §11`, its metrics measured by `camp
 
 ## Anti-pattern
 
-Cutting the fog into nodes so the map looks finished. A node line that retells the task's plan — the map is an index, and the plan is the task's own file. Proposing a node the frontier reported as `held`. Writing the map before the developer has seen the metrics. Editing a node line by hand: `campaigns.mjs set` owns those lines, and a hand-edited one is machine state written by hand. Leaving a `by:` that names a node already done — `node-done` printed the list, and §8a is what to do with it.
+Cutting the fog into nodes so the map looks finished. A node line that retells the task's plan — the map is an index, and the plan is the task's own file. Proposing a node the frontier reported as `held`, or one it reported as `claimed` — the second is a node somebody else is on. Writing the map before the developer has seen the metrics. Editing a node line by hand: `campaigns.mjs set` owns those lines, and a hand-edited one is machine state written by hand. Leaving a `by:` that names a node already done — `node-done` printed the list, and §8a is what to do with it.
 
 ## Bound
 

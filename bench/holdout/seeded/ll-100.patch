@@ -1,0 +1,24 @@
+# id: ll-100
+# fixture: snippets
+# package: h1
+# kind: behavioral
+# item: L4
+# line: users/cleanup.py:7
+# anchor: users.remove(user)
+# trigger: 应识别 L4（状态变更风险 / State Mutation Hazard）：函数在遍历 users 的同时从同一列表中移除元素。Python 的列表迭代器不会在删除元素后重新索引，导致紧跟在被删元素之后的元素被跳过。若存在两个连续的失效用户，只会删除第一个。Trace 应展示删除 users[i] 之后迭代器前进到现在的 users[i+1]（原来是 users[i+2]）。输出必须是中文为主。
+# what: logic-lens case #100 (zh-python-mutation-during-iteration), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/users/cleanup.py b/users/cleanup.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/users/cleanup.py
+@@ -0,0 +1,8 @@
++# 从列表中删除所有 is_active=False 的用户
++def remove_inactive(users):
++    # 遍历用户列表
++    for user in users:
++        # 如果用户已失效就从原列表中移除
++        if not user.is_active:
++            users.remove(user)
++    return users

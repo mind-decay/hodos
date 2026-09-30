@@ -1,0 +1,853 @@
+{
+  "runAt": "2026-09-07T16:27:32.718Z",
+  "only": null,
+  "packages": [
+    {
+      "id": "p1",
+      "copyDir": "copies/p1",
+      "base": "f4566ec",
+      "head": "e38f220",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/summary.ts",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/OrdersSummary.tsx",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l4-mutating-sort": 21,
+        "w-bare-fetch": 8,
+        "w-literal-query-key": 11
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 1,
+        "majors": 6,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/summary.ts",
+          "line": 8,
+          "location": "src/features/orders/summary.ts:8",
+          "item": "lint `no-restricted-globals` · rules/network-through-request.md",
+          "trigger": null,
+          "finding": "raw `fetch` in feature code turns the project's lint gate red; `src/lib/http.ts:12` is meant to hold the only `fetch`",
+          "fix": "`request<Order[]>(`/orders?status=${encodeURIComponent(status)}`)`, per api.ts:23-24"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/summary.ts",
+          "line": 9,
+          "location": "src/features/orders/summary.ts:9",
+          "item": "rules/api-error-propagation.md",
+          "trigger": null,
+          "finding": "no `response.ok` check: a non-OK body — the `{ error: { code, message } }` envelope — is cast to `Order[]` and no `ApiError` is ever raised, so status and code are lost (`/api` 404s by design)",
+          "fix": "route through `request()`, which throws `ApiError.fromResponse` (http.ts:19)"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrdersSummary.tsx",
+          "line": 11,
+          "location": "src/features/orders/ui/OrdersSummary.tsx:11",
+          "item": "rules/query-key-factory.md",
+          "trigger": null,
+          "finding": "literal key array `['orders','summary',status]` written at the call site while the factory entry added at api.ts:20 goes unused",
+          "fix": "`queryKey: keys.summary(status)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/model.ts",
+          "line": 21,
+          "location": "src/features/orders/model.ts:21",
+          "item": "L4 state-mutation hazard",
+          "trigger": "`topByTotal(orders.data, 3)` — the array the doc comment intends, held by the query cache and by `OrderList`",
+          "finding": "`sort()` reorders the caller's array in place; the list re-renders largest-first without asking",
+          "fix": "`[...orders].sort(...)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrdersSummary.tsx",
+          "line": 12,
+          "location": "src/features/orders/ui/OrdersSummary.tsx:12",
+          "item": "plan `### Modules` / `### Dependency direction`",
+          "trigger": null,
+          "finding": "ui calls `listOrders`, not the summary's own request, so `summary.ts` — all of T1 — has zero callers; the design has `ui/` importing `summary.ts`",
+          "fix": "call `fetchSummaryOrders`, itself made a `request()` call, or record the deviation and delete `summary.ts`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/summary.test.ts",
+          "line": null,
+          "location": "src/features/orders/summary.test.ts",
+          "item": "decision 0022 test-first · CLAUDE.md \"a test sits beside the file it covers\"",
+          "trigger": null,
+          "finding": "T1 claims no exemption and has no test; the module parses and casts a response body",
+          "fix": "add the test, failing first, with `fetch` stubbed per rules/test-mocking-boundary.md"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/model.ts",
+          "line": 20,
+          "location": "src/features/orders/model.ts:20",
+          "item": "decision 0022 test-first",
+          "trigger": null,
+          "finding": "T2 claims no exemption; `model.test.ts` has no case for `topByTotal`, so \"largest first\" and `count` are unproven",
+          "fix": "add cases to `model.test.ts` — ties, `count` > length, empty — and prove them by mutation"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/model.ts",
+          "line": 20,
+          "location": "src/features/orders/model.ts:20",
+          "item": "defaults #16 dead code · #8 helper with ≥2 callers",
+          "trigger": null,
+          "finding": "`topByTotal` has no caller: T3's line shows a count and a total, never a ranking",
+          "fix": "consume it in the summary or drop it with T2"
+        }
+      ],
+      "spec": {
+        "missing": null,
+        "extra": null,
+        "misunderstood": null,
+        "unclaimed": null
+      },
+      "words": {
+        "spec": 244,
+        "standards": 310,
+        "coverage": 80
+      },
+      "checks": [
+        "- test: `npm test` → 8 passed (3 files)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → FAILED, exit 1: 1 error — `src/features/orders/summary.ts:8:26` `no-restricted-globals` \"Unexpected use of 'fetch'. Call the network through request() in src/lib/http.ts\""
+      ],
+      "turns": 2,
+      "cost": 0.85485025,
+      "seconds": 215
+    },
+    {
+      "id": "p2",
+      "copyDir": "copies/p2",
+      "base": "ce35e1d",
+      "head": "ed1c54b",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useStatusParam.ts",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l2-type-contract": 8,
+        "w-api-error-shape": 26,
+        "w-barrel-bypass": 3
+      },
+      "exit": 0,
+      "verdict": "NEEDS_WORK",
+      "counts": {
+        "blockers": 0,
+        "majors": 4,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "major",
+          "file": "src/features/home/ui/HomePage.tsx",
+          "line": 3,
+          "location": "src/features/home/ui/HomePage.tsx:3",
+          "item": "rules/feature-barrel-imports.md (+ plan `### Dependency direction`)",
+          "trigger": null,
+          "finding": "deep import `'../../orders/model'` pins home to a file path inside orders; the barrel already exports it (`src/features/orders/index.ts:7`), and this is the only deep cross-feature import in `src`",
+          "fix": "`import { useOrdersFilter } from '../../orders';`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/api.ts",
+          "line": 26,
+          "location": "src/features/orders/api.ts:26",
+          "item": "rules/api-error-propagation.md",
+          "trigger": null,
+          "finding": "`throw new Error(...)` replaces the `ApiError` with a plain `Error`, discarding `code` and `status`; the rule names exactly this (\"a new local error type … throws away the status and code\")",
+          "fix": "re-throw the caught `ApiError` with the fuller message, or set the message on an `ApiError` carrying the original `code`/`status`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useStatusParam.ts",
+          "line": 8,
+          "location": "src/features/orders/ui/useStatusParam.ts:8",
+          "item": "L2 type-contract breach",
+          "trigger": "`/orders?status=bogus` returns `'bogus'`; `/orders?status=` returns `''`, since `??` does not catch the empty string",
+          "finding": "an arbitrary string is cast into the four-member `StatusFilter`, so the declared return type is a lie and the URL fallback invariant does not hold",
+          "fix": "test membership before returning: `const raw = params.get('status'); return isStatusFilter(raw) ? raw : 'all';`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useStatusParam.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useStatusParam.test.ts",
+          "item": "CLAUDE.md conventions — \"a test sits beside the file it covers\"",
+          "trigger": null,
+          "finding": "the new module carries T1's whole behaviour and has no test beside it; the run's 9 tests touch none of it",
+          "fix": "add the file, covering known status, unknown status, and absent parameter"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/ui/useStatusParam.ts",
+          "line": 6,
+          "location": "src/features/orders/ui/useStatusParam.ts:6",
+          "item": "defaults #8 / #16",
+          "trigger": null,
+          "finding": "the hook has zero call sites — `OrdersPage.tsx:8` still reads the store — so the design's goal, a list that can be linked to, is unreached by the diff",
+          "fix": "call it from `OrdersPage`, or return it to the plan as a gap"
+        }
+      ],
+      "spec": {
+        "missing": "T1's second acceptance clause — \"an unknown one falls back to `all`\". `src/features/orders/ui/useStatusParam.ts:8` casts the raw parameter (`as StatusFilter`) instead of checking it, so an unknown status is returned unchanged; no code in the diff meets the criterion.",
+        "extra": "—",
+        "misunderstood": "—",
+        "unclaimed": "the `null` branch of `params.get('status')` at `src/features/orders/ui/useStatusParam.ts:8` — the absent-parameter path. T1's acceptance names only \"a known status in the URL\" and \"an unknown one\"; no acceptance clause exercises a URL with no `status` at all. (T3's `catch` at `api.ts:25` is claimed by T3's acceptance; both `### Invariants & failure modes` clauses are named by T1 and T3.)"
+      },
+      "words": {
+        "spec": 103,
+        "standards": 255,
+        "coverage": 57
+      },
+      "checks": [
+        "- test: `npm test` → 9 passed (3 files)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → clean, 0 problems"
+      ],
+      "turns": 2,
+      "cost": 0.73847675,
+      "seconds": 162
+    },
+    {
+      "id": "p3",
+      "copyDir": "copies/p3",
+      "base": "4fc51e0",
+      "head": "00d70c9",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/refund.test.ts",
+        "src/features/orders/refund.ts",
+        "src/features/orders/ui/OrderActions.test.tsx",
+        "src/features/orders/ui/OrderActions.tsx",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useCancelOrder.ts",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l5-control-flow-escape": 12,
+        "s-unclaimed-refund-state": 2,
+        "w-error-role-alert": 26,
+        "w-test-mocking-boundary": 6
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 1,
+        "majors": 6,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/ui/useCancelOrder.ts",
+          "line": 12,
+          "location": "src/features/orders/ui/useCancelOrder.ts:12",
+          "item": "L5 control-flow escape",
+          "trigger": "`cancel()` pressed while `order` is `undefined` — the detail query is still pending",
+          "finding": "`setBusy(true)` runs, then the early `return` skips `setBusy(false)`: `busy` is stuck true forever, with no call ever made. Plan invariant \"every path out of `cancel` leaves it false\" and T2's acceptance both break",
+          "fix": "guard `if (!order) return;` **above** `setBusy(true)`, and wrap the rest in `try/finally`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useCancelOrder.ts",
+          "line": 13,
+          "location": "src/features/orders/ui/useCancelOrder.ts:13",
+          "item": "L6 callee-contract mismatch",
+          "trigger": "the POST returns non-OK, or never arrives — `request()` throws `ApiError` (`src/lib/http.ts:17-19`)",
+          "finding": "the throw skips `setBusy(false)`: `busy` stays true and the rejection escapes to a caller with no surface for it",
+          "fix": "`try { await request(…) } finally { setBusy(false) }`, and surface the `ApiError`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 26,
+          "location": "src/features/orders/ui/OrderActions.tsx:26",
+          "item": "rules/error-role-alert.md",
+          "trigger": null,
+          "finding": "`{error && <p>{error}</p>}` renders the failure silently; precedents `OrdersPage.tsx:25`, `OrderDetailPage.tsx:11`",
+          "fix": "`<p role=\"alert\">{error}</p>` and assert the role in the test"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.test.tsx",
+          "line": 6,
+          "location": "src/features/orders/ui/OrderActions.test.tsx:6",
+          "item": "rules/test-mocking-boundary.md",
+          "trigger": null,
+          "finding": "`vi.mock('../../../lib/http')` replaces a project module — the one shape the rule refuses, and the first `vi.mock` in the repository. The real `request()` never runs, so the URL, the `/api` prefix and the `ApiError` path are unverified",
+          "fix": "`vi.stubGlobal('fetch', …)` per `src/lib/http.test.ts:15`, unstubbed in `afterEach`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 17,
+          "location": "src/features/orders/ui/OrderActions.tsx:17",
+          "item": "rules/api-error-propagation.md",
+          "trigger": null,
+          "finding": "the `catch` reduces the `ApiError` to `(cause as Error).message` in `useState<string \\",
+          "fix": "null>`, discarding `code` and `status`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useCancelOrder.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useCancelOrder.test.ts",
+          "item": "CLAUDE.md — \"a test sits beside the file it covers\" (decision 0022)",
+          "trigger": null,
+          "finding": "T2's module ships with no test beside it; its `busy` invariant is unclaimed and, in fact, broken on both paths above",
+          "fix": "add the file, failing first, covering the no-order and the rejected-call paths"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderActions.tsx",
+          "line": 14,
+          "location": "src/features/orders/ui/OrderActions.tsx:14",
+          "item": "rules/network-through-request.md",
+          "trigger": null,
+          "finding": "the POST is written at the call site, not declared in the feature's `api.ts` beside `listOrders`/`getOrder` (\"a feature's calls are one line each, declared in its `api.ts`\"); same at `useCancelOrder.ts:13`. Both also interpolate the id without `encodeURIComponent`, unlike `api.ts:25`",
+          "fix": "add `markOrderPaid(id)` and `cancelOrder(id)` to `src/features/orders/api.ts`, encoding the id"
+        },
+        {
+          "sev": "minor",
+          "file": "src/features/orders/refund.ts",
+          "line": 1,
+          "location": "src/features/orders/refund.ts:1",
+          "item": "defaults #9 / #16",
+          "trigger": null,
+          "finding": "the comment claims \"the detail page reads it for its badge\"; nothing imports `refund`, and `OrderDetailPage.tsx` renders no badge",
+          "fix": "drop the claim or wire the badge"
+        }
+      ],
+      "spec": {
+        "missing": "T1 — \"a failure puts the message on the page **where a screen reader announces it**\": the `<p>` at `src/features/orders/ui/OrderActions.tsx:26` carries no `role=\"alert\"`, and no assertion covers announcement. T2 — \"`busy` … false on every path out of it, **including the one where there is no order yet**\": unmet at `src/features/orders/ui/useCancelOrder.ts:12`, and no test claims it.",
+        "extra": "—",
+        "misunderstood": "—",
+        "unclaimed": "`'declined'` — the third member of `RefundState` at `src/features/orders/refund.ts:2` — is in no `Acceptance:` clause (T4 names `requested` and `approved` only). The failure path of `cancel` at `src/features/orders/ui/useCancelOrder.ts:13` (a rejected `request()`) is in no claim. The invariant clause \"A failed call leaves the order as it was and puts the reason on the page\" is named by T1's acceptance for `OrderActions` and by nothing for `useCancelOrder`, which has no error surface at all."
+      },
+      "words": {
+        "spec": 136,
+        "standards": 355,
+        "coverage": 67
+      },
+      "checks": [
+        "- test: `npm test` → 13 passed (5 files)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → 0 problems"
+      ],
+      "turns": 2,
+      "cost": 0.8209679999999999,
+      "seconds": 189
+    },
+    {
+      "id": "p4",
+      "copyDir": "copies/p4",
+      "base": "1972f7b",
+      "head": "61467be",
+      "files": [
+        ".gitignore",
+        "eslint.config.js",
+        "package-lock.json",
+        "package.json",
+        "src/errors.js",
+        "src/http/respond.js",
+        "src/main.js",
+        "src/routes.js",
+        "src/server.js",
+        "src/services/orders.js",
+        "src/store/orders.js",
+        "test/routes.test.js",
+        "test/server.test.js",
+        "test/services.test.js",
+        "tsconfig.json"
+      ],
+      "anchors": {
+        "a-plain-error": 15,
+        "a-route-not-in-table": 32,
+        "b-l3-boundary": 62,
+        "s-unclaimed-page-limit": 61
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 1,
+        "majors": 3,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/services/orders.js",
+          "line": 62,
+          "location": "src/services/orders.js:62",
+          "item": "L3 boundary blindspot",
+          "trigger": "`page(all(), 0, 2)` → `['o-1']`; `page(all(), 0, 1)` → `[]`; `page(all(), 0, 3)` → 2 rows",
+          "finding": "`slice(offset, offset + limit - 1)` is short by one on every limit, so each page silently drops its last row; contradicts the plan invariant \"a page of `limit` rows holds `limit` rows where the collection has them\"",
+          "fix": "`slice(offset, offset + limit)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/services/orders.js",
+          "line": 15,
+          "location": "src/services/orders.js:15",
+          "item": "src/errors.js:2 Convention 3 (also plan `### Invariants & failure modes`, `### Precedent`)",
+          "trigger": null,
+          "finding": "bare `Error` where the file's own precedent 5 lines below throws `AppError`; `respond.js:21` maps it to `internal`/500, so a client input error reads as a server fault and the code is unreachable to the client",
+          "fix": "`throw new AppError('invalid_min', 400, ...)`, and validate before or after the status check consistently"
+        },
+        {
+          "sev": "major",
+          "file": "src/server.js",
+          "line": 31,
+          "location": "src/server.js:31",
+          "item": "src/routes.js:9 Convention 1 (also plan `### Dependency direction`)",
+          "trigger": null,
+          "finding": "`/health` short-circuits above `matchRoute`, so a route exists that the one table does not answer for; it also ignores the method — `POST /health` and `DELETE /health` both return `200 {\"status\":\"ok\"}` (verified), unlike every table route",
+          "fix": "add the row `{ method: 'GET', pattern: '/health', status: 200, handler: … }` and delete the branch"
+        },
+        {
+          "sev": "major",
+          "file": "test/services.test.js",
+          "line": 12,
+          "location": "test/services.test.js:12",
+          "item": "decision 0022 test-first",
+          "trigger": null,
+          "finding": "the diff adds `page` and the `min` parameter with no test for either; the only test added covers T3's pre-existing `all` case. The T2 criterion written as a call — `page(orders, 0, 2)` — would have caught the blocker above",
+          "fix": "add the two `page` cases and the `min` narrow/reject cases"
+        },
+        {
+          "sev": "minor",
+          "file": "src/services/orders.js",
+          "line": 14,
+          "location": "src/services/orders.js:14",
+          "item": "L2 type-contract breach",
+          "trigger": "`?min=` → `Number('') === 0`, all 3 orders returned as if no filter; `?min=Infinity` → passes, returns `[]`",
+          "finding": "`Number.isNaN(Number(min))` admits `''`, whitespace and `Infinity`, where `create`'s precedent at line 47 uses `Number.isFinite`",
+          "fix": "`const n = Number(min); if (min.trim() === '' \\"
+        }
+      ],
+      "spec": {
+        "missing": null,
+        "extra": null,
+        "misunderstood": null,
+        "unclaimed": null
+      },
+      "words": {
+        "spec": 127,
+        "standards": 303,
+        "coverage": 74
+      },
+      "checks": [
+        "- test: `npm test` → 16 passed, 0 failed (3 suites)",
+        "- typecheck: `npm run typecheck` → 0 errors (exit 0)",
+        "- lint: `npm run lint` → clean, 0 problems (exit 0)",
+        "- note: all three pass on this diff; every finding below is invisible to them because no test covers the two behaviours the diff adds."
+      ],
+      "turns": 2,
+      "cost": 0.7863,
+      "seconds": 193
+    },
+    {
+      "id": "p5",
+      "copyDir": "copies/p5",
+      "base": "345e9f8",
+      "head": "d69ab59",
+      "files": [
+        ".gitignore",
+        "eslint.config.js",
+        "package-lock.json",
+        "package.json",
+        "src/errors.js",
+        "src/http/respond.js",
+        "src/main.js",
+        "src/routes.js",
+        "src/server.js",
+        "src/services/orders.js",
+        "src/store/orders.js",
+        "test/routes.test.js",
+        "test/server.test.js",
+        "test/services.test.js",
+        "tsconfig.json"
+      ],
+      "anchors": {
+        "a-nongoal-config-knob": 8,
+        "a-service-imports-http": 2,
+        "b-l9-time-locale": 48
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 1,
+        "majors": 4,
+        "minors": 0
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/services/orders.js",
+          "line": 48,
+          "location": "src/services/orders.js:48",
+          "item": "L9 time and locale (plan `### Invariants & failure modes`)",
+          "trigger": "`create({customer:'Zoe',total:5})` then `list(null,'2026-12-01')` returns `['o-4']` — verified; a future `since` must return `[]`",
+          "finding": "`toLocaleDateString()` writes `9/7/2026` while seeds are ISO `2026-01-05`, so `createdAt >= since` compares two formats. Under `en-GB` it writes `07/09/2026` and the same order is wrongly *excluded*; the stamp is also local-TZ (`9/8/2026` at UTC+14)",
+          "fix": "`new Date().toISOString().slice(0, 10)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/services/orders.js",
+          "line": 2,
+          "location": "src/services/orders.js:2",
+          "item": "lint `no-restricted-imports` (Convention 4; plan `### Dependency direction`)",
+          "trigger": null,
+          "finding": "the service imports `../http/respond.js`; lint exits 1",
+          "fix": "drop the import"
+        },
+        {
+          "sev": "major",
+          "file": "src/services/orders.js",
+          "line": 56,
+          "location": "src/services/orders.js:56",
+          "item": "plan `### Dependency direction`; defaults #8, #16",
+          "trigger": null,
+          "finding": "`createInto` writes the response from the service layer — \"only its\" job is respond.js's — and has zero callers",
+          "fix": "delete the function"
+        },
+        {
+          "sev": "major",
+          "file": "src/server.js",
+          "line": 8,
+          "location": "src/server.js:8",
+          "item": "plan `### Non-goals`; defaults #13",
+          "trigger": null,
+          "finding": "`CORS_ORIGIN` env var (line 8) and the CORS header (line 32); the plan excludes CORS and any new environment variable by name",
+          "fix": "remove both lines"
+        },
+        {
+          "sev": "major",
+          "file": "test/services.test.js",
+          "line": null,
+          "location": "test/services.test.js",
+          "item": "decision 0022 test-first",
+          "trigger": null,
+          "finding": "T2's `since` filter ships with no test; every other service behaviour in this file has one, and a test would have caught the blocker",
+          "fix": "add the seeded-and-created `since` case"
+        }
+      ],
+      "spec": {
+        "missing": null,
+        "extra": null,
+        "misunderstood": null,
+        "unclaimed": null
+      },
+      "words": {
+        "spec": 140,
+        "standards": 190,
+        "coverage": 41
+      },
+      "checks": [
+        "- test: `npm test` → 16 passed, 0 failed (3 suites)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → **exit 1**, 1 error (`src/services/orders.js:2` no-restricted-imports: `'../http/respond.js'` import is restricted from being used by a pattern)"
+      ],
+      "turns": 2,
+      "cost": 0.753118,
+      "seconds": 182
+    },
+    {
+      "id": "p6",
+      "copyDir": "copies/p6",
+      "base": "311d49f",
+      "head": "d78a5f1",
+      "files": [
+        ".claude/hodos/config.json",
+        ".claude/rules/api-error-propagation.md",
+        ".claude/rules/error-role-alert.md",
+        ".claude/rules/feature-barrel-imports.md",
+        ".claude/rules/network-through-request.md",
+        ".claude/rules/query-key-factory.md",
+        ".claude/rules/test-mocking-boundary.md",
+        ".gitignore",
+        ".mcp.json",
+        "CLAUDE.md",
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "src/App.tsx",
+        "src/features/home/index.ts",
+        "src/features/home/ui/HomePage.tsx",
+        "src/features/orders/api.ts",
+        "src/features/orders/index.ts",
+        "src/features/orders/model.test.ts",
+        "src/features/orders/model.ts",
+        "src/features/orders/ui/OrderDetailPage.tsx",
+        "src/features/orders/ui/OrderList.test.tsx",
+        "src/features/orders/ui/OrderList.tsx",
+        "src/features/orders/ui/OrderRefresh.tsx",
+        "src/features/orders/ui/OrdersPage.tsx",
+        "src/features/orders/ui/useOrdersByStatus.ts",
+        "src/features/shift/index.ts",
+        "src/features/shift/ui/ShiftPage.tsx",
+        "src/lib/errors.ts",
+        "src/lib/http.test.ts",
+        "src/lib/http.ts",
+        "src/main.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.setup.ts"
+      ],
+      "anchors": {
+        "b-l6-callee-contract": 22,
+        "b-l7-race": 11,
+        "w-refactor-out-of-scope": 12,
+        "w-silenced-rule": 9
+      },
+      "exit": 0,
+      "verdict": "REJECT",
+      "counts": {
+        "blockers": 2,
+        "majors": 8,
+        "minors": 1
+      },
+      "findings": [
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/ui/useOrdersByStatus.ts",
+          "line": 10,
+          "location": "src/features/orders/ui/useOrdersByStatus.ts:10-12",
+          "item": "L7 concurrency",
+          "trigger": "status goes `open`→`paid` quickly and the `open` response lands second",
+          "finding": "no cleanup, no abort, no staleness check: the late response calls `setOrders` and the rows for the status the user left replace the current ones — the plan's stated invariant and T2's acceptance",
+          "fix": "`useQuery({ queryKey: keys.list(status), queryFn: () => listOrders(status) })`, or an `ignore` flag cleared in the effect's cleanup"
+        },
+        {
+          "sev": "blocker",
+          "file": "src/features/orders/api.ts",
+          "line": 22,
+          "location": "src/features/orders/api.ts:22-23",
+          "item": "plan `### Non-goals` / `### Data & scale`",
+          "trigger": "`OrdersPage.tsx:10` calls `listOrders(status)` for a status with more than 25 orders",
+          "finding": "the defaulted `limit` silently truncates every existing caller's list to 25 of \"the same few hundred rows\"; `keys.list(status)` also omits `limit`, so any varied limit shares one cache entry",
+          "fix": "drop the parameter; if it must stay, make it explicit at the call site and part of the key"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.tsx",
+          "line": 10,
+          "location": "src/features/orders/ui/OrderRefresh.tsx:10",
+          "item": "rules/network-through-request.md",
+          "trigger": null,
+          "finding": "bare `fetch('/api/orders')` bypasses `request()`, and re-prefixes `/api`, which `request()` adds itself",
+          "fix": "`listOrders(status)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.tsx",
+          "line": 9,
+          "location": "src/features/orders/ui/OrderRefresh.tsx:9",
+          "item": "CLAUDE.md conventions (\"do not weaken `eslint.config.js`\")",
+          "trigger": null,
+          "finding": "an inline `eslint-disable-next-line no-restricted-globals` disables the frozen guard for convention 1; the check reports green because the violation was silenced",
+          "fix": "remove the disable and the `fetch` it protects"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.tsx",
+          "line": 10,
+          "location": "src/features/orders/ui/OrderRefresh.tsx:10-11",
+          "item": "L6 callee-contract",
+          "trigger": "`/api/orders` answers 404 — it does in dev, by design",
+          "finding": "`fetch` does not throw on a non-OK status; `response.json()` then rejects on the non-JSON body, giving an unhandled rejection inside the click handler, no `ApiError`, and no error surface at all",
+          "fix": "go through `request()`, which raises `ApiError`, and render it with `role=\"alert\"` per rules/error-role-alert.md"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useOrdersByStatus.ts",
+          "line": 11,
+          "location": "src/features/orders/ui/useOrdersByStatus.ts:11",
+          "item": "rules/api-error-propagation.md",
+          "trigger": "any non-OK `/orders` response or a dead network",
+          "finding": "`.then(setOrders)` with no `catch`: the `ApiError`'s `code` and `status` are dropped into an unhandled rejection, the hook keeps stale rows and nothing above can tell 404 from a dead network",
+          "fix": "return the error to the caller (react-query's `isError`), never swallow it"
+        },
+        {
+          "sev": "major",
+          "file": "src/lib/http.ts",
+          "line": 11,
+          "location": "src/lib/http.ts:11-12,17,22-23",
+          "item": "plan `### Refactor in scope` / `### Non-goals`",
+          "trigger": null,
+          "finding": "the shared client changes behaviour where the plan allows only a comment: every request now aborts at 8 s, the abort surfaces as `'the request did not reach the server'` though it did, and `clearTimeout` in `finally` fires once headers arrive, so the body read is uncovered",
+          "fix": "revert `src/lib/http.ts`; propose the timeout as its own task"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useOrdersByStatus.ts",
+          "line": 10,
+          "location": "src/features/orders/ui/useOrdersByStatus.ts:10",
+          "item": "plan `### Precedent` (`OrdersPage.tsx:10`) + rules/query-key-factory.md",
+          "trigger": null,
+          "finding": "server state fetched with `useEffect`/`useState` instead of the feature's precedent; the rows live in no cache entry, so an invalidation against the barrel's `orderKeys` never refreshes them",
+          "fix": "`useQuery` with `keys.list(status)`"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/useOrdersByStatus.test.ts",
+          "line": null,
+          "location": "src/features/orders/ui/useOrdersByStatus.test.ts",
+          "item": "CLAUDE.md (\"a test sits beside the file it covers\") / decision 0022",
+          "trigger": null,
+          "finding": "the module with the race the plan names as its invariant ships with no test; the suite count is unchanged from base",
+          "fix": "add the failing race test first"
+        },
+        {
+          "sev": "major",
+          "file": "src/features/orders/ui/OrderRefresh.test.tsx",
+          "line": null,
+          "location": "src/features/orders/ui/OrderRefresh.test.tsx",
+          "item": "CLAUDE.md (\"a test sits beside the file it covers\") / decision 0022",
+          "trigger": null,
+          "finding": "new component, no test beside it; T1's acceptance is unverified",
+          "fix": "cover the press with `fetch` stubbed at the boundary"
+        },
+        {
+          "sev": "minor",
+          "file": "src/lib/http.ts",
+          "line": 17,
+          "location": "src/lib/http.ts:17-18",
+          "item": "L1 shadow override",
+          "trigger": "a caller passing `init` with its own `signal` (none today)",
+          "finding": "`...init` spreads after `signal`, so a caller's signal silently replaces the timeout's",
+          "fix": "merge the signals, or spread `init` first"
+        }
+      ],
+      "spec": {
+        "missing": null,
+        "extra": null,
+        "misunderstood": null,
+        "unclaimed": null
+      },
+      "words": {
+        "spec": 179,
+        "standards": 519,
+        "coverage": 75
+      },
+      "checks": [
+        "- test: `npm test` → 3 files, 8 tests passed (identical to base 311d49f: no test accompanies either new module)",
+        "- typecheck: `npm run typecheck` → 0 errors",
+        "- lint: `npm run lint` → 0 problems",
+        "- Note: lint is green only because `src/features/orders/ui/OrderRefresh.tsx:9` suppresses `no-restricted-globals` inline; without that line the raw `fetch` is an eslint error."
+      ],
+      "turns": 2,
+      "cost": 0.8869070000000001,
+      "seconds": 228
+    }
+  ]
+}

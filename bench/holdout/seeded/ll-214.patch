@@ -1,0 +1,33 @@
+# id: ll-214
+# fixture: snippets
+# package: h3
+# kind: behavioral
+# item: L6
+# line: service/UserService.java:10
+# anchor: return user.get().getEmail();  // line 9
+# trigger: Should identify L6 (Callee Contract Mismatch): `repo.findById()` returns `Optional<User>`, explicitly signalling the user might not exist. However, `user.get()` on line 9 is called without checking `user.isPresent()` first. When the user does not exist, `Optional.get()` throws `NoSuchElementException`. The Optional type is designed to force callers to handle the absent case, but using `get()` with
+# what: logic-lens case #214 (java-optional-get-without-check-L6), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/service/UserService.java b/service/UserService.java
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/service/UserService.java
+@@ -0,0 +1,17 @@
++// service/UserService.java
++import java.util.Optional;
++
++public class UserService {
++    private final UserRepository repo;
++    private final EmailService emailService;
++
++    public String getUserEmail(long userId) {
++        Optional<User> user = repo.findById(userId);
++        return user.get().getEmail();  // line 9
++    }
++
++    public void sendWelcome(long userId) {
++        String email = getUserEmail(userId);  // line 13
++        emailService.send(email, "Welcome to our platform!");
++    }
++}

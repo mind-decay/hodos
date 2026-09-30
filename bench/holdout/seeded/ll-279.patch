@@ -1,0 +1,30 @@
+# id: ll-279
+# fixture: snippets
+# package: h6
+# kind: behavioral
+# item: L4
+# line: sort/quicksort.py:14
+# anchor: return arr
+# trigger: L4 Warning (State Mutation Hazard): the function sorts the input array IN PLACE and ALSO returns it. The dual contract is a footgun — callers who write `sorted_a = quicksort(a); print(a)` discover that `a` was mutated. The `return arr` lies about whether a copy was made. Trace: caller passes list `a`, function partitions in place via `arr[i], arr[j] = ...`, recurses on the same backing array, retu
+# what: logic-lens case #279 (quixbugs-style-quicksort-aliased-input-mutation-L4), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/sort/quicksort.py b/sort/quicksort.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/sort/quicksort.py
+@@ -0,0 +1,14 @@
++def quicksort(arr, lo=0, hi=None):
++    if hi is None:
++        hi = len(arr) - 1
++    if lo < hi:
++        pivot = arr[hi]
++        i = lo - 1
++        for j in range(lo, hi):
++            if arr[j] <= pivot:
++                i += 1
++                arr[i], arr[j] = arr[j], arr[i]
++        arr[i+1], arr[hi] = arr[hi], arr[i+1]
++        quicksort(arr, lo, i)
++        quicksort(arr, i+2, hi)
++    return arr

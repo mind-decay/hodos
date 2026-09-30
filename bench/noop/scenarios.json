@@ -49,7 +49,7 @@
       "lines": [
         {
           "file": "skills/task/references/route.md",
-          "line": "Print the checklist and the verdict before asking anything. The developer confirms against what you saw, not against a conclusion:"
+          "line": "Print the checklist and the verdict before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:"
         },
         {
           "file": "skills/task/references/route.md",
@@ -82,8 +82,8 @@
         },
         {
           "file": "skills/task/references/route.md",
-          "line": "Nine rows with evidence or `unknown`, a verdict the rules produce from those rows, the developer's confirmation, `brief.md` on disk, and `ledger.mjs init` run. On a campaign verdict this phase writes nothing: the confirmed verdict is what step 3 carries into the `campaign` skill. The verdict was reached in ≤5 evidence calls.",
-          "replaceWith": "Nine rows with evidence or `unknown`, a verdict the rules produce from those rows, the developer’s confirmation, `brief.md` on disk, and `ledger.mjs init` run. On a campaign verdict this phase writes nothing: the confirmed verdict is what step 3 carries into the `campaign` skill."
+          "line": "Nine rows with evidence or `unknown`, a verdict the rules produce from those rows, the developer's confirmation, `brief.md` on disk, and `ledger.mjs init` run. On an inert verdict, the confirmation also covers the short plan. On a campaign verdict this phase writes nothing: the confirmed verdict is what step 3 carries into the `campaign` skill. The verdict was reached in ≤5 evidence calls.",
+          "replaceWith": "Nine rows with evidence or `unknown`, a verdict the rules produce from those rows, the developer’s confirmation, `brief.md` on disk, and `ledger.mjs init` run. On an inert verdict, the confirmation also covers the short plan. On a campaign verdict this phase writes nothing: the confirmed verdict is what step 3 carries into the `campaign` skill."
         },
         {
           "file": "skills/task/references/route.md",
@@ -96,14 +96,18 @@
           "replaceWith": "Router budget: the searches and reads that fill checklist rows 1–5, and then a verdict. The procedure around them is outside it: the `!` state digest, `config.mjs find`, and the read of the phase reference, which `PLATFORM-NOTES.md` fact 32 makes unskippable. A router that goes exploring has failed — the verdict is “research”, not a private investigation (decision 0029)."
         },
         {
+          "file": "docs/DESIGN.md",
+          "line": "| ≤5 router evidence calls | ten S1 transcripts: **2, 2, 3, 3, 4, 4, 4, 5, 5, 5**, never over | held |"
+        },
+        {
           "file": "docs/COMPONENTS.md",
-          "line": "**Invariants (first 40 lines of the kernel).** No code is written in S1. References are read on entering their phase, fail-closed. The router spends ≤5 evidence calls (decision 0029). Facts are fetched by subagents, decisions are asked of the human — the grilling agent never answers its own questions. Nothing is assumed silently: every open question has an answer or an owner before approval.",
-          "replaceWith": "**Invariants (first 40 lines of the kernel).** No code is written in S1. References are read on entering their phase, fail-closed. Facts are fetched by subagents, decisions are asked of the human — the grilling agent never answers its own questions. Nothing is assumed silently: every open question has an answer or an owner before approval."
+          "line": "**Invariants (first 40 lines of the kernel).** No code is written in S1, except by an `inert` verdict's own flow (decision **0183**). References are read on entering their phase, fail-closed. The router spends ≤5 evidence calls (decision 0029). Facts are fetched by subagents, decisions are asked of the human — the grilling agent never answers its own questions. Nothing is assumed silently: every open question has an answer or an owner before approval.",
+          "replaceWith": "**Invariants (first 40 lines of the kernel).** No code is written in S1, except by an `inert` verdict's own flow (decision **0183**). References are read on entering their phase, fail-closed. Facts are fetched by subagents, decisions are asked of the human — the grilling agent never answers its own questions. Nothing is assumed silently: every open question has an answer or an owner before approval."
         },
         {
           "file": "docs/DESIGN.md",
-          "line": "250 plan lines (advisory) · 3 attempts on a red check · 2 + 2 iterations · `staleDays` 14 · 1.3× / 2×, reported beside the findings caught before human review (§11) · ≤5 router evidence calls · ≤8 interview questions per batch · `quick` criteria (§4.1).",
-          "replaceWith": "250 plan lines (advisory) · 3 attempts on a red check · 2 + 2 iterations · `staleDays` 14 · 1.3× / 2×, reported beside the findings caught before human review (§11) · ≤8 interview questions per batch · `quick` criteria (§4.1)."
+          "line": "250 plan lines (advisory) · 3 attempts on a red check · 2 + 2 iterations · `staleDays` 14 · the multiplier, a price with no threshold, reported beside the findings caught before human review (§11) · ≤5 router evidence calls · ≤8 interview questions per batch · `quick` criteria (§4.1).",
+          "replaceWith": "250 plan lines (advisory) · 3 attempts on a red check · 2 + 2 iterations · `staleDays` 14 · the multiplier, a price with no threshold, reported beside the findings caught before human review (§11) · ≤8 interview questions per batch · `quick` criteria (§4.1)."
         },
         {
           "file": "skills/task/SKILL.md",

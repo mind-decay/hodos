@@ -1,0 +1,14 @@
+{
+  "route": "/orders",
+  "width": 1200,
+  "omitted": 0,
+  "hits": [
+    {
+      "detector": "overflow",
+      "route": "/orders",
+      "ref": "p[11]",
+      "detail": "content is 20px wider than the box (overflow-x: hidden)"
+    }
+  ],
+  "allowed": []
+}

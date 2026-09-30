@@ -15,7 +15,7 @@ Script invocation shorthand used in every hodos document: `ledger.mjs add …` m
 │   ├── settings.local.json         # permissions.allow for hodos scripts (per machine, gitignored)
 │   └── hodos/
 │       ├── config.json
-│       ├── active                  # slug of the active task, or absent
+│       ├── active                  # slug a claim with no session id made, or absent
 │       ├── sessions/<session-id>   # slug of the task that session is on
 │       ├── history.jsonl           # one line per finished task; ledger.mjs only; gitignored
 │       ├── adapters/<role>/<tool>.md  # tracked — this project's own, named project:<tool>
@@ -23,6 +23,7 @@ Script invocation shorthand used in every hodos document: `ledger.mjs add …` m
 │       ├── handoffs/<slug>.md      # tracked — written by /hodos:handoff, deleted at pickup
 │       ├── env/<layer>.json        # gitignored — what this machine raised, and how to stop it
 │       ├── env/<layer>.log         # gitignored — that raise's own output, kept for the diagnosis
+│       ├── env/<layer>.users/<id>  # gitignored — one empty file per session on the layer
 │       └── tasks/<slug>/           # gitignored — working state, one developer, one task
 │           ├── brief.md
 │           ├── research.md
@@ -40,13 +41,15 @@ Script invocation shorthand used in every hodos document: `ledger.mjs add …` m
 
 Monorepo: root `.claude/hodos/config.json` plus nested `<subproject>/.claude/hodos/config.json`; nested extends root (deep merge, nested wins). A subproject earns a nested config when its **commands differ** from the root's, workspace member or not (decision 0060); one that runs the root's commands takes the root config, and a nested file states only what it overrides. Campaign maps are looked up from the current project upward to the git root, then `config.campaigns.external[]`.
 
-`.claude/hodos/sessions/<session-id>` and `.claude/hodos/active` each hold one line — the slug of a task. Both are written by `ledger.mjs` only: `init` writes both, `claim <slug>` writes both when `run` takes up a task — not when it starts and stops, so a run that finds the task `done`, or its plan unapproved, leaves them to whichever session they belong to (`COMPONENTS.md §1.2` step 1). On `Finish` the script deletes every pointer that names the finished task, and `active` when it names it, regardless of whether the task directory is deleted.
+`.claude/hodos/sessions/<session-id>` and `.claude/hodos/active` each hold one line — the slug of a task. Both are written by `ledger.mjs` only, and a claim writes one of them: `sessions/<id>` where the caller's id is reachable, and `active` where it is not (decision **0171**). `init` claims, and so does `claim <slug>` when `run` takes up a task — not when it starts and stops, so a run that finds the task `done`, or its plan unapproved, leaves them to whichever session they belong to (`COMPONENTS.md §1.2` step 1). On `Finish` the script deletes every pointer that names the finished task, and `active` when it names it, regardless of whether the task directory is deleted.
 
-**Which task a caller is on** is resolved in one order everywhere (decision 0047): the caller's session id → `sessions/<id>` → `active`. A hook takes the id from its payload's documented `session_id`; a script a kernel runs takes it from `CLAUDE_CODE_SESSION_ID`. `active` is the single-session path, the fallback when no id is reachable, and what a developer greps; a machine where the id is absent behaves exactly as it did before the pointers existed. `status` garbage-collects a pointer whose session's transcript is gone or whose task directory no longer exists. The `session_id` is not a path: a value outside `[A-Za-z0-9._-]` is treated as no id at all.
+**Which task a caller is on** is resolved in one order everywhere (decisions 0047, **0171**): the caller's session id → `sessions/<id>` → `active`, and `active` only while `sessions/` holds no pointer at all. A caller whose own pointer is missing while another session holds one is on no task: the Stop gate and the commit gate stay open rather than act on another session's work, and each says so in one line. A hook takes the id from its payload's documented `session_id`; a script a kernel runs takes it from `CLAUDE_CODE_SESSION_ID`. `active` is the single-session path — the claim made where no id was reachable — and what a developer greps; a machine where the id is absent behaves exactly as it did before the pointers existed. `status` garbage-collects a pointer whose session's transcript is gone or whose task directory no longer exists. The `session_id` is not a path: a value outside `[A-Za-z0-9._-]` is treated as no id at all.
 
-`.claude/hodos/env/<layer>.json` — one record per layer **this machine raised**, written by `env.mjs up` and deleted by `env.mjs down`: the pid of the detached process, when it started, the command, the `stop` the config declared, the directory the raise ran in, and the layer's log. `cwd` is on the record because `down` runs the `stop` where the raise ran, whatever the config's `cwd` says by then. A layer found already up never gets one, which is what makes "stop what hodos started, and never a layer it found already up" a property rather than a promise (decision 0074). Beside it, `env/<layer>.log` holds what **that** raise printed: `down` keeps the log and removes the record, so the log is started empty each time the layer is raised and a `ready` line is proof of the raise that is running. Both are gitignored, like every other per-machine file under `hodos/`.
+`.claude/hodos/env/<layer>.json` — one record per layer **this machine raised**, created by `env.mjs up` before its spawn and deleted by the `env.mjs down` that stops it. It holds the pid of the detached process, when it started, the command, the `stop` the config declared, the directory the raise ran in, the layer's log, and the `session` that raised it, `null` with no id. The record is created exclusively, as the link of a finished temporary file, so two sessions raising one layer at once spawn one process: the loser spawns nothing, waits on the layer's own proof and attaches. A record whose pid is dead, or still `null` past the layer's `timeout`, is a raise that crashed, and it is raised again (decision **0169**). `cwd` is on the record because `down` runs the `stop` where the raise ran, whatever the config's `cwd` says by then. A layer found already up never gets a record, which is what makes "stop what hodos started, and never a layer it found already up" a property rather than a promise (decision 0074). Beside it, `env/<layer>.log` holds what **that** raise printed: `down` keeps the log and removes the record, so the log is started empty each time the layer is raised — by the one process that won the record — and a `ready` line is proof of the raise that is running. Both are gitignored, like every other per-machine file under `hodos/`.
 
-`.claude/hodos/history.jsonl` — one JSON line per finished task, appended by `ledger.mjs` on `Finish`. Gitignored. `status` computes its rates from it, so metrics survive task-directory deletion.
+`env/<layer>.users/<session-id>` — one empty file per session on a layer, created by that session's `up` before it probes, and removed by its `down` before that `down` counts. The process is stopped only when no file is left, `down` names the sessions still on it otherwise, and `down --all` stops it regardless. A record with no users — every raise by a caller with no id — is stopped by any `down`, as every record was before sessions shared a layer. Files rather than a list, because two processes rewriting one list lose one of the entries. A session is registered on each layer just before that layer is probed, a layer it found up included, because another session's raise may be what it found, and a layer skipped behind a failed one is never registered; a layer with no record is never stopped, whoever is on it. The users files are gitignored with the record.
+
+`.claude/hodos/history.jsonl` — one JSON line per finished task, appended by `ledger.mjs` on `Finish`. Gitignored. A task with a shape adds `"shape"`, and a line without the key had none, so lines written before decision **0183** read as they did. `status` computes its rates from it, so metrics survive task-directory deletion.
 
 ```json
 { "slug": "orders-summary", "path": "standard", "type": "feature",
@@ -78,12 +81,15 @@ Monorepo: root `.claude/hodos/config.json` plus nested `<subproject>/.claude/hod
   "verify": {
     "recipes": [
       { "name": "unit", "kind": "command", "run": "npx vitest run", "when": "always" },
-      { "name": "ui", "kind": "browser", "routes": ["/"], "when": "ui" },
+      { "name": "ui", "kind": "browser", "routes": ["/"], "when": "ui",
+        "checks": [{ "route": "/orders",
+                     "evaluate": "() => document.querySelector('[role=\"status\"]').textContent.trim()",
+                     "expect": "Total 3" }] },
       { "name": "api", "kind": "http", "base": "http://localhost:3000", "when": "api" }
     ],
     "profile": "local",
     "profiles": {
-      "local": { "layers": ["infra", "spa"] },
+      "local": { "layers": ["infra", "seed-overdue", "spa"] },
       "stand": { "layers": ["spa-stand"] }
     },
     "layers": {
@@ -93,8 +99,12 @@ Monorepo: root `.claude/hodos/config.json` plus nested `<subproject>/.claude/hod
                            { "kind": "http", "target": "http://localhost/health", "expect": 200 }],
                  "access": { "needs": ["Bash(sh ../infra/*)"], "grant": "permissions", "grantedAt": "2026-09-05" } },
       "spa": { "up": "npm run dev", "ready": "Local:", "url": "http://localhost:5173" },
-      "spa-stand": { "up": "npm run dev:stand", "ready": "Local:", "url": "http://localhost:5173" }
-    }
+      "spa-stand": { "up": "npm run dev:stand", "ready": "Local:", "url": "http://localhost:5173" },
+      "seed-overdue": { "up": "node seed.mjs up", "stop": "node seed.mjs reset",
+                        "timeout": 120,
+                        "check": [{ "kind": "cmd", "run": "node seed.mjs count" }] }
+    },
+    "detectors": { "allow": ["overflow:/marketing/*"] }
   },
   "conventions": {
     "commit": "conventional",
@@ -133,9 +143,13 @@ Monorepo: root `.claude/hodos/config.json` plus nested `<subproject>/.claude/hod
 Field notes:
 - `commands.*` are the exact shell commands `init` ran successfully at `verifiedAt`. Reviewer and verifier run them verbatim. A command is `null` when the project has no such tool; the reviewer records `check: not configured` and the verifier skips the matching recipe with that reason.
 - `verify.recipes[].kind`: `command` | `browser` | `http` | `a11y` | `viewport` (decision 0095). `a11y` audits the recipe's `routes` through the browser adapter's `audit` operation, or through the recipe's own `run` where the project names a tool, and its rows are grouped by the audit's `impact`; a **route** the audit could not run is a skip carrying the reason the tool gave — a `runtimeError` through `lighthouse_audit`, a non-zero exit through an axe or pa11y `run`. A **check the tool could not decide** is neither a finding nor a skip: it names work for a person, not a failed route, so the route's row carries its count and leaves it to the quadrant it belongs to (`DESIGN.md §7.4`). The two tools differ in what that count is worth. `lighthouse_audit` returns the same ten `scoreDisplayMode: "manual"` audits on every accessibility run — a fixed list, so a change in the number means the run itself changed. Axe's `incomplete` is per element and per page: it holds the nodes axe found on **this** DOM and could not judge, so it moves run to run and is read as this run's, never as a constant. Only the Lighthouse half is measured here; the axe half is written from the tool's contract. `notApplicable` is neither, and is not counted. Measured 2026-09-06 on a live run: 76 accessibility audits, `"incomplete"` zero times, `"manual"` ten, `notApplicable` 54, one carrying `impact`. `widths` belongs to `viewport` and to no other kind, and a `viewport` recipe whose `widths` or `routes` is missing or empty is a `check` error: the recipe iterates routes × widths, and an empty either side is a recipe with nothing to run. `viewport` re-visits the recipe's `routes` at each width of `widths[]` — CSS pixels, one row and one screenshot per route × width. Both are `when`-gated like every other recipe, so a project that declares neither pays nothing for them. `when`: `always` · `ui` (task touches files matching the project's UI globs) · `api` · `perf` (only when the plan declared it) · a glob.
+- **`verify.recipes[].checks[]` are the pins** (decision **0094**): a claim the verifier proved once, written back as an assertion so that every later run of this recipe checks it again. Each entry is `{route, evaluate, expect}` — the route it holds on, the predicate that reads it, and the value the predicate returned when the row passed. It belongs to a `browser` recipe and to no other kind, for the reason `widths` belongs to `viewport`: nothing else runs it. `expect` is whatever the predicate returned — a string, a number, a boolean, `null` — because the type belongs to the claim rather than to this file. It is written **only by `finish`, on the developer's approval** of a `pass` row the verifier marked `pin`, pruned by `init --refresh` when its route no longer resolves, and otherwise deleted by hand one line at a time. A check that no longer holds is a `fail` row with source *pin* (§10), and whether the pin rotted or the change broke it is settled at the base sha the way §10 states it: a `git` proof that the elements the row names are byte-identical there, where the diff touches nothing their render depends on, and a plain `fail · major` naming the base sha where it does not (decisions **0097**, **0119**, **0127**). The predicate is over a role or text and never a class or an id, and it reaches every element by a **query** and never by a walk from one — `nextElementSibling`, `parentElement`, `children[n]`, `:nth-child` and their kind are what an element inserted between breaks, which is a smaller change than renaming a class (decision **0129**). It is written as a **function**, `() => (…)`, because that is what the adapter table maps the field to (decision **0130**). `config.mjs check` **warns** and loads on each of the three, because a brittle predicate is a config that runs and fails later rather than one that cannot run at all (decision **0118**); the run wraps a bare expression, so a pin written the old way still fires.
+- **`verify.recipes[].unrun`** is the one recipe field that describes the *layer's* knowledge rather than the check (decision **0148**): `true` means this recipe's command has never been observed green here, so `config.verifiedAt` does not cover it. `config.mjs check` reports it as a **warning** naming the recipe, because it records a developer's decision about a command that cannot run in a session — the pilot's `slo_release_gate` clones a multi-GB corpus — rather than a mistake; and the verify phase's row for such a recipe reads `not verified in this session`, so a red row on it is *never green here* and not a regression. `init` writes it only on the approval that answered for that command, `--refresh` clears it the first time the command runs green, and `false` or an absent field says the ordinary thing.
 - `verify.profile`, `profiles`, `layers`: the environment the claims are run against, raised by hodos before the verifier is dispatched (decision 0074). `profile` names the active profile; a profile names the layers a run needs, **in the order they are raised**; a layer says how it is raised (`up`, and `cwd`, `stop`) — every layer is spawned detached, because a process started inside a session dies with it, how it is proven up (`check[]`, or `ready` and `url` for the one foreground layer), how long it may take (`timeout`, **in seconds**), and what it needs to be allowed (`access`). Absent: `commands.dev` is the environment, unchanged — a project with one `spa` layer is `commands.dev` with more words. A `profile` or a layer name that resolves to nothing is a `check` error, because a layer nobody raises is discovered at the preflight otherwise. **The stack is POSIX-only today:** `env.mjs down` stops a foreground layer by signalling its process group (`process.kill(-pid, 'SIGTERM')`), which Windows has no equivalent of — `taskkill /T /PID` is its form and is unbuilt — so a project declaring `verify.env` on Windows would raise a layer it cannot stop. The command recipes and everything else in `verify` are platform-neutral.
+- **A seeded data state is a layer, and needs no key of its own** (decision **0099**). `seed-overdue` above is the whole of it: `up` runs the seed, `check.kind: cmd` **proves the state it claims to have made** — a count, a query, an exit code, not a process listening — and `stop` resets it, so a run leaves the data where it found it — once the last session on the layer has left (decision **0169**). Its place in the profile is the raise order, so it is declared after the layer whose store it writes into and before the one that serves from it. A `up` that exits when the seeding is done is the normal shape here rather than an exception: what says a layer is up is its `check`, never a live pid, so a seed that finished is up and `up` run twice seeds once. A claim that rests on that state names this layer in the plan's `## Verify plan` (`skills/task/references/plan.md §5`), which is what tells a reader of `verify.md` which data the row saw. What this does **not** settle is who the user is: named logins are `verify.personas`, deferred to Stage 12 by the same decision, because none of the four bench fixtures has authentication and a credential format written against nothing is a credential in a committed file (`BACKLOG.md`).
 - `verify.layers[].check[].kind`: `tcp` — `target` is `host:port` and the port opens · `cmd` — `run` exits 0 · `http` — `target` answers with `expect` (default 200). Each check's own `timeout` is the seconds one attempt is given; the layer's is the seconds every check has to go green in. `ps` listing a container is not a check: what a check asserts is that the thing answers.
 - `verify.layers[].access`: `needs[]` names the `permissions.allow` entries the raise runs under, or the one-time machine grant it needs; `grant` is `permissions` | `one-time`; `grantedAt` is the date it was granted, or `null`. `null` is the only state in which hodos asks anything at all, and the question is *may I* — offering to write the entry itself — never *go and run this*. A decline degrades that layer's `browser` and `http` claims to `skip: environment not up — <layer>, access declined`, leaves the command recipes running, and is **not** persisted: the next run asks once rather than skipping in silence.
+- `verify.detectors.allow[]`: the presentation-detector hits this project has declared intentional (decisions **0093**, **0107**). One flat array of strings, each `"<detector>:<route glob>"` — the detector id before the colon, `*` there standing for every detector, and the route glob read the way `review.generated`'s globs are, so `*` stays inside one path segment and `**` crosses them. The ids are the five of `scripts/detectors.mjs`: `overflow`, `clipped`, `overlap`, `focus`, `axe`. An entry with no detector in front of its route, a detector nobody runs, or nothing after the colon is a `check` error naming the form — a string that silences nothing is worse than no string, because it reads as if it did. A hit an entry matches produces no row and is counted as allowed, which is what tells a reader of `verify.md` that the detector ran. There is no key for the thresholds: they live in the decider, which is what lets them be mutated one at a time in a test (decision 0109), and a project that disagrees with one writes the route into this list.
 - `conventions.commit`: `conventional` | `ticket-prefix` | `custom:<pattern>`; degenerate project conventions are replaced by `conventional` on approval.
 - `models.*` are passed as the `model` parameter on every subagent dispatch for that role. Planning and execution run in the main session on the session's model; there is no key for them.
 - There is no key for the per-dispatch turn bound. It is `maxTurns` in the agent definition, which is a plugin file (decision 0044): the Agent tool takes no such parameter, so a project sets one only by shipping its own `.claude/agents/hodos-<role>.md`.
@@ -195,6 +209,13 @@ Row 1 counts **every file the change creates or edits** — the source files, th
 The other four are unchanged: `feature` · `bug` · `refactor` · `question`.
 
 `refactor` additionally has a **shape**, which adds no path and changes none of the six rules below: a refactor is **mechanical** when row 1 is above the `quick` limit **and** every touched file takes the *same* edit — one transformation statable as a single rule, so a codemod can make it and a sample can stand for it. Rule 3 still routes it to `deep` on width; what the shape changes is downstream, in `execute` and in what the reviewer is handed (the codemod plus a sample, not one diff per file).
+
+A `quick` verdict of type `feature` or `refactor` has one shape, **inert** (decision **0183**). Like `mechanical`, it adds no path and changes none of the six rules below.
+- **The test.** `yes` when every line the change edits is text no program reads to decide anything: a comment, documentation, a message that reaches only a human (an assertion's text, a log's text, an error's text that no caller or test matches on), or whitespace. `no` when any edited line is branched on, returned, stored or compared, including a message a test matches by content.
+- **The evidence** is the read of the lines to be edited, plus a Grep for a message's text in the tests and the callers. A shape the router's budget did not reach is not claimed.
+- **What it changes** is everything after the verdict. The task runs in one session with no design fields, no simplify pass and no verifier, and gets one fresh reviewer. Any line a program reads upgrades it to `quick`.
+
+A verdict with a shape carries a fourth line, `Shape: <mechanical|inert> — <one sentence>`, and `ledger.mjs init` records it (`--shape`, §6).
 
 Verdict rules, applied in this order, first match wins:
 1. any `yes` or `unknown` on rows 6–9 → **campaign**;
@@ -292,14 +313,20 @@ Tests: visual — layout and the three states only, no branch · verified by ui 
 
 ## Outcome            ← appended by finish
 Review: ACCEPT after 1 fix (0 blocker / 1 major fixed / 1 minor open)
-Verify: PASS — evidence/01-orders.png, unit 14/14
+Verify: PASS — 18 claims, 8 skipped, 0/0/1 by severity, flaky 0, pre-existing 1; evidence/01-orders.png, unit 14/14
 Open minors: …
 Gaps: 1 — see ledger
 ```
 
-No frontmatter. The ten design fields of `DESIGN.md §6.2` are the nine `### Design` subsections plus the top-level `## Non-goals`; all ten must be non-empty at approval. An architecture row's `Axis` is one of the five of `skills/task/references/design.md` — module boundary · dependency direction · where state lives · what becomes an invariant · what fails and how — and alternatives differing on none of them are one alternative (decision **0085**). A row that settles something other than an architecture question, a library version or a scope call, carries `—`. `Open questions` must be empty at approval. Line count over 250 triggers an advisory lint message only.
+The `Verify:` line carries the statuses of Stage 11d-3's decisions (**0097**, **0098**, **0108**, **0119**, **0126**, **0127**): the severities copied off the `fail` rows rather than recounted, and the `flaky` and `pre-existing` counts beside them. They are written on every run, `0` included, because `verify.md` is deleted at finish and this line is where a `pre-existing` defect the run found and did not introduce survives it. The **pins** are deliberately not here: a check `finish` wrote into `verify.recipes[<ui>].checks[]` is recorded by the committed config it now sits in (decision **0094**), which outlives the task directory without help, and the finish report names it in the chat. An `inert` task has no verifier, so its line reads `Verify: — inert: commands.test and commands.lint green, evidence/<files>`, the two commands' output standing where the statuses would (decision **0183**).
+
+No frontmatter. The ten design fields of `DESIGN.md §6.2` are the nine `### Design` subsections plus the top-level `## Non-goals`; all ten must be non-empty at approval on every plan except an inert one (below). An architecture row's `Axis` is one of the five of `skills/task/references/design.md` — module boundary · dependency direction · where state lives · what becomes an invariant · what fails and how — and alternatives differing on none of them are one alternative (decision **0085**). A row that settles something other than an architecture question, a library version or a scope call, carries `—`. `Open questions` must be empty at approval. Line count over 250 triggers an advisory lint message only.
 
 A task has no `Tests:` line when it is test-first, which is the default. A task that deviates carries `Tests: <reason> — <justification> · verified by <what>` with `<reason>` one of `visual`, `glue`, `infra`, `no-harness` and both halves non-empty; `Tests: test-first` written out is also accepted. Any other value fails lint (decision 0022).
+
+**An amended clause** (decision **0176**). A `Gap:` whose resolution contradicts a task's `Acceptance:` clause rewrites that clause in the same step, so that the clause reads as the developer settled it. The line below keeps the approved one: `Amended <YYYY-MM-DD> by Gap: <the clause as it was>`. The reviewer and the verifier read the `Acceptance:` line, and the amendment is what keeps the approved contract visible. It is the one edit `plan.md` takes after approval, other than `## Outcome`.
+
+**The inert form** (decision **0183**). The plan of a task with `Shape: inert` carries its header line, with `Shape: inert` after the type, and then `## Goal`, `## Non-goals`, `## Tasks` and an empty `## Open questions`. It has no `## Decisions`, `## Design` or `## Verify plan`, because a change no program reads leaves them nothing to hold. Each task names its `Files:` and an `Acceptance:` that the two commands are green, plus what the text reads afterwards. Its `done` carries `--inert` in place of a red phase or a `Tests:` exemption (§6). `review-package.mjs` packages this plan only when `state.json` carries the shape (§8). An upgrade out of the shape reverts the edit and re-grills the plan into the full form, whose T1 rebuilds it test-first on the same branch (decision **0184**, `skills/task/references/inert.md` §7). The header's `Base:` is filled after `Plan: approved`, as on every plan.
 
 ## 6. Ledger — `ledger.md`
 
@@ -307,25 +334,26 @@ Append-only. One event per line. Written only by `ledger.mjs`. The model passes 
 
 | CLI form (what the kernel passes) | Stored form | Phase after |
 |---|---|---|
-| `init <slug> --path <p> --type <t> [--campaign <c/n>]` (command, not a line) | `Init: <path> <type>` | `plan` |
-| `add "Route: <path> <type>"` (only if the path changed at confirmation) | same | `plan` |
+| `init <slug> --path <p> --type <t> [--shape <s>] [--campaign <c/n>]` (command, not a line) | `Init: <path> <type>`, or `Init: <path> <type> <shape>` | `plan` |
+| `add "Route: <path> <type> [<shape>]"` (only if the verdict changed at confirmation) | same | `plan` |
 | `add "Plan: approved" --tasks <n> --branch <name>` | `Plan: approved (⟨base-sha⟩, <n> tasks, <name>)` | `approved` |
 | `add "Task <n>: started"` | same | `execute` |
 | `add "Task <n>: test red"` | same | `execute` |
-| `add "Task <n>: done" --sha <sha> [--tests <reason>]` | `Task <n>: done (<sha>)`, or `Task <n>: done (<sha>, tests: <reason>)` | `execute` |
+| `add "Task <n>: mutation" --tests <k>` | `Task <n>: mutation (<k> tests)` | `execute` |
+| `add "Task <n>: done" --sha <sha> [--tests <reason> \| --inert]` | `Task <n>: done (<sha>)`, `Task <n>: done (<sha>, tests: <reason>)`, or `Task <n>: done (<sha>, inert)` | `execute` |
 | `add "Task <n>: red-check attempt <k>/3 — <text>"` | same | `execute` |
 | `add "Ruling: <what> — <why> — <cost if wrong>"` | same | unchanged |
 | `add "Gap: <what the plan lacked> — <resolution>"` | same | unchanged |
-| `add "Upgrade: <from>→<to> — <why>"` | same | unchanged |
+| `add "Upgrade: <from>→<to> — <why>"` (`<from>` is the task's rung, `inert` included) | same | unchanged; one out of `inert` restarts the counts (§7) |
 | `add "Simplify: done" --sha <sha> --net <n>` | `Simplify: done (<sha>, net -<n>)` | `review` |
-| `add "Review <k>: <ACCEPT\|NEEDS_WORK\|REJECT> <b>/<m>/<mi>"` | `Review <k>: … (<b>/<m>/<mi>)` | `ACCEPT` → `verify`; else `fix` |
+| `add "Review <k>: <ACCEPT\|NEEDS_WORK\|REJECT> <b>/<m>/<mi>"` | `Review <k>: … (<b>/<m>/<mi>)` | `ACCEPT` → `verify`, or `finish` on an `inert` task; else `fix` |
 | `add "Fix <k>: done" --sha <sha>` | `Fix <k>: done (<sha>)` | `review` if last event was a review; `verify` if it was a verify |
 | `add "Verify <k>: <PASS\|FAIL> <n> claims, <s> skipped"` | same | `PASS` → `finish`; `FAIL` → `fix` |
-| `add "Breaker: <review\|verify> — <accept\|manual\|rollback T<n>>"` | same | `accept` → next phase as if passed; `manual` → `manual`; `rollback` → `execute` |
+| `add "Breaker: <review\|verify> — <accept\|manual\|rollback T<n>>"` | same | `accept` → next phase as if passed, so `finish` after an `inert` task's review; `manual` → `manual`; `rollback` → `execute` |
 | `add "Compact: session compacted"` | same | unchanged |
 | `add "Finish: report delivered"` | same | `done` |
 
-`Task <n>: done` is refused with exit 1 unless the ledger already holds `Task <n>: test red` or `--tests` names one of `visual`, `glue`, `infra`, `no-harness` — the exemption the plan gave that task (decision 0022). The script does not read `plan.md`; the reviewer compares the two records. Any other line is rejected with exit 1 and the grammar printed. `--net` and `--tasks` take a whole number of 0 or more: the stored form writes the sign, so `--net -2` is rejected rather than stored as `net --2`, which the derivation's own pattern cannot read. `add` acts on the task this session is on (`sessions/<id>`, then `active`); `--slug <slug>` overrides. With no config, or no active task and no `--slug`, `add` prints `no active task` and exits 0 — hooks rely on this. `Finish: report delivered` also appends the task's summary line to `.claude/hodos/history.jsonl` and removes the task's session pointers and `active`.
+`Task <n>: done` is refused with exit 1 unless the ledger already holds `Task <n>: test red`, or `--tests` names one of `visual`, `glue`, `infra`, `no-harness` — the exemption the plan gave that task (decision 0022) — or `--inert` stands on a task whose shape is `inert` (decision **0183**). The script does not read `plan.md`; the reviewer compares the two records. The **mutation** row carries the count the phase produced: `<k>` is the number of tests the task wrote in its red phase and mutated, a whole number of 0 or more, and the row is what a resumed session and a fresh reader read instead of a transcript (decision **0122**). `--tests` therefore has two types, told apart by the event — a count here, the plan's exemption on `done` — and the refusal names the one the event takes. The row is not a gate: nothing refuses `done` without it, and what reads it is the reviewer, which compares `<k>` against the test declarations the diff adds and calls a mismatch a `major`. **The shape** (decision **0183**). `--shape` is `inert` or `mechanical`. `inert` rides only on a `quick` path of type `feature` or `refactor`, and `mechanical` only on type `refactor`. Anything else is refused before the directory exists. A `bug` opens with a red loop, which a change no program reads cannot have; `question` and `spike` commit nothing; and an `upgrade` edits a version a program reads. A `Route:` line without a shape clears it. Any `Upgrade:` leaves `inert`, which is why `inert` is the ratchet's lowest rung and never a target. The ledger holds that too (decision **0184**). An `Upgrade:` is refused unless its `<from>` is the task's rung, which is `inert` while the task carries it and its path otherwise. A `Route:` carrying `inert` is refused once `Plan: approved` or an `Upgrade:` is in the ledger. `--inert` on `done` is accepted only when the ledger's own shape is `inert`, and never beside `--tests`. The shape is read from the ledger and not from the caller, so the flag cannot become a fifth exemption: an inert change has no line a test could pin, and the developer confirmed that at the verdict. An inert task's accepted review goes to `finish`, because the shape has no verifier. Any other line is rejected with exit 1 and the grammar printed. `--net` and `--tasks` take a whole number of 0 or more: the stored form writes the sign, so `--net -2` is rejected rather than stored as `net --2`, which the derivation's own pattern cannot read. `add` acts on the task this session is on (`sessions/<id>`, then `active`); `--slug <slug>` overrides. With no config, or no active task and no `--slug`, `add` prints `no active task` and exits 0 — hooks rely on this. `Finish: report delivered` also appends the task's summary line to `.claude/hodos/history.jsonl` and removes the task's session pointers and `active`.
 
 ## 7. `state.json`
 
@@ -334,6 +362,7 @@ Append-only. One event per line. Written only by `ledger.mjs`. The model passes 
   "slug": "orders-summary",
   "path": "standard",
   "type": "feature",
+  "shape": null,
   "phase": "execute",
   "campaign": null,
   "branch": "feature/orders-summary",
@@ -349,7 +378,7 @@ Append-only. One event per line. Written only by `ledger.mjs`. The model passes 
 }
 ```
 
-`phase` ∈ `plan · approved · execute · review · fix · verify · finish · manual · done`, derived exactly by the table in §6. `branch` comes from `--branch`; `tasks.total` from `--tasks`; `tasks.done` counts `Task n: done` lines after the most recent `Breaker: … rollback` (or all of them if none); `tasks.current` is the task to execute next — the last started task if it has no `done`, otherwise the last done task + 1, capped at `total`; after a rollback to `T<n>` it is `n`. `redCheckAttempts` counts attempts for the current task and resets on `done`. `review.iteration` / `verify.iteration` count their events — the number written in the line is the model's and is not read — and, like `tasks.done`, they count only the events after the most recent `Breaker: … rollback`: rebuilt work is judged on a fresh loop bound, and its `verdict` is `null` until the first review of that work (decision 0023). Never edited by hand.
+`phase` ∈ `plan · approved · execute · review · fix · verify · finish · manual · done`, derived exactly by the table in §6. `shape` is `inert`, `mechanical` or `null`, from the last `Init:` or `Route:` line and cleared from `inert` by any `Upgrade:`. `branch` comes from `--branch`; `tasks.total` from `--tasks`; `tasks.done` counts `Task n: done` lines after the most recent reset point (or all of them if there is none). A reset point is a `Breaker: … rollback`, or an `Upgrade: inert→…`, whose edit is reverted and rebuilt (decision **0184**). `tasks.current` is the task to execute next: the last started task if it has no `done`, otherwise the last done task + 1, capped at `total`. After a rollback to `T<n>` it is `n`, and after an upgrade out of `inert` it is 1. `redCheckAttempts` counts attempts for the current task and resets on `done`. `review.iteration` / `verify.iteration` count their events — the number written in the line is the model's and is not read — and, like `tasks.done`, they count only the events after the most recent reset point: rebuilt work is judged on a fresh loop bound, and its `verdict` is `null` until the first review of that work (decision 0023). Never edited by hand.
 
 ## 8. `review-input.md`
 
@@ -358,11 +387,15 @@ Generated by `review-package.mjs`:
 ```markdown
 # Review input — orders-summary
 Base: a1b2c3d · Head: d4e5f6a · Commits: 3
+Mutation: T1 3 tests · T2 0 tests
 
 ## Projects
 <one line per config that answers for this diff: its directory and its config path>
 
-## Design (from plan)
+## Shape: inert (decision 0183)            ← an inert task only
+<the claim the developer confirmed at the verdict>
+
+## Design (from plan)                      ← absent on an inert task
 <verbatim design section>
 
 ## Tasks (from plan)
@@ -374,12 +407,19 @@ Base: a1b2c3d · Head: d4e5f6a · Commits: 3
 ## Callers
 <one line per call site of a symbol whose exported declaration the diff changed>
 
+## Task-directory paths
+<one line per added line that names a concrete .claude/hodos/tasks/<slug> path>
+
 ## Diff stat
 <git diff --stat base..head — every changed file, generated ones included>
 
 ## Diff
 <git diff -U10 base..head — the packaged files only>
 ```
+
+**An inert task** (decision **0183**) has a plan with no `## Design`. The script packages it only when `state.json` carries `shape: inert`, and every other plan without the section still exits 1. In place of the design, the package states what the developer confirmed at the verdict: that every edited line is text no program reads. That claim is the reviewer's to check. The shape is read from the state the ledger writes, not from the plan.
+
+The header's **`Mutation:`** value is the counts the ledger holds, read from `tasks/<slug>/ledger.md` by the script (decision **0143**): `T<n> <k> tests` per task, in task order, the latest row for a task winning because a re-run of the check is the later of two records of one thing. It is the only route decision **0122**'s count has to the reviewer, whose inputs are otherwise a closed list, and the reviewer compares each `<k>` against the test declarations the diff adds. `Mutation: —` where the ledger holds no such row — which on a diff that adds test declarations is the finding, not the absence of one — and `Mutation: — (ledger.md unreadable)` where nobody could read the record, because a bare dash would claim the task mutated nothing (decision **0139**'s rule, one layer down). A package built for a diff that **owns no task** carries no `Mutation:` line at all, because there is no ledger to read one from: that is the `--target` variant below, and it is also every package `bench/review/invoke.mjs` builds. The reviewer's reading of each of the three is in `agents/hodos-reviewer.md`, and the absent line is the one that produces no finding and no Coverage sentence.
 
 `## Projects` names the configs that answer for the diff — `config.mjs for-files` over the changed files (decision 0076). One line each, `- <dir> · config: <path>`, both git-root-relative — the git root itself is `.` — root first and then by depth and name:
 
@@ -401,13 +441,19 @@ The reviewer runs each project's `commands.*` — read from the config named her
 
 It is a **pointer list the reviewer judges**, never a finding: a grep by name misses a symbol reached through a re-export or a dynamic key, and a common name resolves into unrelated modules. The declaration families it reads are JavaScript and TypeScript's `export` and Rust's `pub`; a language that spells its public surface otherwise gets no section. An import line is not a call site, and neither is a line in a document — a project rule quoting the shape it requires is not a caller — and neither is the name inside a string or a comment: a match has to be **shaped like a call**, the name and then `(`. The run of 2026-09-06 is why the shape is required and not merely hoped for; it packaged `` `list` · test/server.test.js:31 — `it('answers the list route with JSON', async () => {` `` for two packages, and a title is not a caller (`bench/review/runs/2026-09-06/README.md`). The price of the shape is a symbol passed as a value — `useEffect(fetchOrders)` — which reads as a dependency and is dropped with the titles. The caps are **10 symbols** and **5 call sites each**, constants in the script rather than config keys, and a cap that bites says so on its own line — the shape `## Not packaged` uses. Nothing exported changed, or nothing outside the diff names it: no section.
 
+**`## Task-directory paths`** is decision **0172**'s list:
+- **What it lists.** The diff's added lines that name a concrete task directory — `.claude/hodos/tasks/` followed by a real slug — as `- <file>:<line> — <text>`. The `<slug>` placeholder is not listed, because it is how the engine's own text names the path. Neither is a line of `.gitignore`, which is where `init` writes it, or a removed line, which is the repair.
+- **Why it is a finding.** `init` gitignores that directory (decision **0144**), so each line names a path no other checkout has. The reviewer files each as a `major`, unless the line quotes the path as its subject rather than citing it as a source, and says which in the row.
+- **The cap.** Twenty lines; past it, the cap says so on its own line.
+- **When it is written.** The list is computed from the packaged diff, so a `--mechanical` package reads its sample. With no such line, there is no section.
+
 `## Not packaged` is written only when a changed file matches `config.review.generated` (default: the lockfiles, `*.snap`, `dist/`, `build/`, `generated/`, `__generated__/`). Those files are named with their churn and left out of the diff, and the section tells the reviewer to name them in its Coverage line, so the omission is in the review rather than silent. The stat stays complete: what changed is not what was packaged, and the reviewer sees both (decision 0065).
 
 A package over `config.review.maxBytes` (default 1,000,000) is not written: the script exits 1 naming the five largest packaged files. The rule handles the routine lockfile bump; the cap is the second guard, for a source change past the size at which one reviewer's finding rate means anything.
 
-For iteration 2 the script takes `--since <fix-sha>` and includes the previous `review.md` findings table plus the fix diff only.
+For iteration 2 the script takes `--since <fix-sha>`. It includes the previous `review.md`'s `## Spec` section and its findings table, verbatim, under `## Previous findings` as `### Spec` and `### Standards`, plus the fix diff only. Spec travels because some majors live only there: decision **0122**'s mutation count, and a `Tests:` exemption the diff contradicts. A re-review handed the table alone never re-read what a ruling had closed (decision **0175**).
 
-**Two variants** (Stage 11c). `--mechanical <path>` packages a one-shape change as what it is: the codemod at `<path>` — which must be one of the changed files, or the script exits 1 — plus a three-file sample of what it rewrote, with every other rewritten file named under `## Not packaged` beside the generated ones, each carrying its churn and the reason `the codemod makes this edit`. `--target <ref|range|path>` packages a diff no task owns: a branch against its merge-base with the default branch, an explicit `a..b`, or the working-tree changes under a path. It takes no slug and writes nothing into the project — the file goes to a temporary directory whose path is printed, and no task, ledger line or state is created. There is no plan, so `## Design (from plan)` and `## Tasks (from plan)` are replaced by one section:
+**Two variants** (Stage 11c). `--mechanical <path>` packages a one-shape change as what it is: the codemod at `<path>` — which must be one of the changed files, or the script exits 1 — plus a three-file sample of what it rewrote, with every other rewritten file named under `## Not packaged` beside the generated ones, each carrying its churn and the reason `the codemod makes this edit`. `--target <ref|range|path>` packages a diff no task owns: a branch against its merge-base with the default branch, an explicit `a..b`, or the working-tree changes under a path. It takes no slug and writes nothing into the project — the file goes to a temporary directory whose path is printed, and no task, ledger line or state is created. There is no plan, so `## Design (from plan)` and `## Tasks (from plan)` are replaced by one section — and no ledger, so the header carries no `Mutation:` line, per the paragraph above:
 
 ```markdown
 ## Intent (from commit messages)
@@ -428,7 +474,7 @@ Verdict: NEEDS_WORK · blockers 0 · majors 2 · minors 1
 - lint: `npm run lint` → 1 warning (src/orders/summary/Widget.tsx:31 no-unused-vars)
 
 ## Spec
-Missing: — · Extra: — · Misunderstood: —
+Missing: — · Extra: — · Misunderstood: — · Unclaimed: `status: 'partial'` — the third member of `LoadState`, added at src/orders/model.ts:14, is in no claim
 (≤400 words)
 
 ## Standards
@@ -447,24 +493,76 @@ Where the package carried a `## Projects` section (§8), each of the three roles
 
 Verdict rule: any blocker → `REJECT`; any major → `NEEDS_WORK`; else `ACCEPT`. A row without a location and an item is invalid and is dropped by the reviewer before writing. A finding whose subject is a file that does not exist — a module shipped with no test beside it — is located by the path of **that** file: the one that is missing, named in full, with no line. Not the directory it would sit in, and not the neighbour that does exist. That is the one case where a location has no `:<line>` (decision 0038).
 
-`Item` names the source of the judgement: a project rule, a lint result, a plan design field, a `defaults.md` entry, or a behavioral risk code `L1`..`L9` (the checklist in `agents/hodos-reviewer.md`). `Trigger` is the concrete input or state under which the defect manifests: mandatory for a behavioral finding at `blocker` or `major`, `—` for a convention finding, whose instance is the location itself. A behavioral finding at those severities whose trigger cannot be named is invalid and is dropped with the rows that lack a location or an item (decision 0015).
+**Unclaimed** is the fourth word of the Spec line and the one that reads the other way (decision **0092**): the other three measure the plan against the diff, and this one measures the diff against the plan's claims — a member of a typed state the diff adds or widens, a branch's failure path it adds, or a clause of `### Invariants & failure modes` that no `Acceptance:` clause names. The clauses are the tasks' own: the package carries `## Design (from plan)` and `## Tasks (from plan)` and not `## Verify plan` (§8), so a clause claimed only in that section reads as unclaimed here — a true statement about the tasks, answered with a claim rather than with a change, and the check that sees both sections is the plan reviewer's seventh gap, which holds `plan.md` whole. It is written on **every** path, because the reviewer holds both inputs whatever the router said. Each entry names the thing itself — the member, the path, or the clause — the member and the failure path with the `file:line` the diff added them at, and the clause by its own words, since a clause of the plan is added by no diff. It carries no severity and moves no verdict — a claim nobody wrote is not a defect in the code — and the fix is a claim, which is why it is reported one phase before the verifier runs. Where the state is not a type, the plan's own by-hand line (`§5`) is what the claims are read against.
+
+`Item` names the source of the judgement: a project rule, a lint result, a plan design field, a `defaults.md` entry, a behavioral risk code `L1`..`L9` (the checklist in `agents/hodos-reviewer.md`), or `shape` for an edited line a program reads in an `inert` package (decision **0183**). `Trigger` is the concrete input or state under which the defect manifests: mandatory for a behavioral finding at `blocker` or `major`, `—` for a convention finding, whose instance is the location itself. A behavioral finding at those severities whose trigger cannot be named is invalid and is dropped with the rows that lack a location or an item (decision 0015).
 
 ## 10. `verify.md`
 
 ```markdown
 # Verify 1 — orders-summary
-Verdict: PASS · claims 5 · pass 4 · fail 0 · skip 1
+Verdict: FAIL · claims 10 · pass 5 · fail 2 · flaky 1 · pre-existing 1 · skip 1
 
 | # | Claim (from plan) | Command / action | Evidence | Status |
 |---|---|---|---|---|
 | 1 | T1 totals for fixture range | `npx vitest run summary` | 3 passed | pass |
-| 2 | /orders shows totals | browser.navigate /orders; screenshot | evidence/01-orders.png | pass |
+| 2 | /orders shows totals | navigate /orders; `evaluate` the `status` role's text | `"Total 3"` · evidence/01-orders.png · detectors: 0 hits, 1 allowed | pass · pin |
 | 3 | error state on 500 | browser: mock 500 via devtools → screenshot | evidence/02-error.png | pass |
-| 4 | mutation: api.test pins range key | broke key line → test red → restored | vitest output | pass |
-| 5 | perf: ≤5k orders single request | — | Skip: plan did not declare perf | skip |
+| 4 | mutation: api.test pins range key | broke key line → test red → restored | vitest output · 1 of 3 new tests | pass |
+| 5 | perf: ≤5k orders single request | — | skip: plan did not declare perf | skip |
+| 6 | /orders/new throws on load | source *console* · navigate /orders/new | `TypeError: rows is undefined` at summary.tsx:31 | fail · major |
+| 7 | /orders/new sends two POSTs on a double submit | source *attack* · snapshot; click submit twice | `window.__orderCalls === 2`, evidence/03-double-submit.js | fail · blocker |
+| 8 | T3 summary renders in ≤100 ms | `npx vitest bench summary` ×7 | median 41 ms · p95 63 ms | pass |
+| 9 | /orders/o-1 opens | navigate /orders/o-1 ×2 | 1st `TypeError: order is undefined`, 2nd clean — evidence/04-flake-1.txt, 04-flake-2.txt | flaky |
+| 10 | T2 lint is clean | `npm run lint`, then the same in a worktree at base `9f1c2ab` | head 3 problems, base 3 problems — evidence/05-lint-base.txt | pre-existing |
+
+## Claim feedback
+- unfalsifiable: 2 — "shows totals" names no number; it ran as a screenshot and a screenshot cannot fail it
+- redundant: —
+- absent: the `declined` member of `RefundState`, which T4 added, is in no claim
+
+## Not covered
+- matrix: routes 2 × states 2 × widths 2 → 4 rows, of 8 in the product
+- skips: 5 — plan did not declare perf
+- residue: the first cross-feature interaction before a neighbor is pinned, aesthetics and product fit, and usability as a person means it
 ```
 
-Every `skip` has a reason. A claim from the plan that does not appear in the table is a verify failure. The header counts must equal the table.
+The **mutation row's Evidence cell ends with its sample** — ` · 1 of <k> new tests` — because one `pass` row with no number beside it reads as the diff's tests being proven, when what ran is one of them (decision **0122**). `<k>` is summed from the `Task <n>: mutation (<k> tests)` rows of `ledger.md` **beside the plan**, which is the path decision **0143** added to the verifier's inputs for this hop; the package's `Mutation:` header (§8) is the reviewer's copy of the same number and the verifier never receives it. Where the ledger holds no such row the cell says ` · 1 of an unrecorded count`, which is a true sentence about a missing record and not a number invented for the cell. Where the rows sum to **zero** and the diff adds no test declaration, the verifier mutates a line the diff **changed** in a test file instead. That covers a task under one of decision 0022's exemptions, and a change made entirely inside existing tests. The cell then reads ` · 1 of 0 new tests — mutated <file>:<line>, a line this diff changed` (decision **0173**). The row is kept, because it is the only behavioural oracle a message-only task has, and it names what it sampled. Three of the pilot's five hodos tasks were this case, and they wrote three different cells.
+
+Every `skip` has a reason. A claim from the plan that does not appear in the table is a verify failure. The header counts must equal the table: `claims` is the number of rows, and the five status counts sum to it. All five are written on every run, `0` included — a reader who cannot see `flaky 0` cannot tell a run with no flake from a run whose verifier never retried, which is the same argument the `detectors: 0 hits` count and the residue line are made on.
+
+**The Status cell is the status, and then at most one word after it.** `fail · <severity>` on every failing row (decision **0097**), `pass · pin` on a row whose predicate `finish` may write into `verify.recipes[<ui>].checks[]` (decision **0094**), and the status alone everywhere else. The five statuses are `pass`, `fail`, `flaky`, `pre-existing` and `skip`.
+
+**A row marked `pin` carries what a pin is made of**, or the mark has nothing behind it: the **route** and the `evaluate` predicate in the Command cell, and the **value the predicate returned** in the Evidence cell, quoted, before the screenshot. Row 2 is the shape. `finish` reads those three out of the row and puts them to the developer (`skills/run/references/finish.md`); a marked row missing one of them is a row `finish` reports and does not write.
+
+**Severity is derived from the row's own source, never chosen** (decision **0108**). These six rows are the whole of it, and the verifier reads the same six in `skills/run/references/oracles.md §5` — one table in two files, so a change to it is a change to both:
+
+| The row | Severity |
+|---|---|
+| a claim the plan made — a task's `Acceptance:` clause or a `## Verify plan` line | `blocker`: the plan's contract is unmet |
+| an uncaught exception, an unhandled rejection or a 5xx under an attack (source *attack*) | `blocker` |
+| a console error or a failed request on a visited route (source *console*, *network*) | `major` |
+| a pin that no longer holds (source *pin*) | `major` |
+| a detector hit (source *detector*) | `minor` — except overlapping interactive elements and focus not visible, which are `major`, because they remove a control the route offers |
+| an `a11y` row, which keeps the audit's own vocabulary | `critical`, `serious` → `major` · `moderate`, `minor` → `minor` |
+
+A model's judgement of its own observation is the one signal in this phase that has been measured and found unreliable (decision **0093**), so a severity that does not come out of that table is a judgement wearing a mechanical column.
+
+**`pre-existing` is earned at the base sha** (decisions **0097**, **0119**, **0127**) — by a re-run on a command row, and by a `git` proof on a browser one. A `command`, `typecheck`, `lint` or `http` check is re-run in a `git worktree` at the task's `Base:` sha; red there too, and the row says `pre-existing` with **both** outputs in the Evidence cell and the base sha named — row 10 is the shape. Green there, and the change broke it. Without the base output there is no status: a check that cannot run at base stays a plain `fail`, which is what keeps this from becoming the excuse column. **A browser row has no base *run*** — a predicate is asserted against a running application, the environment is the kernel's to raise (`DESIGN.md §7.4`, decision 0074) and a layer's `url` is one port. **It can still have a base *proof*, from `git`** (decision **0127**): where the elements the row names are byte-identical at the task's `Base:` sha and the diff touches nothing their render depends on — no shared stylesheet, no shared layout component on the path — the row is `pre-existing`, and its evidence names the base sha, the files whose bytes are unchanged, and that the proof was `git` and not a re-run. Where the bound does not hold, the row is `fail · major` whose evidence reads `no base run — a browser check needs a second environment` beside the base sha, and the developer is who tells a pin this task broke from one the last task did (`BACKLOG.md` carries the second environment to Stage 12).
+
+**A `pre-existing` claim fails the verdict; a `pre-existing` row nobody claimed does not** (decision **0120**). The verdict answers for the plan's contract, and a claim that has never passed is unmet whoever broke it — row 10 is why the example's verdict is `FAIL` even though no `fail` row of it belongs to this task's change. A row from one of the four added sources is news rather than a contract, so it is reported and moves nothing. Neither is repaired in the fix pass — and neither is any other row whose defect is outside this task's diff, whatever status it carries (decision **0125**): fixing it there is an unreviewed change to code the plan never named, one phase after the review closed (`skills/run/references/verify-loop.md §7`). What the row does is reach the breaker with its base output and go into `plan.md#Outcome`, which is where it survives this file's deletion.
+
+**`flaky` is a pass on retry nobody could explain** (decisions **0098**, **0126**). A browser or command row that fails and then passes on **exactly one** retry is `flaky`, with both outputs in the Evidence cell — *unless the verifier can name the mechanism*, and then the row is a `fail` at its severity with both outputs in evidence just the same. The status carries no severity of its own, so writing it over a diagnosed failure trades the diagnosis for an observation and drops the row out of the fix pass's order. It is treated as a failure by the verdict, because a flaky claim recorded as `pass` on the retry is the one outcome that actively misinforms; the developer may accept it at the breaker (`skills/run/references/verify-loop.md §9`), and that acceptance is a recorded choice rather than a status.
+
+**A number names the statistic it was read on** (decision **0098**, generalizing **0088**). Row 8 is the shape: a claim whose evidence is a number says which number it is, and a timing claim runs at least five times and reports **median and p95** — never a mean, which one slow run moves and no percentile does.
+
+**Rows 6 and 7 are not the plan's claims**, and they are rows all the same (decision **0093**). Four sources may be added and no fifth: a console error or a failed request on a route the run visited (*console*, *network*), a detector hit (*detector*), a crash under one of the closed attacks (*attack*), and a check in `verify.recipes[<ui>].checks[]` that no longer holds (*pin*, decision **0094**). The Command cell names the source in italics before what was run, the Claim cell says what was observed and where — the plan named nothing to quote — and `claims` counts the rows, added ones included: the count exists to make a dropped row visible, and a row is a row. The catalogues these come from are `skills/run/references/oracles.md`; the severity a `fail` row carries is derived from its source (decision **0108**).
+
+**A stage behind a red one** produces rows too. The stages run command recipes, then `http`, then the browser sweep, and a stage that did not run writes each of its rows as `skip: not run — <recipe> red`, naming the recipe that went red — `skip: not run — unit red`. The counts still equal the rows, and the verdict is `FAIL` on the red row rather than on the skips.
+
+**`## Not covered`** is the last block, three lines, always all three, `—` where there is nothing (decision **0096**). **matrix** is the sweep that ran — the dimensions with their sizes, the rows run, and the product they were taken from, which `scripts/matrix.mjs` prints. **skips** names every `skip` row of the table by number with its reason, so a run's blind spots are countable without reading the table. **residue** is fixed text, written exactly as it stands above on every run, including a run with no skips at all: it names what this engine does not check by construction, and a report that omits it reads as if it had. `scripts/lint.mjs --project` checks the block and that line.
+
+`## Claim feedback` is the verifier's reading of the claim **set**, and it is the one thing in this file that is not a run (decision **0092**). Three lines, in this order and always all three, `—` where there is nothing to say: **unfalsifiable** — a claim no evidence could have contradicted; **redundant** — two claims that ran the same command against the same state; **absent** — something the diff or the plan's own contract carries that no claim names. Each line names the claim numbers it is about, or the thing itself where the point is that no claim exists. It is a section and never a row: it is outside the table, outside the header counts, and outside the verdict, because a claim nobody wrote is not a claim that failed. `finish` carries it into the report; the fix, where there is one, is a claim in the next plan. The bound is the grader's (`research/09 §3.2`): the section is feedback on the assertions, not a second table of findings.
 
 Where a profile raised the environment (§2), the first line carries it — `# Verify 1 — orders-summary · env: local` — because the same claims run against a locally raised back end and against a remote stand produce the same table and different evidence, and a screenshot that does not say which is evidence of nothing (decision 0074). No profile, and the line is what it was.
 
@@ -501,9 +599,13 @@ Home: shop.example/Shop.Web/spa
 - backend billing API — @backend-team, asked 2026-08-27
 ```
 
-**Node line grammar** (parsed by `campaigns.mjs`): `- [<status>] <name> — <gist> · deps: <v> · owner: <v> · branch: <v> · ref: <v> · metric: <v>` followed by optional ` · by: <v>`, ` · repo: <v>`, ` · path: <v>`. Fields are separated by ` · ` (space, middle dot, space); the first segment is `[status] name — gist` with `name` a kebab-case token and `gist` free text without ` · `; every other segment is `key: value`; an empty value is `—`. `deps` is a comma-separated list of node names. `ref` is `task:<slug>` while active, `sha:<sha>` when done. `status` ∈ `fog · ready · blocked · active · review · done · dropped`. `campaigns.mjs` rewrites only the line whose `name` matches and only the fields it was told to change; unknown keys are preserved.
+**Node line grammar** (parsed by `campaigns.mjs`): `- [<status>] <name> — <gist> · deps: <v> · owner: <v> · branch: <v> · ref: <v> · metric: <v>` followed by optional ` · by: <v>`, ` · repo: <v>`, ` · path: <v>`. Fields are separated by ` · ` (space, middle dot, space); the first segment is `[status] name — gist` with `name` a kebab-case token and `gist` free text without ` · `; every other segment is `key: value`; an empty value is `—`. `deps` is a comma-separated list of node names. `ref` is `task:<slug>` while active, `sha:<sha>` when done. `status` ∈ `fog · ready · blocked · active · review · done · dropped`. `campaigns.mjs` rewrites only the line whose `name` matches and only the fields it was told to change; unknown keys are preserved. The `name` itself is not writable — a node is renamed by being replaced, because the name is what a branch, a `ref: task:<slug>` and another node's `deps:` point at (decision **0136**) — while the **gist** is, as free text that may not contain ` · `.
+
+**A claim is a node line on a branch** (`DESIGN.md §9`, decision **0135**): `[active] … · owner: @who · branch: <branch>`, committed on that branch, so the map on `main` still reads `[ready]` until it merges. `campaigns.mjs frontier` and the digest read the map from every local branch and remote-tracking ref, and a node the working tree calls `ready` that another ref calls `active` or `review` is reported as `claimed` with its owner and branch and left off the frontier. A node the working tree already calls `active` is the `active` line it always was — the same claim seen from the branch that made it.
 
 Metric rows in `Done-metrics` may carry ` · repo: <name>` after the command when the command runs in another repository.
+
+**Where a `repo:` name points** (decision **0134**). On a node, and after a metric row's command, `repo:` is a repository **root's own directory name** — `kit` for a checkout at `../kit`. It is looked for among the three roots a session can name without a key of its own: the repository the session stands in, the repository the map lives in, and the repositories `config.campaigns.external[]` names, read from both of those configs. The command of a row carrying one runs in that repository's git root, and every other row in the git root of the repository the map lives in (§2's anchor, decision **0075**). A name nothing resolves leaves its cell where a timed-out command would — the previous number with the date it was true on — and says `no repository named <name> — known: <the names it does know>`, which are the roots above in the order they are searched, so a typo is a one-line fix; one unreadable row is not a reason to stop the command (decision **0055**), and the command exits 0. `path:` is a directory **inside** the repository `repo:` names, repo-relative like every other path a config hands to a command, and says where in that repository the node's work sits.
 
 ## 12. SessionStart digest (hook output)
 
@@ -517,7 +619,15 @@ hodos: config verified 2026-08-30 · 1 active task · 1 stale task · 2 campaign
 - decay: 3 cited paths renamed or deleted since the scan (441be53) — /hodos:init --refresh
 ```
 
-The campaign line is produced only when `campaigns.mjs` is available (Stage 9a); before that the digest omits it. A count that is zero is not printed, so a map with nothing blocked reads `frontier 2 ready`; a map with nothing in any of the four reads `frontier nothing open`, whether its remaining nodes are claimed or finished. The row's whole vocabulary is `ready · held · blocked · fog · nothing open`. `--full` adds one `campaigns.mjs frontier` block per map after the rows, which is what `status` reports; a map that reaches into another repository is one line — `<slug> — cross-repository (Stage 9b)` — and no block.
+**The `fetch failed` row** (decision **0080**, at Stage 9b as 0080's *Applied in* says). Under `--fetch` and nowhere else, a repository whose fetch failed — a timeout at five seconds (decision **0138**), an unreachable or removed remote, a credential prompt, or no remote configured at all — yields one row, before the campaign row:
+
+```
+- fetch failed — the map is as of your last pull (mono)
+```
+
+`(<repo>)` is the repository **root's own directory name**, the same name a `repo:` field carries (§11, decision **0134**), and two repositories that both failed print two rows. It sits after the task rows and **immediately before the campaign row**, because it is a caveat on what that row says rather than an item beside it — and the campaign row underneath is the full local map with every claim it already holds: a failed fetch costs the freshness of a claim and nothing else. A hook never prints this row, because no hook passes `--fetch`; its absence in a hook's output is therefore not evidence of a reachable remote.
+
+The campaign line is produced only when `campaigns.mjs` is available (Stage 9a); before that the digest omits it. A count that is zero is not printed, so a map with nothing blocked reads `frontier 2 ready`; a map with nothing in any of the four reads `frontier nothing open`, whether its remaining nodes are claimed or finished. The row's whole vocabulary is `ready · claimed · held · blocked · fog · nothing open`. **`claimed`** is a node this project's map calls `ready` and another ref calls `active` — a claim committed on its own branch (`DESIGN.md §9`), read from the local branches and remote-tracking refs and kept off the frontier (decision **0135**). The read is git and never the network: two processes per repository, capped at fifty refs, failing open to the local frontier. **It costs about 100 ms per repository** — measured 2026-09-08 on the seeded pair, a five-node map on a four-ref repository: the bare digest ran in 198–204 ms with the read and 93–100 ms without it. Stage 0's own budget — every hook exits within 200 ms in a project with **no** config — is unaffected, because a project with no config reads no map. Making a remote-tracking ref current is `/hodos:status`'s own fetch and no hook's (decision **0080**). `--full` adds one `campaigns.mjs frontier` block per map after the rows, which is what `status` reports. A map in another repository — one `config.campaigns.external[]` names — is a row and a block like any other.
 
 ### The decay row
 
@@ -536,7 +646,7 @@ At most **one** offer per digest, and none at all when no precondition holds —
 | Priority | Verb | Precondition | The line it produces |
 |---|---|---|---|
 | 1 | `review` | HEAD is on a branch other than the repository's default, it is ahead of its upstream, and no hodos task is on it (no `state.branch` names it) | `- offer: review — feat/orders is 2 commits ahead of origin/main with no hodos task — /hodos:review feat/orders` |
-| 2 | `handoff` | at least one **stale** task — its `ledger.md` has not changed for `config.tasks.staleDays` — exists | `- offer: handoff — users-export has been open 21 days — /hodos:handoff users-export` |
+| 2 | `handoff` | at least one **stale** task that is not at `phase: done` — its `ledger.md` has not changed for `config.tasks.staleDays` — exists; a done task is not open, and its `stale:` row already names what it needs (decision **0179**) | `- offer: handoff — users-export has been open 21 days — /hodos:handoff users-export` |
 | 3 | `prune` | at least one precedent in `.claude/rules/*.md` has rotted — a citation that no longer resolves, or an anchor whose text has moved out from under it (decisions **0082**, **0078**) | `- offer: prune — 3 rule precedents have rotted — /hodos:status --prune` |
 
 Priority is by **how long the precondition will keep holding**, not by importance. The `review` offer is transient — it holds only while that branch is ahead and unreviewed — while a stale task and a rotted precedent are chronic and will still be true tomorrow: a transient offer that loses the slot is lost, a chronic one is not. The `handoff` offer names the third verb for a stale task that its own row does not carry; the row still reads `fold or delete`, unchanged.

@@ -1,0 +1,36 @@
+# id: ll-233
+# fixture: snippets
+# package: h5
+# kind: behavioral
+# item: L1
+# line: util/strings.go:6
+# anchor: len "github.com/internal/constraints"  // accidentally named 'len'
+# trigger: Should identify L1 (Shadow Override): the import alias `len "github.com/internal/constraints"` binds the identifier `len` to the imported package `constraints`, shadowing Go's built-in `len` function. In Go, package-level identifiers (including imports) shadow built-ins from the universe block. After the change, `len(words)` in `CountWords` and `TruncateWords` resolves to the `constraints` package
+# what: logic-lens case #233 (go-import-shadows-builtin-len-L1), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/util/strings.go b/util/strings.go
+index 4aa01ef..0d1bc2e 100644
+--- a/util/strings.go
++++ b/util/strings.go
+@@ -3,11 +3,12 @@ package util
+ 
+ import (
+     "strings"
++    len "github.com/internal/constraints"  // accidentally named 'len'
+ )
+ 
+ func CountWords(text string) int {
+     words := strings.Fields(text)
+-    return len(words)
++    return len(words)   // which len?
+ }
+ 
+ func TruncateWords(text string, max int) string {
+@@ -17,3 +18,7 @@ func TruncateWords(text string, max int) string {
+     }
+     return strings.Join(words[:max], " ")
+ }
++
++func IsWithinLimit(count, limit int) bool {
++    return len.Check(count, limit)   // intended use of the import
++}

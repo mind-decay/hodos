@@ -1,0 +1,39 @@
+# id: detail-flaky-every-other-load
+# fixture: webapp
+# kind: flake
+# route: /orders/:id
+# what: the order detail throws on every second page load, so a failing row passes on one retry
+# how: a load counter in sessionStorage, advanced once per module evaluation so StrictMode's second render pass does not move it, and read only where a navigation entry exists — jsdom reports none, so the unit suite cannot see this and the verify phase is the only place it appears
+# applies: inside the task commit of detail-timing, whose diff already reaches this route
+diff --git a/src/features/orders/ui/OrderDetailPage.tsx b/src/features/orders/ui/OrderDetailPage.tsx
+index 89b1739..1dd57f0 100644
+--- a/src/features/orders/ui/OrderDetailPage.tsx
++++ b/src/features/orders/ui/OrderDetailPage.tsx
+@@ -3,7 +3,27 @@ import { useParams } from 'react-router-dom';
+ 
+ import { getOrder, keys } from '../api';
+ 
++// Seeded: this route fails on every second page load. `loads` is kept in
++// sessionStorage so it survives a reload, and counted once per module
++// evaluation so StrictMode's second render pass does not advance it. A real
++// page load is what a navigation entry means: jsdom reports none, so the unit
++// suite never sees this and the verify phase is the only place it appears.
++const LOADS = 'detail-loads';
++let counted = false;
++
++function loadNumber(): number {
++  const isPageLoad = typeof performance !== 'undefined' && performance.getEntriesByType('navigation').length > 0;
++  if (!isPageLoad) return 1;
++  if (counted) return Number(sessionStorage.getItem(LOADS) ?? '1');
++  counted = true;
++  const next = Number(sessionStorage.getItem(LOADS) ?? '0') + 1;
++  sessionStorage.setItem(LOADS, String(next));
++  return next;
++}
++
+ export function OrderDetailPage() {
++  if (loadNumber() % 2 === 0) throw new Error('the order detail failed to render on this load');
++
+   const { id = '' } = useParams<{ id: string }>();
+   const order = useQuery({ queryKey: keys.detail(id), queryFn: () => getOrder(id), enabled: id !== '' });
+ 

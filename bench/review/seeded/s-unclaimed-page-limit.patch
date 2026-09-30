@@ -1,0 +1,20 @@
+# id: s-unclaimed-page-limit
+# fixture: api
+# package: p4
+# kind: spec
+# item: Unclaimed
+# names: limit
+# line: src/services/orders.js:61
+# anchor: if (limit <= 0) return [];
+# what: the paging helper adds a branch for a limit of zero or less, and no Acceptance clause of the plan names that path — the invariant claims a page of limit rows and both clauses of T2 pass a positive limit
+diff --git a/src/services/orders.js b/src/services/orders.js
+index 654f01b..3fcd444 100644
+--- a/src/services/orders.js
++++ b/src/services/orders.js
+@@ -58,5 +58,6 @@ export function create(input) {
+  * @returns {Order[]}
+  */
+ export function page(orders, offset, limit) {
++  if (limit <= 0) return [];
+   return orders.slice(offset, offset + limit - 1);
+ }

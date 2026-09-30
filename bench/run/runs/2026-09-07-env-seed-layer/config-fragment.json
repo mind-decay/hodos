@@ -1,0 +1,25 @@
+{
+  "verify": {
+    "profile": "local",
+    "profiles": {
+      "local": {
+        "layers": [
+          "seed-overdue"
+        ]
+      }
+    },
+    "layers": {
+      "seed-overdue": {
+        "up": "node seed.mjs up",
+        "stop": "node seed.mjs reset",
+        "timeout": 60,
+        "check": [
+          {
+            "kind": "cmd",
+            "run": "node seed.mjs count"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+# id: ll-212
+# fixture: snippets
+# package: h3
+# kind: behavioral
+# item: L7
+# line: store/state.go:15
+# anchor: logger.mu.Lock()
+# trigger: Should identify L7 (Concurrency / Async Hazard): a deadlock can occur. `Cache.Write` acquires cache.mu then logger.mu. `Logger.Flush` acquires logger.mu then cache.mu. These are opposite acquisition orders. If goroutine A holds cache.mu and waits for logger.mu, while goroutine B holds logger.mu and waits for cache.mu, each blocks waiting for the other — classic deadlock. Trace must show: (1) A loc
+# what: logic-lens case #212 (go-deadlock-mutex-order-L7), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/store/state.go b/store/state.go
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/store/state.go
+@@ -0,0 +1,28 @@
++// store/state.go
++type Cache struct {
++    mu   sync.Mutex
++    data map[string]string
++}
++
++type Logger struct {
++    mu  sync.Mutex
++    buf []string
++}
++
++func (c *Cache) Write(logger *Logger, key, val string) {
++    c.mu.Lock()
++    defer c.mu.Unlock()
++    logger.mu.Lock()
++    defer logger.mu.Unlock()
++    c.data[key] = val
++    logger.buf = append(logger.buf, "wrote: "+key)
++}
++
++func (l *Logger) Flush(cache *Cache, summary string) {
++    l.mu.Lock()
++    defer l.mu.Unlock()
++    cache.mu.Lock()
++    defer cache.mu.Unlock()
++    cache.data["_flush"] = summary
++    l.buf = append(l.buf, "flushed")
++}

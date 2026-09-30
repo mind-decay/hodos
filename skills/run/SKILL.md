@@ -57,9 +57,11 @@ Then the resume table below, from the phase the ledger now derives.
 | `manual` | say the task is in manual mode after a breaker, and stop |
 | `done` | say the task is finished, and stop |
 
+A task whose `state.shape` is `inert` resumes in `${CLAUDE_PLUGIN_ROOT}/skills/task/references/inert.md` instead, because the shape has no simplify pass and no verify (decision **0183**). The section follows the phase. It is §3 for `approved`, and for `execute` while a task lacks its `done`. It is §5 for `execute` once every task has its `done`, and for `review` and `fix`. It is §6 for `finish`.
+
 Resume is a read, not a replay: `tasks.current` names the task to execute next and `redCheckAttempts` how many of the three are already spent. A task whose `done` line is in the ledger has its commit in git — never build it again.
 
-On every row that does not stop, run `ledger.mjs claim <slug>` before the phase's reference is read. That writes the pointer this session's hooks and `ledger.mjs add` calls find the task by, and another task opened between the two sessions leaves the project-wide `active` naming that one — so a session taking up work claims it, every time, without checking. A session that stops claims nothing: it is doing nothing this task's ledger should record, and the pointers may belong to a session that is. `ledger.mjs` writes them on `init` and deletes them on `Finish: report delivered`.
+On every row that does not stop, run `ledger.mjs claim <slug>` before the phase's reference is read. That writes the pointer this session's hooks and `ledger.mjs add` calls find the task by. A session with no pointer of its own is on no task while another session holds one (decision **0171**), so a session taking up work claims it, every time, without checking. A session that stops claims nothing: it is doing nothing this task's ledger should record, and the pointers may belong to a session that is. `ledger.mjs` writes them on `init` and deletes them on `Finish: report delivered`.
 
 ## Phases
 
@@ -67,14 +69,14 @@ On every row that does not stop, run `ledger.mjs claim <slug>` before the phase'
 |---|---|---|---|
 | 1 | Execute | `references/execute.md`, `references/defaults.md` | every task has `Task <n>: done (<sha>)` and the pass has `Simplify: done` |
 | 2 | Review | `references/review-loop.md` | `Review <k>: ACCEPT`, or a `Breaker:` line |
-| 3 | Verify | `references/verify-loop.md` | `Verify <k>: PASS`, or a `Breaker:` line |
+| 3 | Verify | `references/verify-loop.md`, `references/oracles.md` | `Verify <k>: PASS`, or a `Breaker:` line |
 | 4 | Finish | `references/finish.md` | `Finish: report delivered` and the report in chat |
 
 ## Gates
 
 Three of the mandatory stops of `DESIGN.md §4.4` fall in this session.
 
-- **A fork the plan did not settle** that changes behavior, a contract, structure, or a dependency: `AskUserQuestion` with the options and a recommendation, then `ledger.mjs add "Gap: <what the plan lacked> — <resolution>"`. Under `config.autonomy: "rulings"` this class is settled here instead and recorded as a `Ruling:`.
+- **A fork the plan did not settle** that changes behavior, a contract, structure, or a dependency: `AskUserQuestion` with the options and a recommendation, then `ledger.mjs add "Gap: <what the plan lacked> — <resolution>"`. Where the resolution contradicts an `Acceptance:` clause, rewrite that clause in `plan.md` in the same step, and keep the old one below it as `Amended <date> by Gap: <the clause as it was>` (decision **0176**): the verifier reads its claims from the plan, and a settled clause left as written is failed as written. Under `config.autonomy: "rulings"` this class is settled here instead and recorded as a `Ruling:`.
 - **A purely local choice** — a name, an order, a file's position — is decided and recorded: `ledger.mjs add "Ruling: <what> — <why> — <cost if wrong>"`. This holds under both autonomy settings.
 - **The breaker**, and every destructive or outward-facing action, stops under every setting.
 

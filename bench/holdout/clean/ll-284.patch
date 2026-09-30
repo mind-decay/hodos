@@ -1,0 +1,32 @@
+diff --git a/cache/lru.py b/cache/lru.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/cache/lru.py
+@@ -0,0 +1,26 @@
++from threading import Lock
++from typing import Optional
++
++class BoundedLruCache:
++    def __init__(self, capacity: int):
++        if capacity <= 0:
++            raise ValueError('capacity must be positive')
++        self._capacity = capacity
++        self._data: dict[str, str] = {}
++        self._lock = Lock()
++
++    def get(self, key: str) -> Optional[str]:
++        with self._lock:
++            value = self._data.pop(key, None)
++            if value is not None:
++                self._data[key] = value  # move-to-end for LRU
++            return value
++
++    def put(self, key: str, value: str) -> None:
++        with self._lock:
++            if key in self._data:
++                self._data.pop(key)
++            elif len(self._data) >= self._capacity:
++                oldest = next(iter(self._data))
++                self._data.pop(oldest)
++            self._data[key] = value

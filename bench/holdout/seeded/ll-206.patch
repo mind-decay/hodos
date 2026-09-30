@@ -1,0 +1,23 @@
+# id: ll-206
+# fixture: snippets
+# package: h2
+# kind: behavioral
+# item: L2
+# line: checkout/discount.js:2
+# anchor: return price - (price * percentage / 100);
+# trigger: Should identify L2 (Type Contract Breach): the function accepts strings but works *only* by accident under the current operator mix. JS arithmetic operators `*`, `/`, `-` coerce string operands to numbers, so `'100' * '10' / 100 = 10`, then `'100' - 10 = 90` — correct. But L2 manifests as fragility: the day a developer adds another formula step using `+` (a `+` between any string operand triggers 
+# what: logic-lens case #206 (logic-review-js-implicit-coercion-fragile), from its expected_output
+# source: hyhmrright/logic-lens 0ea7f9b evals/content/v2/evals-v2.json, MIT
+diff --git a/checkout/discount.js b/checkout/discount.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/checkout/discount.js
+@@ -0,0 +1,7 @@
++function calcDiscount(price, percentage) {
++  return price - (price * percentage / 100);
++}
++
++// Called from a form-handler where all values arrive as strings:
++const final = calcDiscount(formData.price, formData.discount);
++console.log('You pay:', final);

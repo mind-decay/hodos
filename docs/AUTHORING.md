@@ -122,7 +122,7 @@ A rule earns its place only with evidence on all three:
 2. **Would the model do it without the rule?** Check the defaults list (`DESIGN.md §7.2`) and the developer's observations. Yes → no rule.
 3. **Is it mechanically checkable?** Yes → propose a hook, a lint rule, or a CI check. Prose is the fallback, not the default.
 
-Form: lead with the rule; one concept per rule; a code example over a paragraph; the precedent and, where the rule came from a source, the URL; the incident if there was one. Rules describe the target state — no legacy clauses ("X for new code, Y for old" confuses the model). One fact lives in one file; cross-reference by link, never by restatement.
+Form: lead with the rule; one concept per rule; a code example over a paragraph; the precedent and, where the rule came from a source, the URL; the incident if there was one. A rule that asks for a source says what counts as one: a tracked file, a URL, or the fact written in place. It never names `.claude/hodos/tasks/`, which `init` gitignores, so a citation into it resolves in no other checkout (decision **0172**). Rules describe the target state — no legacy clauses ("X for new code, Y for old" confuses the model). One fact lives in one file; cross-reference by link, never by restatement.
 
 The old shape lives in a `## Migration` section, never in the rule's own sentence: how many places still carry it, cited by `file:line`, and that the target is written above. That keeps a prescriptive rule readable as one instruction while the gap it opens stays counted — a rule whose migration section never shrinks is a rule the project did not mean.
 

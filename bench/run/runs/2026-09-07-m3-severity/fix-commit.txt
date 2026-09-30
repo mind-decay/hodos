@@ -1,0 +1,12 @@
+668a206
+fix: unclip the orders summary line and drop the unplanned shift save
+
+Verify 1 row 19: the summary line sat in an 80px box with overflow
+hidden, so "3 orders · 61.50" rendered as "3 orders · 61". The box is
+gone and the line sizes to its own text.
+
+Verify 1 rows 20-21: the /shift save posted to /api/handover, which
+dev-api.ts never answers, and sent one request per click with no guard.
+The plan never named that behaviour, so ShiftPage.tsx returns to its
+base shape.
+

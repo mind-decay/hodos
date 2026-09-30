@@ -1,0 +1,2 @@
+Gap: the plan did not say what the barrel's export order is — alphabetical by component, matching the file it already had, confirmed in chat
+Ruling: data-count carries the number as an attribute as well as text — one selector for a test, no second source of truth — cost if wrong: one attribute removed

@@ -6,12 +6,44 @@ installs one into a throwaway fixture copy.
 ```
 node bench/run/seed.mjs <plan> [--fixture webapp|mono] [--gap] [--autonomy ask|rulings]
                                [--into <dir>] [--at approved|review|verify|finish]
-                               [--defect <id>] [--rule-arm one|two]
+                               [--defect <id>]… [--rule-arm one|two]
 ```
 
 It prints `{ copy, slug, branch, base, tasks }`. The copy is at
 `state.phase == "approved"` with the branch checked out, so
 `claude -p "/hodos:run <slug>"` inside it starts where session 2 starts.
+
+**Every headless arm that reaches the verify phase sets `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`.** Print mode kills a background task at 600 s and still reports `result.subtype: "success"` with `is_error: false` (`PLATFORM-NOTES.md` fact 52), and a verifier dispatch is a background task: Stage 11d-2's arm 2 was terminated after 68 browser operations, wrote no `verify.md`, and cost $2.79 to say so. A record whose ledger carries no `Verify` line is a stop, whatever the result line says.
+
+**Release the browser before a browser arm.** One `chrome-devtools` MCP server
+runs at a time — they share `~/.cache/chrome-devtools-mcp` — so an arm launched
+while the operator's own session holds the adapter reports
+`chrome-devtools MCP adapter failed to connect (CONNECT_TIMEOUT), retried once`
+and puts every browser claim in `skip`. The verdict that comes back is green over
+the rows that could run, which is correct and is not the arm you bought
+(`PLATFORM-NOTES.md` fact 53).
+
+**Read an arm's artifact for a marker before you read its numbers.** Until
+2026-09-07 the marketplace build of this plugin (`hodos@hodos`, **0.1.0**,
+commit `686b8d9`) was installed and enabled in the user's settings, so a
+session started with `--plugin-dir` at this repository had two builds of it
+available and the resolution order decided which answered. It is uninstalled
+and its marketplace removed — `claude plugin list` names no hodos — so an arm
+run after that date has one build to find. The marker check stays because it
+costs nothing and answers the question from the artifact rather than from the
+invocation: 0.1.0's verifier contains `pre-existing`, `flaky`, `attack` and
+`Claim feedback` zero times each and ships no
+`skills/run/references/oracles.md`, and its reviewer contains `Unclaimed` zero
+times. A `verify.md` whose header has no `flaky` column, or a `review.md` with
+no `Unclaimed` word, is not a run of this tree. Re-installing it for the pilot
+brings the two-build condition back.
+
+**The `webapp` copy serves its own `/api`** (decision **0123**): three orders —
+`o-1` Ada 10.10 open, `o-2` Grace 20.20 paid, `o-3` Alan 31.20 cancelled — so
+`/orders` renders `3 orders · 61.50` and `/orders/o-1` renders a detail. A route's
+failed-request row in an arm's `verify.md` is therefore about the task's own
+code; before this the fixture produced one on every route. An error state is
+reached by asking for an order that is not there.
 
 **A harness, not a bench** (decision 0033). It produces inputs and scores
 nothing: no gate, no measurement, no threshold. `router/`, `review/` and
@@ -28,6 +60,11 @@ nothing: no gate, no measurement, no threshold. `router/`, `review/` and
 | `status-label-frozen-lint` | quick · 1 | `status-label` with the project's lint configuration frozen in its Non-goals. With `environment/broken-eslint-config.patch` committed before the base, the reviewer finds a major no reading of the plan predicts and no fix inside the task closes, and iteration 2 comes back not-`ACCEPT`. The route to the breaker. |
 | `orders-summary-frozen-store` | standard · 3 | `orders-summary` with `src/features/orders/model.ts` and its suite frozen in `## Non-goals`, and `D3` recording why: a parallel branch is rewriting the module. Its `## Verify plan` asks for a green test command rather than two named suites. With `--defect orders-frozen-store-and-attr` two claims break at once — one the fix pass closes inside the task, one whose fix the plan bars — which is the route to two `Verify … FAIL` lines and the breaker. |
 | `grid-columns` | quick · 1 | An acceptance check that cannot pass, and whose impossibility no reading of the plan reveals: vitest's default `css: false` means an imported stylesheet never reaches jsdom, so `getComputedStyle` returns nothing, and `## Non-goals` closes the two ways out — an inline style and a change to `vite.config.ts`. The plan is internally consistent; only running it finds the wall. The three red-check attempts and the stop. |
+| `home-shift-link` | quick · 1 | The pin's first task (decision **0094**): the landing page gains a navigation landmark, and its `## Verify plan` browser claim is over the two link texts — a predicate the verifier can prove, mark `pass · pin`, and hand to `finish` to write into `verify.recipes[ui].checks[]`. `/` needs no API, which is why the claim can actually pass in this fixture (`BACKLOG.md`: every data route renders its error state). Added at Stage 11d-3. |
+| `home-shift-wording` | quick · 1 | The pin's second task: the same two links, reworded to the floor's words, which is what breaks the predicate `home-shift-link` pinned. Seeded onto **the same copy** after that task's finish commits the pin, so the `fail` row with source *pin* is a regression a later task caused and not a defect anybody patched in. Added at Stage 11d-3. |
+| `home-site-name` | quick · 1 | The `pre-existing` arm (decisions **0097**, **0119**, **0120**): a one-string task whose acceptance **claims the project's lint is clean**, run on a copy where `environment/broken-eslint-config.patch` was committed before the base. Lint is red at head and at base alike, which is the only shape the status can hold — a command check, and its claim is the plan's own. Its `## Non-goals` freezes the lint configuration, so the fix is barred inside the task the way a real project bars it. Added at Stage 11d-3. |
+| `detail-timing` | quick · 1 | The statistics and `flaky` arm (decision **0098**): its `## Verify plan` asks for `/orders`' DOMContentLoaded as the **median and p95 of five loads** — a number that has to name its statistic — and its browser claim is that `/orders/:id` loads with a clean console, which `--defect detail-flaky-every-other-load` breaks on every second load. Added at Stage 11d-3. |
+| `kit-badge` | standard · 1 · `--fixture kit` · `--campaign` | The cross-repository finish (Stage 9b, criterion 1): one task in the **external** repository of the seeded pair, whose campaign node lives in `mono`'s map. Seeded with `--campaign badge-rollout/kit-badge` — `state.campaign` is all `finish.md §4` reads — and at `--at finish`, because that phase runs no project command and the question is what it does with a map in another repository: write it, print the repository, the file and the `git -C … commit` line, and commit nothing there (decision **0137**). Its verify is command-only, which is why this plan is the one with no `evidence/` directory. Added at Stage 9b. |
 | `cross-cut` | standard · 2 · `--fixture mono` | One counting helper on each side of the monorepo, each covered where it lives. The only plan whose change spans two workspaces, so two configs with different test commands answer for one diff (decision 0076): `config.mjs for-files` returns `svc` and `web`, and the review package names both under `## Projects`. Added at Stage 11b-1. |
 
 ## `--at review`, `--at verify` and `--at finish`
@@ -89,10 +126,22 @@ git -C <dir> commit -qam "chore: split the house rules out of the lint config"
 node bench/run/seed.mjs status-label-frozen-lint --copy <dir> --at review --defect detail-inline-labels
 ```
 
+The same three commands with `home-site-name --at verify` at the end are the
+`pre-existing` arm of Stage 11d-3: that plan's acceptance claims lint is clean,
+and with this patch behind the base the claim is red at head and at base alike,
+which is what the status is proved by (decisions **0097**, **0119**). Measured
+2026-09-07: `npm run lint` exits **2** in the copy and **2** again in a
+`git worktree` at the base sha — with the working tree's `node_modules` linked
+in, because a bare worktree has no install and the command would otherwise fail
+for want of a binary rather than for the defect.
+
 `--defect <id>` works with either endpoint and applies `defects/<id>.patch`
 inside the **last** task's commit,
 so the seeded defect is inside `base..HEAD` — the range the review reads — and
-the tree is clean. The patches carry their own metadata header, as the review
+the tree is clean. It is **repeatable**: every patch given lands in that one
+commit. That is how an arm seeds two surfaces in one diff, which decision
+**0112** made necessary — the attacks reach only the routes the diff resolves
+to, so a defect committed to the copy's base is on no route they see. The patches carry their own metadata header, as the review
 bench's do:
 
 | Defect | Plan | Severity | What it is |
@@ -100,11 +149,47 @@ bench's do:
 | `detail-inline-labels` | `status-label` | major | the detail view spells the three words again instead of reading `statusLabels` — the two-places-to-change shape the plan's D1 chose option A to remove |
 | `orders-no-data-status` | `orders-summary` | major | the row drops the `data-status` T3's acceptance clause names. Test, typecheck and lint stay green and the seeded review accepts it: only the verifier runs that claim |
 | `orders-frozen-store-and-attr` | `orders-summary-frozen-store` | major | the same dropped attribute **and** a filter-store `reset` that returns `open` instead of `all`, turning the test command red from a module the plan freezes. Two claims, one fixable here and one not |
+| `summary-clipped-line` | `orders-summary` | minor | the summary line sits in an 80px box with `nowrap` and `overflow: hidden`, so its numbers are cut off with nothing saying so. No claim names the layout and every command stays green: the presentation detector is the only thing that reports it (decision **0096**) |
+| `detail-console-throw` | `orders-summary` | major | `/orders/:id` schedules work that reads a field of a global the application never sets, so mounting it throws a `TypeError` out of a timer. The page still renders, no suite mounts the component, and the double cast keeps typecheck green. It is the *console* source of decision 0093, and it is applied to a copy's **base**: a console read happens on every route the sweep visits, so it needs none of the attack surface decision 0112 defines |
+| `detail-flaky-every-other-load` | `detail-timing` | — | `/orders/:id` throws out of render on every **second page load**, so a browser row fails and then passes on one retry. **It does not produce `flaky`, and M4 is what showed why** (decision **0126**): the mechanism is readable in the diff, the verifier read it and wrote `fail · blocker` with the parity named, which is the better answer because `flaky` carries no severity. A defect that produces the status has to be one nobody can explain — a race, not a counter — and every seeded defect is in the diff. The counter is in `sessionStorage`, so it survives a reload, and it advances once per module evaluation so StrictMode's second render pass does not move it. It counts only where `performance.getEntriesByType('navigation')` reports an entry — jsdom reports none, so **the unit suite cannot see it** and the verify phase is the only place it appears, which is what a flake is. Verified in a real browser on 2026-09-07: loads 1 and 3 rendered, loads 2 and 4 left the page empty with `Uncaught Error: the order detail failed to render on this load` in the console. It carries no severity of its own: `flaky` is a status and not a `fail` |
+| `shift-double-submit` | `orders-summary` | blocker | `Save handover` posts with nothing holding the button while the call is in flight, so two clicks send two POSTs. The route is one no claim of the plan names, and the closed attack list is what finds it. Registering `/shift` in the `ui` recipe's routes is the arm's setup, not the patch's, and the patch belongs in the task's own commit: decision **0112** runs the attacks only on the routes the diff resolves to |
 
 `plans/status-label.impl/T1/` is the clean implementation of that plan: 11 tests
 pass, typecheck and lint are green without the defect, so a review of the
 undefected copy has nothing to report and the loop's first iteration is measuring
 the seeded major and not the harness.
+
+### What `.finish` carries
+
+`plans/<plan>.finish/` holds `review-one.md` and `review-two.md` (decision
+0048's two arms — a plan needs at least the one the run asks for),
+`verify.md`, and optionally `evidence/` and `events.txt`. **`evidence/` is
+optional**: a verify whose every claim is a command leaves no artifact, which
+is `kit-badge`'s shape. **`events.txt`** is the gap and the ruling a run of
+*this* plan would have left, one per line; a plan without it gets
+`orders-summary`'s pair, which is what every arm before Stage 9b used.
+
+## `--setup`
+
+`--setup <id>` applies `environment/<id>.patch` **before the base commit**, so
+the arm's own preparation is in the tree the task branches from and never in
+`base..HEAD`. Repeatable; an id with no patch is refused by name, and the
+message says which directory it looked in.
+
+The distinction against `--defect` is the whole point. A **defect** is what the
+run is meant to find, so it goes inside the last task's commit, in the diff the
+review and the verify phase read. A **setup** is what the arm needed in order to
+ask its question at all — a route added to a recipe, a config the fixture does
+not ship — and a run that meets it in the reviewed range reports it as work the
+plan never named. Stage 11d-3's **M3** is the measurement: `/shift` was
+registered by a commit on top of `HEAD`, and the run opened with *"The config
+was edited after the review closed"* and a `Gap:` line, both true of the harness
+and neither true of anything the fixture meant to say
+(`runs/2026-09-07-m3-severity/`).
+
+| id | fixture | what it prepares |
+|---|---|---|
+| `ui-sweeps-shift` | `webapp` | `/shift` in the `ui` recipe's `routes`, so a browser arm reaches the page and its three deliberate presentation defects |
 
 ## `--gap`
 

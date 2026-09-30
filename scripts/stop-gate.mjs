@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { activeTask, findConfig, hodosDir, readState, sessionOf } from './config.mjs';
+import { declinedLine, findConfig, hodosDir, readState, resolveTask, sessionOf } from './config.mjs';
 
 const BLOCK_LIMIT = 6; // Claude Code overrides at 8 (PLATFORM-NOTES.md fact 6)
 const OPEN_PHASES = ['execute', 'review', 'fix', 'verify'];
@@ -81,8 +81,12 @@ function main() {
   // The session's own task: two terminals on one project used to block each
   // other on the other's open item (decision 0047). `session_id` is documented
   // on the payload (PLATFORM-NOTES.md fact 38).
-  const slug = activeTask(found.projectRoot, sessionOf(payload));
-  if (!slug) return 0;
+  const { slug, others } = resolveTask(found.projectRoot, sessionOf(payload));
+  if (!slug) {
+    // Another session's task is not this one's reason to keep working (decision 0171).
+    if (others > 0) process.stderr.write(`${declinedLine(others, 'the Stop gate')}\n`);
+    return 0;
+  }
 
   const taskDir = join(hodosDir(found.projectRoot), 'tasks', slug);
   const state = readState(found.projectRoot, slug);

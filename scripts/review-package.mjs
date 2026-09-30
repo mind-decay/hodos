@@ -96,8 +96,8 @@ plan's Design and Tasks sections and the diff from the task's base to HEAD,
 and prints the path it wrote.
 
   --since <sha>       scope the diff to <sha>..HEAD and carry the previous
-                      review.md's findings table — the iteration-2 package of
-                      DESIGN.md §4.5.
+                      review.md's Spec section and its findings table — the
+                      iteration-2 package of DESIGN.md §4.5.
   --mechanical <path> a one-shape change: package <path> — the codemod, which
                       must be one of the changed files — plus a ${MECHANICAL_SAMPLE}-file sample
                       of what it did, and name the rest under Not packaged.
@@ -127,19 +127,68 @@ export function section(planText, heading) {
   return body.replace(/^\n+/, '').replace(/\n+$/, '');
 }
 
-/** The Standards table of a `review.md`, verbatim; null when it holds none. */
+/**
+ * What the last `review.md` found: its `## Spec` section verbatim and its
+ * Standards table, each under its own heading; null when it holds neither.
+ * Spec is copied whole because some majors live only there — decision 0122's
+ * mutation count, a `Tests:` exemption the diff contradicts — and a re-review
+ * handed the table alone never re-read what a ruling had closed (decision
+ * 0175). Copying a section is not parsing prose.
+ */
 export function previousFindings(reviewText) {
-  const body = section(reviewText, 'Standards');
-  if (body === null) return null;
-  const rows = body.split('\n').filter((line) => line.trimStart().startsWith('|'));
-  return rows.length === 0 ? null : rows.join('\n');
+  const parts = [];
+  const spec = section(reviewText, 'Spec');
+  if (spec) parts.push('### Spec', spec, '');
+  const standards = section(reviewText, 'Standards');
+  const rows = standards === null ? [] : standards.split('\n').filter((line) => line.trimStart().startsWith('|'));
+  if (rows.length > 0) parts.push('### Standards', ...rows);
+  return parts.length === 0 ? null : parts.join('\n').replace(/\n+$/, '');
+}
+
+/** The task's ledger text, `''` when there is none and `null` when it cannot be read. */
+function readLedger(taskDir) {
+  const path = join(taskDir, 'ledger.md');
+  if (!existsSync(path)) return '';
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The mutation counts the ledger holds, as the header's `Mutation:` value
+ * (decision **0143**). One entry per task, in task order and not ledger order —
+ * the reviewer reads the plan's tasks in theirs — and the latest row for a task
+ * wins, because a re-run of the check is the later of two records of one thing.
+ * `—` where the ledger holds no such row: a diff that adds test declarations
+ * under a dash is the silence decision 0122 exists to end.
+ */
+export function mutationCounts(ledgerText) {
+  if (ledgerText === null) return '— (ledger.md unreadable)';
+  const counts = new Map();
+  // A rollback breaker restarts the counters (`FORMATS.md §7`, decision 0023),
+  // so everything before the last one is history — a task rebuilt after a
+  // rollback must not present its pre-rollback count as its record.
+  const lines = ledgerText.split('\n');
+  const rolledBack = lines.reduce((at, line, i) => (/Breaker: (?:review|verify) — rollback T\d+\s*$/.test(line) ? i : at), -1);
+  for (const line of lines.slice(rolledBack + 1)) {
+    const m = /Task (\d+): mutation \((\d+) tests\)\s*$/.exec(line);
+    if (m) counts.set(Number(m[1]), m[2]);
+  }
+  if (counts.size === 0) return '—';
+  return [...counts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([n, k]) => `T${n} ${k} tests`)
+    .join(' · ');
 }
 
 /** The file, in the order FORMATS.md §8 gives it. */
-export function render({ slug, base, head, commits, design, tasks, intent, stat, diff, findings, projects, notPackaged, notPackagedNote, callerLines }) {
+export function render({ slug, base, head, commits, design, tasks, intent, shape, stat, diff, findings, projects, notPackaged, notPackagedNote, callerLines, taskDirLines, mutation }) {
   const parts = [
     `# Review input — ${slug}`,
     `Base: ${base} · Head: ${head} · Commits: ${commits}`,
+    ...(mutation === undefined ? [] : [`Mutation: ${mutation}`]),
     '',
   ];
   if (projects !== undefined && projects.length > 0) {
@@ -162,10 +211,15 @@ export function render({ slug, base, head, commits, design, tasks, intent, stat,
   if (intent !== undefined) {
     parts.push('## Intent (from commit messages)', intent, '');
   } else {
-    parts.push('## Design (from plan)', design, '', '## Tasks (from plan)', tasks, '');
+    if (shape === 'inert') parts.push('## Shape: inert (decision 0183)', INERT_CLAIM, '');
+    if (design !== null && design !== undefined) parts.push('## Design (from plan)', design, '');
+    parts.push('## Tasks (from plan)', tasks, '');
   }
   if (callerLines !== undefined && callerLines.length > 0) {
     parts.push('## Callers', ...callerLines, '');
+  }
+  if (taskDirLines !== undefined && taskDirLines.length > 0) {
+    parts.push('## Task-directory paths', ...taskDirLines, '');
   }
   parts.push(
     '## Diff stat',
@@ -178,6 +232,14 @@ export function render({ slug, base, head, commits, design, tasks, intent, stat,
 }
 
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+
+// What the developer confirmed at the verdict of an `inert` task, and so what
+// its plan has instead of a design (decision 0183). It is the reviewer's to
+// check, which is why it is in the package rather than only in the brief.
+const INERT_CLAIM =
+  'The developer confirmed at the verdict that every line this change edits is text\n' +
+  'no program reads to decide anything: a comment, documentation, a message only a\n' +
+  'human reads, or whitespace. The plan carries no design fields for that reason.';
 
 // Decision 0100: three of the reviewer's nine behavioral codes ask a question
 // the diff cannot answer — which caller still expects the outer value, who
@@ -283,6 +345,49 @@ export function callers(root, diff, changed) {
     lines.push(`- … and ${over} changed export${over === 1 ? '' : 's'} not searched (cap: ${MAX_CALLER_SYMBOLS} symbols)`);
   }
   return lines;
+}
+
+// Decision 0172: `init` gitignores `.claude/hodos/tasks/` (decision 0144), so
+// a tracked line naming a path under it names something no other checkout has.
+// A project rule that asks for a source got the plan's address instead of the
+// plan's sentence, and 32 of those reached the pilot's trunk — 17 of them in
+// two ADRs, so citing a decision record did not close it. The slug has to be a
+// real one: `<slug>` is how the engine's own text names the path, and this
+// repository is dogfooded. `.gitignore` is `init`'s own line.
+const TASK_DIR = /\.claude\/hodos\/tasks\/[a-z0-9][a-z0-9-]*/;
+const MAX_TASK_DIR_LINES = 20;
+
+/**
+ * The added lines of a diff that name a concrete task directory, as
+ * `- <file>:<line> — <text>`: a pointer list the reviewer judges, the shape
+ * `## Callers` has. A removed line is the repair, not the defect.
+ */
+export function taskDirPaths(diff) {
+  const lines = [];
+  let file = null;
+  let at = 0;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+++ ')) {
+      file = line.startsWith('+++ b/') ? line.slice('+++ b/'.length) : null;
+      continue;
+    }
+    if (line.startsWith('--- ') || line.startsWith('diff --git ')) continue;
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) {
+      at = Number(hunk[1]);
+      continue;
+    }
+    if (file === null) continue;
+    if (line.startsWith('+')) {
+      const text = line.slice(1);
+      if (TASK_DIR.test(text) && !/(^|\/)\.gitignore$/.test(file)) lines.push(`- ${file}:${at} — ${code(text.trim())}`);
+      at += 1;
+    } else if (line.startsWith(' ')) {
+      at += 1;
+    }
+  }
+  if (lines.length <= MAX_TASK_DIR_LINES) return lines;
+  return [...lines.slice(0, MAX_TASK_DIR_LINES), `- … and ${lines.length - MAX_TASK_DIR_LINES} more (cap: ${MAX_TASK_DIR_LINES} lines)`];
 }
 
 function fail(reason) {
@@ -420,6 +525,7 @@ function targetMain(projectRoot, root, config, target) {
     stat: facts.stat,
     diff: diff.stdout.trimEnd(),
     callerLines: callers(root, diff.stdout, facts.files),
+    taskDirLines: taskDirPaths(diff.stdout),
     notPackaged: generated.map(({ file, glob }) => ({
       file,
       stat: statOf(facts.churn, file),
@@ -505,7 +611,11 @@ function main(argv) {
   const planText = readFileSync(planPath, 'utf8');
   const design = section(planText, 'Design');
   const tasks = section(planText, 'Tasks');
-  if (design === null) return fail(`${slug}: the plan has no "## Design" section (FORMATS.md §5)`);
+  // An inert task's plan has no design fields to copy (decision 0183). The
+  // shape comes from state.json, which only the ledger writes, not from the
+  // plan, which the session writes.
+  const shape = stateShape(taskDir);
+  if (design === null && shape !== 'inert') return fail(`${slug}: the plan has no "## Design" section (FORMATS.md §5)`);
   if (tasks === null) return fail(`${slug}: the plan has no "## Tasks" section (FORMATS.md §5)`);
 
   let findings;
@@ -525,7 +635,7 @@ function main(argv) {
     if (!existsSync(reviewPath)) {
       return fail(`${slug}: --since scopes a re-review, and there is no review.md to scope against`);
     }
-    findings = previousFindings(readFileSync(reviewPath, 'utf8')) ?? '(the previous review recorded no findings table)';
+    findings = previousFindings(readFileSync(reviewPath, 'utf8')) ?? '(the previous review recorded no Spec section and no findings table)';
   }
 
   const resolved = git(root, ['rev-parse', '--short', `${base}^{commit}`]);
@@ -615,6 +725,7 @@ function main(argv) {
     commits: commits.stdout.trim(),
     design,
     tasks,
+    shape,
     stat: facts.stat,
     diff: diff.stdout.trimEnd(),
     findings,
@@ -622,6 +733,12 @@ function main(argv) {
     notPackaged,
     notPackagedNote,
     callerLines: callers(root, diff.stdout, facts.files),
+    taskDirLines: taskDirPaths(diff.stdout),
+    // The ledger is beside the plan this package was built from, and it is the
+    // only route the count has to the reviewer's closed input list (0143). A
+    // header cell is never a reason to refuse a review of real code, so an
+    // absent ledger is a dash and an unreadable one says which it is (0139).
+    mutation: mutationCounts(readLedger(taskDir)),
   });
 
   if (Buffer.byteLength(body) > maxBytes) {
@@ -640,6 +757,15 @@ function main(argv) {
   writeFileSync(outPath, body);
   process.stdout.write(`${outPath}\n`);
   return 0;
+}
+
+/** The shape state.json carries, or null when it carries none or cannot be read. */
+function stateShape(taskDir) {
+  try {
+    return JSON.parse(readFileSync(join(taskDir, 'state.json'), 'utf8')).shape ?? null;
+  } catch {
+    return null;
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

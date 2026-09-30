@@ -1,0 +1,35 @@
+# id: detail-console-throw
+# plan: orders-summary
+# task: —
+# kind: verify
+# item: —
+# line: src/features/orders/ui/OrderDetailPage.tsx:12
+# anchor: const banner = (window as unknown as { __banner: { text: string } }).__banner;
+# what: the detail route schedules work that reads a field of a global the application never sets, so mounting /orders/:id throws a TypeError out of a timer — an uncaught exception in the console, on a route no claim of orders-summary names. The page still renders, npm test never mounts this component, and typecheck and lint are green: the double cast makes the property non-optional to TypeScript and undefined at run time. Only the console read of a visited route finds it, which is the first of decision 0093's four sources
+# severity: major
+# note: applied to the copy's BASE, not to the task's diff. The console source is not gated by the attack surface of decision 0112 — every route the sweep visits is read — so a base defect exercises it, and keeping /orders/:id out of the diff keeps it out of the attack surface and the arm inside the verifier's turn bound. It becomes `pre-existing` rather than `fail` when decision 0097 is built at Stage 11d-3, which is the case that stage's criterion asks for; today there is no such machinery and the row is a fail
+diff --git a/src/features/orders/ui/OrderDetailPage.tsx b/src/features/orders/ui/OrderDetailPage.tsx
+index 0718c2d..2e61e17 100644
+--- a/src/features/orders/ui/OrderDetailPage.tsx
++++ b/src/features/orders/ui/OrderDetailPage.tsx
+@@ -1,3 +1,5 @@
++import { useEffect } from 'react';
++
+ import { useQuery } from '@tanstack/react-query';
+ import { useParams } from 'react-router-dom';
+ 
+@@ -7,6 +9,14 @@ export function OrderDetailPage() {
+   const { id = '' } = useParams<{ id: string }>();
+   const order = useQuery({ queryKey: keys.detail(id), queryFn: () => getOrder(id), enabled: id !== '' });
+ 
++  useEffect(() => {
++    const timer = setTimeout(() => {
++      const banner = (window as unknown as { __banner: { text: string } }).__banner;
++      document.title = banner.text;
++    }, 0);
++    return () => clearTimeout(timer);
++  }, []);
++
+   if (order.isPending) return <p>Loading order…</p>;
+   if (order.isError) return <p role="alert">{order.error.message}</p>;
+ 
