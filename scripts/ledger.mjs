@@ -478,13 +478,31 @@ class UnreadableLedger extends Error {
  * inside writeFileSync leaves a partial file where the task's phase used to be;
  * a rename is atomic, so a reader sees the old state or the new one.
  */
-function writeAtomic(target, text) {
+// Windows refuses a rename onto a target another process is renaming or has
+// open, with one of these, and lets go within milliseconds: the 0.2.0 release's
+// windows job met EPERM on two concurrent adds. Anything else is not a wait.
+const RENAME_RETRY = new Set(['EPERM', 'EACCES', 'EBUSY']);
+const RENAME_ATTEMPTS = 10;
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+export function writeAtomic(target, text, { rename = renameSync, sleep = sleepSync } = {}) {
   // One temporary name per process: two writers sharing `<target>.tmp` meet
   // at the rename, and the second finds its file already moved (ENOENT) after
   // its ledger line has landed — 12 to 15 of 40 concurrent adds at 12d-1.
   const tmp = `${target}.${process.pid}.tmp`;
   writeFileSync(tmp, text);
-  renameSync(tmp, target);
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      rename(tmp, target);
+      return;
+    } catch (error) {
+      if (!RENAME_RETRY.has(error.code) || attempt >= RENAME_ATTEMPTS) {
+        rmSync(tmp, { force: true });
+        throw error;
+      }
+      sleep(10 * attempt); // at most 450 ms in all
+    }
+  }
 }
 
 function readLedger(taskDir) {

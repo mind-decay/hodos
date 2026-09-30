@@ -5,6 +5,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-30
+
+The 0.2.0 release's `windows` job failed on both remotes, and this patch is its two fixes. 0.2.0 is otherwise unchanged.
+
+### Fixed
+
+- On Windows, two `ledger.mjs add` running at once could fail with `EPERM` while renaming the temporary file onto `state.json`, because Windows refuses a rename onto a target another process holds. The write now retries `EPERM`, `EACCES` and `EBUSY`, up to 450 ms in all, and removes its temporary file when it gives up.
+- `campaigns.test.mjs` built a regular expression from a path, and a Windows path's backslashes read as escapes. The path is now escaped.
+
 ## [0.2.0] — 2026-09-30
 
 The first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, a cross-repository campaign node and three `inert` pairs. `docs/PILOT.md` has the numbers and what each one does not prove. One line per build stage, in the order they ran:
@@ -95,6 +104,7 @@ First release. The engine is complete and measured against the four projects in
 
 - `state.json` and the two claim pointers are written through a temp file and a rename, and a write refuses a ledger it could not read instead of deriving a beginning state from zero events (decision 0101).
 
-[Unreleased]: https://github.com/mind-decay/hodos/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mind-decay/hodos/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/mind-decay/hodos/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mind-decay/hodos/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mind-decay/hodos/releases/tag/v0.1.0

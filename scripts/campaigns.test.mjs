@@ -675,7 +675,10 @@ test('node-done in another repository writes the map and commits nothing there',
   assert.equal(cli.status, 0, cli.stderr);
 
   // The instruction: the repository, the file, and the command to run there.
-  assert.match(cli.stdout, new RegExp(`the map is in ${home.root}, not in this repository — commit it there`));
+  // A path is text, not a pattern: a Windows root is all backslashes (the
+  // 0.2.0 release's windows job).
+  const literal = home.root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  assert.match(cli.stdout, new RegExp(`the map is in ${literal}, not in this repository — commit it there`));
   assert.match(cli.stdout, /git -C .*home add \.claude\/hodos\/campaigns\/state-migration\.md/);
   assert.match(cli.stdout, /commit -m "chore: users-list done in campaign state-migration"/);
 

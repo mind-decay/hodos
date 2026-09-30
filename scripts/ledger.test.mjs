@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, readdirSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, readdirSync, renameSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -1162,4 +1162,52 @@ test('nothing returns to inert once the task is past its verdict', () => {
   const again = run(upgraded, 'add', 'Route: quick feature inert');
   assert.equal(again.status, 1);
   assert.equal(readState(upgraded, 'fix-doc-comment').shape, null);
+});
+
+// Windows refuses a rename onto a file another process is renaming or has
+// open, with EPERM, EACCES or EBUSY; the release's windows job met it on two
+// concurrent adds. The write retries those, and only those, for a bounded time.
+
+test('writeAtomic retries a rename Windows refused while another process held the target', async () => {
+  const { writeAtomic } = await import('./ledger.mjs');
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-atomic-')));
+  const target = join(dir, 'state.json');
+  let calls = 0;
+  const busy = (code) => (from, to) => {
+    calls += 1;
+    if (calls <= 2) throw Object.assign(new Error(`${code}: rename`), { code });
+    return renameSync(from, to);
+  };
+  for (const code of ['EPERM', 'EACCES', 'EBUSY']) {
+    calls = 0;
+    writeAtomic(target, `{"${code}":1}\n`, { rename: busy(code), sleep: () => {} });
+    assert.equal(calls, 3, code);
+    assert.equal(readFileSync(target, 'utf8'), `{"${code}":1}\n`, code);
+  }
+  assert.deepEqual(readdirSync(dir), ['state.json'], 'no temporary file is left');
+});
+
+test('writeAtomic gives up after its bound, removes its temporary file, and retries nothing else', async () => {
+  const { writeAtomic } = await import('./ledger.mjs');
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-atomic-')));
+  const target = join(dir, 'state.json');
+  let calls = 0;
+  const always = (code) => () => {
+    calls += 1;
+    throw Object.assign(new Error(`${code}: rename`), { code });
+  };
+  // Busy for a hundred attempts, then free: a write with no bound would get
+  // through, so the refusal is what shows the bound.
+  const busyFor = (limit) => (from, to) => {
+    calls += 1;
+    if (calls <= limit) throw Object.assign(new Error('EPERM: rename'), { code: 'EPERM' });
+    return renameSync(from, to);
+  };
+  assert.throws(() => writeAtomic(target, '{}\n', { rename: busyFor(100), sleep: () => {} }), /EPERM/);
+  assert.ok(calls > 3 && calls <= 20, `a bounded number of attempts, got ${calls}`);
+  assert.deepEqual(readdirSync(dir), [], 'the temporary file is removed');
+
+  calls = 0;
+  assert.throws(() => writeAtomic(target, '{}\n', { rename: always('ENOENT'), sleep: () => {} }), /ENOENT/);
+  assert.equal(calls, 1, 'any other error is thrown at once');
 });

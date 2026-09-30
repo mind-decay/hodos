@@ -6,7 +6,7 @@ hodos is a Claude Code plugin that installs a complete development workflow into
 
 The developer is the driver of ideas and decisions. hodos is the driver of the *process*: it asks the right questions, refuses to guess where the plan is silent, reviews with fresh eyes, verifies by running, and cleans up after itself.
 
-**Status: 0.2.0.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
+**Status: 0.2.1.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
 
 | | hodos |
 |---|---|
