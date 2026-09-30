@@ -5,6 +5,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-09-30
+
+The fixes of 12d-2's second review. The `inert` upgrade had one path on which a line the reviewer called behaviour stayed unreviewed.
+
+### Fixed
+
+- **The upgrade out of `inert` now reverts every commit since the plan's base** (`git revert --no-edit <base>..HEAD`), not only the task's own. A fix-pass commit that a later review named as behaviour used to stay below the new base, where no review or test reached it (decision 0184).
+- **The same upgrade returns the task to `plan`.** A `/hodos:run` resumed before the new approval now stops at the missing approval, instead of entering the fix pass on a reverted tree (decision 0184).
+- **An uncommitted `inert` edit is set aside with `git stash -u`.** `git restore` left behind a file the edit had added.
+- `ledger.mjs`'s grammar now says an upgrade starts at the task's rung, which is what it has enforced since 0.2.0.
+
 ## [0.2.1] — 2026-09-30
 
 The 0.2.0 release's `windows` job failed on both remotes, and this patch is its two fixes. 0.2.0 is otherwise unchanged.
@@ -51,7 +62,7 @@ The first release measured on a real codebase. The pilot ran on `ariadne_v2`, a 
   - Decisions 0168–0181.
 - **Stage 12d-2** — the numbers and the `inert` shape.
   - Every `DESIGN.md §13` number was read against the pilot, and the multiplier's thresholds were withdrawn (decision 0182).
-  - `quick` gains the `inert` shape for a change no program reads: one session, one fresh reviewer and no verifier, priced on three same-task pairs (decision 0183).
+  - `quick` gains the `inert` shape for a change no program reads: one session, one fresh reviewer and no verifier, priced on three same-task pairs (decision 0183). An upgrade out of the shape reverts the edit and rebuilds it test-first, and the ledger refuses any way back into it (decision 0184).
 
 ### Changed
 
@@ -104,7 +115,8 @@ First release. The engine is complete and measured against the four projects in
 
 - `state.json` and the two claim pointers are written through a temp file and a rename, and a write refuses a ledger it could not read instead of deriving a beginning state from zero events (decision 0101).
 
-[Unreleased]: https://github.com/mind-decay/hodos/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/mind-decay/hodos/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/mind-decay/hodos/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/mind-decay/hodos/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mind-decay/hodos/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mind-decay/hodos/releases/tag/v0.1.0

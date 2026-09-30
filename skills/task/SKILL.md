@@ -61,7 +61,7 @@ Type `question` answers in chat and writes no plan: the answer, then the sources
 
 1. Present the summary: the goal in one paragraph, the decisions with their choices, the tasks with their acceptance criteria, and what the plan explicitly does not do.
 2. Ask for approval with `AskUserQuestion`. A plan with a non-empty `## Open questions` is not presented — those questions are the round that has not been asked yet.
-3. On approval, create the branch from `config.conventions.branch` with the slug substituted. A branch that already exists is a question, never a checkout.
+3. On approval, create the branch from `config.conventions.branch` with the slug substituted. A branch that already exists is a question, never a checkout. The exception is a task upgraded out of `inert`, which keeps the branch it is on (`references/inert.md §7`).
 4. `ledger.mjs add "Plan: approved" --tasks <n> --branch <name>` — the script records `base` from HEAD and moves the phase to `approved`.
 5. Print exactly, as the last two lines of the session:
 

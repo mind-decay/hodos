@@ -403,7 +403,7 @@ Settled at its Start on 2026-09-30 (`docs/stages/12d2-plan.md`). Every `§13` nu
 4. **`CHANGELOG.md` records 0.2.0.** It has one line per stage since 0.1.0 in run order, each citing its decisions, `[Unreleased]` is empty, and the compare links are `v0.1.0...v0.2.0`.
 5. **Both manifests say 0.2.0 and validate.** `claude plugin validate --strict` passes on the marketplace and on the plugin manifest in the exported tree.
 6. **The export is clean.** `export-public.mjs` exits 0 with zero scrub hits, and its test, `npm test` and `node scripts/lint.mjs` are green inside the exported tree.
-7. **0.2.0 is released.** On `mind-decay/hodos`, `v0.2.0` is one commit on top of `v0.1.0`, byte-identical to the export. `hodos-build` carries every stage tag. CI is green on both remotes.
+7. **0.2.0 is released.** On `mind-decay/hodos`, `v0.2.0` is one commit on top of `v0.1.0`, byte-identical to the export. `hodos-build` carries every stage tag. CI is green on both remotes. *Amended at the breaker, 2026-09-30, by the developer (`stages/12d2-review-2.md`):* the 0.2 line is released on the public `main` above `4174d24`, each tag byte-identical to its own export, with CI green on both remotes at the last tag. v0.2.0's red `windows` stays on record.
 8. **It installs from a clean machine.** The install record names 0.2.0 and the release commit.
 9. **The build tree is green at head.** `npm test`, `node scripts/lint.mjs` and `node bench/noop/run.mjs --check-scenarios`.
 10. **The ledger knows the shape** (decision **0183**). `Task <n>: done (<sha>, inert)` is accepted only under `inert`. `Review <k>: ACCEPT` moves an `inert` task to `finish`. `Finish` writes `shape` into `history.jsonl`. Red first, with a mutant on each gate.

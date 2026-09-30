@@ -1211,3 +1211,21 @@ test('writeAtomic gives up after its bound, removes its temporary file, and retr
   assert.throws(() => writeAtomic(target, '{}\n', { rename: always('ENOENT'), sleep: () => {} }), /ENOENT/);
   assert.equal(calls, 1, 'any other error is thrown at once');
 });
+
+test('the upgrade out of inert returns the task to plan, so run stops at the missing approval', () => {
+  const upgraded = derive(
+    'Init: quick refactor inert',
+    'Plan: approved (a1b2c3d, 1 tasks, fix/doc-comment)',
+    'Task 1: started',
+    'Task 1: done (e1e1e1e, inert)',
+    'Review 1: NEEDS_WORK (0/1/0)',
+    'Fix 1: done (f1f1f1f)',
+    'Review 2: NEEDS_WORK (0/1/0)',
+    'Upgrade: inert→quick — the fix reads a line a program compares',
+  );
+  assert.equal(upgraded.phase, 'plan');
+
+  // Any other upgrade leaves the phase where it was.
+  const wider = derive('Init: quick feature', 'Review 1: NEEDS_WORK (0/1/0)', 'Upgrade: quick→standard — wider');
+  assert.equal(wider.phase, 'fix');
+});

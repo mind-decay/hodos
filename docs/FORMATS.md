@@ -326,7 +326,7 @@ A task has no `Tests:` line when it is test-first, which is the default. A task 
 
 **An amended clause** (decision **0176**). A `Gap:` whose resolution contradicts a task's `Acceptance:` clause rewrites that clause in the same step, so that the clause reads as the developer settled it. The line below keeps the approved one: `Amended <YYYY-MM-DD> by Gap: <the clause as it was>`. The reviewer and the verifier read the `Acceptance:` line, and the amendment is what keeps the approved contract visible. It is the one edit `plan.md` takes after approval, other than `## Outcome`.
 
-**The inert form** (decision **0183**). The plan of a task with `Shape: inert` carries its header line, with `Shape: inert` after the type, and then `## Goal`, `## Non-goals`, `## Tasks` and an empty `## Open questions`. It has no `## Decisions`, `## Design` or `## Verify plan`, because a change no program reads leaves them nothing to hold. Each task names its `Files:` and an `Acceptance:` that the two commands are green, plus what the text reads afterwards. Its `done` carries `--inert` in place of a red phase or a `Tests:` exemption (§6). `review-package.mjs` packages this plan only when `state.json` carries the shape (§8). An upgrade out of the shape reverts the edit and re-grills the plan into the full form, whose T1 rebuilds it test-first on the same branch (decision **0184**, `skills/task/references/inert.md` §7). The header's `Base:` is filled after `Plan: approved`, as on every plan.
+**The inert form** (decision **0183**). The plan of a task with `Shape: inert` carries its header line, with `Shape: inert` after the type, and then `## Goal`, `## Non-goals`, `## Tasks` and an empty `## Open questions`. It has no `## Decisions`, `## Design` or `## Verify plan`, because a change no program reads leaves them nothing to hold. Each task names its `Files:` and an `Acceptance:` that the two commands are green, plus what the text reads afterwards. Its `done` carries `--inert` in place of a red phase or a `Tests:` exemption (§6). `review-package.mjs` packages this plan only when `state.json` carries the shape (§8). An upgrade out of the shape reverts every commit since the plan's base and re-grills the plan into the full form, whose T1 rebuilds it test-first on the same branch (decision **0184**, `skills/task/references/inert.md` §7). The header's `Base:` is filled after `Plan: approved`, as on every plan.
 
 ## 6. Ledger — `ledger.md`
 
@@ -344,7 +344,7 @@ Append-only. One event per line. Written only by `ledger.mjs`. The model passes 
 | `add "Task <n>: red-check attempt <k>/3 — <text>"` | same | `execute` |
 | `add "Ruling: <what> — <why> — <cost if wrong>"` | same | unchanged |
 | `add "Gap: <what the plan lacked> — <resolution>"` | same | unchanged |
-| `add "Upgrade: <from>→<to> — <why>"` (`<from>` is the task's rung, `inert` included) | same | unchanged; one out of `inert` restarts the counts (§7) |
+| `add "Upgrade: <from>→<to> — <why>"` (`<from>` is the task's rung, `inert` included) | same | unchanged; one out of `inert` → `plan`, and it restarts the counts (§7) |
 | `add "Simplify: done" --sha <sha> --net <n>` | `Simplify: done (<sha>, net -<n>)` | `review` |
 | `add "Review <k>: <ACCEPT\|NEEDS_WORK\|REJECT> <b>/<m>/<mi>"` | `Review <k>: … (<b>/<m>/<mi>)` | `ACCEPT` → `verify`, or `finish` on an `inert` task; else `fix` |
 | `add "Fix <k>: done" --sha <sha>` | `Fix <k>: done (<sha>)` | `review` if last event was a review; `verify` if it was a verify |

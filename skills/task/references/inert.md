@@ -86,8 +86,8 @@ The shape ends as soon as the change needs a line a program reads. Three things 
 node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Upgrade: inert→quick — <the line, and what reads it>"
 ```
 
-The ledger restarts its task count and both loops at this line (decision **0184**). The work is rebuilt, not carried: a line a program reads gets its red test before it lands. Then, in order:
-1. **Take the edit out of the tree.** Run `git revert --no-edit <sha>` for each `Task <n>: done (<sha>, inert)`, newest first. An edit not yet committed is this session's own, so `git restore` its files. Say in chat what was reverted.
+The ledger restarts its task count and both loops at this line and returns the task to `plan` (decision **0184**). The work is rebuilt, not carried: a line a program reads gets its red test before it lands. Then, in order:
+1. **Take the edit out of the tree.** Run `git revert --no-edit <base>..HEAD`, with `<base>` from the `Plan: approved` line. That reverts every commit the task made, newest first: its `Task <n>: done (<sha>, inert)` commits, and the commits of any fix pass the review loop ran. An edit not yet committed is this session's own, so `git stash -u` and then `git stash drop`, which takes a file the edit added as well. Say in chat what was reverted.
 2. **Re-plan.** Return to the kernel's step 6. The plan is grilled into a full `quick` plan with its ten design fields, and what the reverted edit did becomes its T1, built test-first like any other task.
 3. **Approve on the same branch.** At step 8 the task keeps the branch it has, so no branch is created and there is no question about an existing one. `Plan: approved` records the base the rebuild starts from, which is the revert, and the task continues in `/hodos:run`.
 

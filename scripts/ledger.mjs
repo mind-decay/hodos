@@ -58,7 +58,7 @@ const GRAMMAR = `Ledger grammar (FORMATS.md §6) — the CLI forms:
   add "Task <n>: red-check attempt <k>/3 — <text>"
   add "Ruling: <what> — <why> — <cost if wrong>"
   add "Gap: <what the plan lacked> — <resolution>"
-  add "Upgrade: <from>→<to> — <why>"      (<from> may be inert)
+  add "Upgrade: <from>→<to> — <why>"      (<from> is the task's rung, inert included)
   add "Simplify: done" --sha <sha> --net <n>
   add "Review <k>: <ACCEPT|NEEDS_WORK|REJECT> <b>/<m>/<mi>"
   add "Fix <k>: done" --sha <sha>
@@ -176,7 +176,9 @@ const RULES = [
         ? null
         : `Upgrade goes one way: ${m[1]}→${m[2]} is not an upgrade (DESIGN.md §4.1)`,
     stored: (line) => line,
-    phase: () => null,
+    // Out of inert, the edit is reverted and the plan re-grilled, so the task is
+    // back before its approval, and a resumed run says so (decision 0184).
+    phase: (m) => (m[1] === 'inert' ? 'plan' : null),
   },
   {
     id: 'simplify',
