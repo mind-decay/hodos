@@ -1,6 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, describe } from 'node:test';
 
@@ -13,6 +12,7 @@ import {
   seedConfig,
   summarize,
 } from './invoke.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const PLUGIN_ROOT = '/repo/hodos';
 
@@ -173,7 +173,7 @@ describe('summarize', () => {
 
 describe('seedConfig', () => {
   const copy = () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hodos-invoke-'));
+    const dir = tempDir('hodos-invoke-');
     writeFileSync(
       join(dir, 'package.json'),
       JSON.stringify({ name: 'x', scripts: { test: 'node --test', lint: 'eslint .' } }),
@@ -201,7 +201,7 @@ describe('seedConfig', () => {
   });
 
   test('a copy with no package.json gets null commands rather than invented ones', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hodos-invoke-'));
+    const dir = tempDir('hodos-invoke-');
     assert.equal(seedConfig(dir), true);
     const written = JSON.parse(readFileSync(join(dir, '.claude/hodos/config.json'), 'utf8'));
     assert.equal(written.commands.test, null);

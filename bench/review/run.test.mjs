@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { parseMeta, hunkRanges, kindOfItem, score , report } from './run.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const RUN = fileURLToPath(new URL('./run.mjs', import.meta.url));
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -505,7 +506,7 @@ test('--check-key exits 0 on the shipped set and reports its shape', () => {
 
 /** A copy of the shipped set, so a doctored patch never touches the repository. */
 function setCopy() {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-reviewbench-')));
+  const dir = tempDir('hodos-reviewbench-');
   for (const name of ['seeded', 'clean', 'packages']) cpSync(join(HERE, name), join(dir, name), { recursive: true });
   cpSync(join(HERE, 'clean.json'), join(dir, 'clean.json'));
   return dir;
@@ -553,7 +554,7 @@ test('--check-key fails a patch whose anchor is not the line it declares', () =>
 });
 
 test('--verdicts scores a run and exits 1 when a threshold is missed', () => {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-verdicts-')));
+  const dir = tempDir('hodos-verdicts-');
   mkdirSync(dir, { recursive: true });
   const empty = join(dir, 'verdicts.json');
   writeFileSync(empty, JSON.stringify({ packages: [{ id: 'p1', findings: [] }] }));
@@ -658,7 +659,7 @@ test('a run that covers part of the set does not pass the gate silently', () => 
 });
 
 test('--json prints the labeled report: four gates, and measurements when the run wrote them', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodos-review-report-'));
+  const dir = tempDir('hodos-review-report-');
   const verdicts = join(dir, 'verdicts.json');
   const measurements = join(dir, 'measurements.json');
   cpSync(join(HERE, 'runs/2026-09-02/verdicts.json'), verdicts);
@@ -683,7 +684,6 @@ test('--json prints the labeled report: four gates, and measurements when the ru
   assert.equal(report.metrics.find((m) => m.name === 'turns, mean').value, 3);
   assert.equal(report.passed, true);
   assert.equal(report.details.recall.overall.found, 18);
-  rmSync(dir, { recursive: true, force: true });
 });
 
 
@@ -779,7 +779,6 @@ test('--check-key fails a spec patch that names no token to match on', () => {
 
   assert.equal(out.status, 1);
   assert.match(out.stdout, /names/);
-  rmSync(dir, { recursive: true, force: true });
 });
 
 test('--check-key fails a spec patch that carries a trigger', () => {
@@ -790,11 +789,10 @@ test('--check-key fails a spec patch that carries a trigger', () => {
 
   assert.equal(out.status, 1);
   assert.match(out.stdout, /trigger/);
-  rmSync(dir, { recursive: true, force: true });
 });
 
 test('the spec recall is a measurement in the JSON report, never a gate', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodos-review-spec-'));
+  const dir = tempDir('hodos-review-spec-');
   const verdicts = join(dir, 'verdicts.json');
   cpSync(join(HERE, 'runs/2026-09-02/verdicts.json'), verdicts);
   const out = spawnSync(process.execPath, [RUN, '--verdicts', verdicts, '--json'], { encoding: 'utf8' });
@@ -809,5 +807,4 @@ test('the spec recall is a measurement in the JSON report, never a gate', () => 
     ['recall, overall', 'recall, convention', 'recall, behavioral', 'precision'],
   );
   assert.equal(report.passed, true);
-  rmSync(dir, { recursive: true, force: true });
 });

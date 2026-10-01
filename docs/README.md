@@ -2,8 +2,8 @@
 
 | Document | Role | Read when |
 |---|---|---|
-| `STAGE-PROTOCOL.md` | How a build stage runs: start → build → self-verify → fresh review → report → tick | every session |
-| `BUILD-PLAN.md` | 12 stages, deliverables, acceptance criteria, **Progress** checklist | every session |
+| `STAGE-PROTOCOL.md` | How a build stage runs: start → build → self-verify → fresh review → report → tick | every session that builds a stage |
+| `BUILD-PLAN.md` | 12 stages, deliverables, acceptance criteria, **Progress** checklist | every session that builds a stage |
 | `DESIGN.md` | The system: principles, architecture, workflow, state, quality mechanisms, hooks, tokens, glossary | the sections the stage touches |
 | `COMPONENTS.md` | Contract of every skill, reference, agent, script, hook, adapter, source, eval | when building that component |
 | `FORMATS.md` | Exact file shapes: config, brief, research, plan, ledger grammar, state, review, verify, campaign map, digest, adapter, source, handoff, environment diagnosis | when writing or parsing that file |
@@ -21,7 +21,7 @@
 
 ## Where these files live
 
-Two of the rows above resolve only in the **build repository**, `mind-decay/hodos-build` (decisions **0064**, **0102**): `../research/` and `stages/`. A marketplace install clones the public repository onto every installing machine, and neither the evidence base nor seventeen stage records is something an installer reads — while the evidence base is a survey of repositories that are not this project's to publish. Everything else in this table is public, and nothing in the **engine** cites what is not: a citation from a skill, a reference or an agent into `docs/stages/` fails `node scripts/lint.mjs` **in the exported tree**, where that path resolves to nothing — which is why the `export` job runs lint there and not only here.
+Two of the rows above resolve only in the **build repository**, `mind-decay/hodos-build` (decisions **0064**, **0102**): `../research/` and `stages/`. A marketplace install clones the public repository onto every installing machine, and neither the evidence base nor seventeen stage records is something an installer reads — while the evidence base is a survey of repositories that are not this project's to publish. Two files outside the table stay in the build repository for the same reason: `CLAUDE.md`, and the `.claude/` layer that `init` writes at this repository's root once it is dogfooded (decision **0185**). They say how this checkout is built, not what an installer runs, and a fixture's own `.claude/` under `bench/fixtures/` still ships. Everything else in this table is public, and nothing in the **engine** cites what is not: a citation from a skill, a reference or an agent into `docs/stages/` fails `node scripts/lint.mjs` **in the exported tree**, where that path resolves to nothing — which is why the `export` job runs lint there and not only here.
 
 The public history begins at `v0.1.0` and is written by an export the build repository runs at each release — `tools/`, which is itself not exported. The export refuses to write a tree carrying one of the names the scrub removed, an absolute path into somebody's home, or a tracker id written with an uppercase prefix (decisions **0064**, **0104**) — which is what makes the scrub a check rather than a promise. A lowercase prefix is out of the pattern on purpose, because it cannot be told from an ordinary hyphenated word.
 

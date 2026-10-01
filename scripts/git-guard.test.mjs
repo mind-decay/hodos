@@ -2,18 +2,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { segments, words } from './git-guard.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const GUARD = fileURLToPath(new URL('./git-guard.mjs', import.meta.url));
 
 function project({ gates = { denyDangerousGit: true }, phase = null } = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-guard-')));
+  const root = tempDir('hodos-guard-');
   mkdirSync(join(root, '.git'), { recursive: true });
   mkdirSync(join(root, '.claude', 'hodos', 'tasks'), { recursive: true });
   writeFileSync(join(root, '.claude', 'hodos', 'config.json'), JSON.stringify({ version: 1, gates }));
@@ -101,7 +101,7 @@ test('with both gates off everything is allowed', () => {
 });
 
 test('with no config, no gates section, or a broken payload the guard says nothing', () => {
-  const bare = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-noguard-')));
+  const bare = tempDir('hodos-noguard-');
   allowed(bare, 'git push --force');
 
   const noGates = project({ gates: {} });

@@ -3,36 +3,22 @@ import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   realpathSync,
-  rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { copyFixture, fixtureNames } from './fixture-copy.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
 const SCRIPT = join(HERE, 'fixture-copy.mjs');
 const FIXTURES = join(REPO, 'bench', 'fixtures');
-
-/** Temp directories this file made, removed when it ends. */
-const made = [];
-const temp = (prefix) => {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
-  made.push(dir);
-  return dir;
-};
-
-after(() => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true });
-});
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -41,7 +27,7 @@ const run = (args, options = {}) =>
 
 /** A fixtures root the tests own, so the checked-in fixtures are never touched. */
 function syntheticRoot() {
-  const root = temp('hodos-fixtures-');
+  const root = tempDir('hodos-fixtures-');
   syntheticProbe(root);
   syntheticWorkspaces(root);
   syntheticAuthored(root);
@@ -116,7 +102,7 @@ describe('fixtureNames', () => {
 
 describe('copyFixture', () => {
   it('copies a fixture into a git repository with three conventional commits', () => {
-    const copy = copyFixture({ name: 'webapp', root: FIXTURES, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'webapp', root: FIXTURES, into: tempDir('hodos-copy-') });
 
     assert.ok(existsSync(join(copy, 'package.json')));
     assert.ok(existsSync(join(copy, 'src', 'lib', 'http.ts')));
@@ -136,12 +122,12 @@ describe('copyFixture', () => {
   // "fatal: empty ident name". The identity belongs in the repository this
   // script creates, not in `-c` flags each later caller has to remember.
   it('carries its own commit identity, so any script may commit into it', () => {
-    const copy = copyFixture({ name: 'webapp', root: FIXTURES, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'webapp', root: FIXTURES, into: tempDir('hodos-copy-') });
     assert.equal(git(copy, 'config', 'user.email'), 'bench@hodos.invalid');
 
     // A runner's environment: no global config, no system config, no identity
     // in the environment either.
-    const bare = { ...process.env, GIT_CONFIG_GLOBAL: join(temp('hodos-noconfig-'), 'none'), GIT_CONFIG_NOSYSTEM: '1' };
+    const bare = { ...process.env, GIT_CONFIG_GLOBAL: join(tempDir('hodos-noconfig-'), 'none'), GIT_CONFIG_NOSYSTEM: '1' };
     for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']) {
       delete bare[key];
     }
@@ -152,7 +138,7 @@ describe('copyFixture', () => {
   });
 
   it('puts configuration, then sources, then tests, in that order', () => {
-    const copy = copyFixture({ name: 'webapp', root: FIXTURES, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'webapp', root: FIXTURES, into: tempDir('hodos-copy-') });
     const filesOf = (n) => git(copy, 'show', '--name-only', '--format=', `HEAD~${n}`).split('\n').filter(Boolean);
 
     assert.ok(filesOf(2).includes('package.json'));
@@ -163,7 +149,7 @@ describe('copyFixture', () => {
 
   it('leaves the copy able to run its tests by linking node_modules', () => {
     const root = syntheticRoot();
-    const copy = copyFixture({ name: 'probe', root, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') });
 
     assert.ok(existsSync(join(copy, 'node_modules', 'left-pad')), 'the dependency is not resolvable in the copy');
     assert.equal(
@@ -175,7 +161,7 @@ describe('copyFixture', () => {
 
   it('points a workspace link at the copy, not at the fixture it came from', () => {
     const root = syntheticRoot();
-    const copy = copyFixture({ name: 'probe-mono', root, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'probe-mono', root, into: tempDir('hodos-copy-') });
     const linked = realpathSync(join(copy, 'node_modules', '@probe', 'svc'));
 
     assert.equal(linked, realpathSync(join(copy, 'svc')));
@@ -192,7 +178,7 @@ describe('copyFixture', () => {
     // A build artefact the fixture's own .gitignore covers. Naming it to
     // `git add` aborts the whole commit, so the copier has to drop it first.
     writeFileSync(join(root, 'probe', 'tsconfig.tsbuildinfo'), '{}\n');
-    const copy = copyFixture({ name: 'probe', root, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') });
 
     assert.equal(git(copy, 'log', '--format=%s').split('\n').length, 3);
     assert.equal(git(copy, 'status', '--porcelain'), '');
@@ -206,7 +192,7 @@ describe('copyFixture', () => {
     // with an escaped name. Comparing that answer to the raw path skips
     // nothing, and the whole commit aborts again.
     writeFileSync(join(root, 'probe', 'naïve.tsbuildinfo'), '{}\n');
-    const copy = copyFixture({ name: 'probe', root, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') });
 
     assert.equal(git(copy, 'log', '--format=%s').split('\n').length, 3);
     assert.equal(git(copy, 'status', '--porcelain'), '');
@@ -221,14 +207,14 @@ describe('copyFixture', () => {
     writeFileSync(join(root, 'probe', '.gitignore'), 'node_modules\ndist\n*.tsbuildinfo\ntest/\n');
 
     assert.throws(
-      () => copyFixture({ name: 'probe', root, into: temp('hodos-copy-') }),
+      () => copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') }),
       /test.*ignored/s,
     );
   });
 
   it('copies neither the source repository nor its build output', () => {
     const root = syntheticRoot();
-    const copy = copyFixture({ name: 'probe', root, into: temp('hodos-copy-') });
+    const copy = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') });
 
     assert.ok(!existsSync(join(copy, 'dist')), 'dist was copied');
     assert.equal(git(copy, 'log', '--format=%s').split('\n').length, 3);
@@ -236,10 +222,10 @@ describe('copyFixture', () => {
 
   it('removes .claude only when asked to', () => {
     const root = syntheticRoot();
-    const kept = copyFixture({ name: 'probe', root, into: temp('hodos-copy-') });
+    const kept = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') });
     assert.ok(existsSync(join(kept, '.claude', 'hodos', 'config.json')));
 
-    const stripped = copyFixture({ name: 'probe', root, into: temp('hodos-copy-'), stripClaude: true });
+    const stripped = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-'), stripClaude: true });
     assert.ok(!existsSync(join(stripped, '.claude')));
   });
 
@@ -248,11 +234,11 @@ describe('copyFixture', () => {
   // that misses one hands the next stage a copy that is not virgin.
   it('strips the whole hodos layer, not only .claude/', () => {
     const root = syntheticRoot();
-    const kept = copyFixture({ name: 'probe', root, into: temp('hodos-copy-') });
+    const kept = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-') });
     assert.ok(existsSync(join(kept, 'CLAUDE.md')), 'CLAUDE.md was removed without --strip-claude');
     assert.match(readFileSync(join(kept, '.gitignore'), 'utf8'), /\.claude\/hodos\/tasks\//);
 
-    const stripped = copyFixture({ name: 'probe', root, into: temp('hodos-copy-'), stripClaude: true });
+    const stripped = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-'), stripClaude: true });
     assert.ok(!existsSync(join(stripped, '.claude')));
     assert.ok(!existsSync(join(stripped, 'CLAUDE.md')), 'the map init wrote survived --strip-claude');
     const ignore = readFileSync(join(stripped, '.gitignore'), 'utf8');
@@ -261,7 +247,7 @@ describe('copyFixture', () => {
 
   it('strips the managed block and leaves the developer\'s CLAUDE.md otherwise byte-identical', () => {
     const root = syntheticRoot();
-    const stripped = copyFixture({ name: 'authored', root, into: temp('hodos-copy-'), stripClaude: true });
+    const stripped = copyFixture({ name: 'authored', root, into: tempDir('hodos-copy-'), stripClaude: true });
 
     const text = readFileSync(join(stripped, 'CLAUDE.md'), 'utf8');
     assert.equal(text, '# authored\n\nThe developer wrote this line.\n');
@@ -281,7 +267,7 @@ describe('copyFixture', () => {
       '# truncated\n\nThe developer wrote this line.\n\n<!-- hodos:begin -->\n\n## Map\n\nhodos wrote this.\n',
     );
 
-    const stripped = copyFixture({ name: 'truncated', root, into: temp('hodos-copy-'), stripClaude: true });
+    const stripped = copyFixture({ name: 'truncated', root, into: tempDir('hodos-copy-'), stripClaude: true });
     assert.equal(
       readFileSync(join(stripped, 'CLAUDE.md'), 'utf8'),
       '# truncated\n\nThe developer wrote this line.\n',
@@ -290,7 +276,7 @@ describe('copyFixture', () => {
 
   it('skips the module link when told to', () => {
     const root = syntheticRoot();
-    const copy = copyFixture({ name: 'probe', root, into: temp('hodos-copy-'), modules: false });
+    const copy = copyFixture({ name: 'probe', root, into: tempDir('hodos-copy-'), modules: false });
     assert.ok(!existsSync(join(copy, 'node_modules')));
   });
 
@@ -300,7 +286,7 @@ describe('copyFixture', () => {
     // .claude/hodos/tasks/. The run then read a ledger describing commits its
     // tree did not have, and the review measured the harness.
     const root = syntheticRoot();
-    const into = temp('hodos-copy-');
+    const into = tempDir('hodos-copy-');
     writeFileSync(join(into, 'keep.txt'), 'mine\n');
 
     // The path goes into the message, not into a pattern: a Windows temp path
@@ -316,7 +302,7 @@ describe('copyFixture', () => {
 
   it('refuses a fixture that does not exist, and says which do', () => {
     assert.throws(
-      () => copyFixture({ name: 'nope', root: FIXTURES, into: temp('hodos-copy-') }),
+      () => copyFixture({ name: 'nope', root: FIXTURES, into: tempDir('hodos-copy-') }),
       /nope.*api, kit, mono, webapp/s,
     );
   });
@@ -324,7 +310,7 @@ describe('copyFixture', () => {
 
 describe('the command line', () => {
   it('prints the path of the copy it made', () => {
-    const into = temp('hodos-copy-');
+    const into = tempDir('hodos-copy-');
     const printed = run(['webapp', '--into', into]).trim();
     assert.equal(realpathSync(printed), realpathSync(into));
     assert.ok(existsSync(join(printed, 'package.json')));

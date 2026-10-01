@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -14,11 +14,13 @@ import { createServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
+import { tempDir } from './temp-dir.mjs';
+
 const ENV = fileURLToPath(new URL('./env.mjs', import.meta.url));
 
 function tree(files) {
   // realpath: macOS tmpdir is a symlink, and the walk compares directory paths.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-env-')));
+  const root = tempDir('hodos-env-');
   for (const [rel, content] of Object.entries(files)) {
     const abs = join(root, rel);
     mkdirSync(dirname(abs), { recursive: true });

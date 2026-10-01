@@ -3,11 +3,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from './temp-dir.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MANIFEST = JSON.parse(readFileSync(join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
@@ -63,7 +63,7 @@ test('every script a hook names exists', () => {
 });
 
 test('in a project with no config every hook is silent, exits 0, and is quick', () => {
-  const bare = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-hooks-')));
+  const bare = tempDir('hodos-hooks-');
   // A payload every hook can read: the two that take one use different keys of it.
   const payload = JSON.stringify({
     session_id: 'test',
@@ -99,7 +99,7 @@ test('every script prints usage on --help and exits 0', () => {
 });
 
 test('in a project with an active task the hooks do what COMPONENTS.md §4 says', () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-hooked-')));
+  const root = tempDir('hodos-hooked-');
   mkdirSync(join(root, '.claude', 'hodos'), { recursive: true });
   writeFileSync(join(root, '.claude', 'hodos', 'config.json'), JSON.stringify({ version: 1, verifiedAt: '2026-08-31' }));
   execFileSync('git', ['init', '-q'], { cwd: root });

@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { pilotPackages, prepPilot, redactPilot, snippetPackages } from './invoke.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const INVOKE = fileURLToPath(new URL('./invoke.mjs', import.meta.url));
 const sha = (text) => createHash('sha256').update(text).digest('hex');
@@ -15,7 +15,7 @@ const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.email=t@t', '-c',
 
 /** A repository with a base and a head commit, and a cached package for it. */
 function pilotRepo() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-holdout-pilot-')));
+  const root = tempDir('hodos-holdout-pilot-');
   const repo = join(root, 'repo');
   mkdirSync(join(repo, 'src'), { recursive: true });
   writeFileSync(join(repo, 'src/lib.rs'), 'pub fn one() -> u32 {\n    1\n}\n');
@@ -83,7 +83,7 @@ test('the snippet packages come from this set, not from bench/review', () => {
 });
 
 test('--dry-run builds every snippet package with its patches applied, and dispatches nothing', () => {
-  const out = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-holdout-dry-')));
+  const out = tempDir('hodos-holdout-dry-');
 
   const run = spawnSync(process.execPath, [INVOKE, '--out', out, '--dry-run', '--pilot', '/nonexistent/checkout'], { encoding: 'utf8' });
 

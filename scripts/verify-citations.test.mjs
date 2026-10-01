@@ -2,18 +2,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { anchors, citations, verifyAnchors, verifyFile } from './verify-citations.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-citations.mjs', import.meta.url));
 
 function tree(files) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-cite-')));
+  const root = tempDir('hodos-cite-');
   for (const [rel, content] of Object.entries(files)) {
     const abs = join(root, rel);
     mkdirSync(dirname(abs), { recursive: true });

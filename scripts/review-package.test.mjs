@@ -2,13 +2,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, appendFileSync, rmSync, chmodSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, appendFileSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { changedExports, section, previousFindings, taskDirPaths } from './review-package.mjs';
+import { tempDir, track } from './temp-dir.mjs';
 
 const SCRIPT = fileURLToPath(new URL('./review-package.mjs', import.meta.url));
 
@@ -64,7 +65,7 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' 
 
 /** A git repository with a hodos config and one commit before the task's base. */
 function project() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-package-')));
+  const root = tempDir('hodos-package-');
   git(root, 'init', '-q', '-b', 'main');
   git(root, 'config', 'user.email', 'bench@hodos.test');
   git(root, 'config', 'user.name', 'hodos bench');
@@ -100,7 +101,15 @@ function task(root, slug = 'orders-summary', { commits = 2, plan = PLAN, base } 
   return { dir, baseSha, shas };
 }
 
-const run = (root, ...args) => spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, encoding: 'utf8' });
+/**
+ * A `--target` run writes its package into a fresh temp directory and leaves
+ * it for the reviewer, so the test that caused it removes it.
+ */
+const run = (root, ...args) => {
+  const out = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, encoding: 'utf8' });
+  if (args.includes('--target') && out.status === 0) track(dirname(out.stdout.trim()));
+  return out;
+};
 const inputOf = (dir) => readFileSync(join(dir, 'review-input.md'), 'utf8');
 
 test('--help prints the usage and exits 0', () => {
@@ -125,7 +134,7 @@ test('no slug exits 2', () => {
 });
 
 test('a project without a hodos config exits 1 with the reason', () => {
-  const bare = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-noconfig-')));
+  const bare = tempDir('hodos-noconfig-');
   const out = run(bare, 'orders-summary');
 
   assert.equal(out.status, 1);
@@ -615,7 +624,7 @@ test('--target and a slug are not the same call', () => {
 
 /** A monorepo per FORMATS.md §1: a root config, a nested one, a package in each. */
 function monorepo() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-mono-')));
+  const root = tempDir('hodos-mono-');
   git(root, 'init', '-q', '-b', 'main');
   git(root, 'config', 'user.email', 'bench@hodos.test');
   git(root, 'config', 'user.name', 'hodos bench');

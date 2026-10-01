@@ -2,19 +2,19 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, readdirSync, renameSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { appendFileSync, chmodSync, mkdirSync, readdirSync, renameSync, writeFileSync, readFileSync, existsSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { append, deriveState, normalizeSlug, eventOf } from './ledger.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const LEDGER = fileURLToPath(new URL('./ledger.mjs', import.meta.url));
 
 /** A project with a config and a git repository — `Plan: approved` reads HEAD. */
 function project() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-ledger-')));
+  const root = tempDir('hodos-ledger-');
   mkdirSync(join(root, '.claude', 'hodos'), { recursive: true });
   writeFileSync(join(root, '.claude', 'hodos', 'config.json'), JSON.stringify({ version: 1 }));
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
@@ -54,7 +54,7 @@ const runIn = (root, home, session, ...args) =>
 
 /** A fake home holding one transcript line per session id given. */
 function transcripts(sessions) {
-  const home = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-home-')));
+  const home = tempDir('hodos-home-');
   const dir = join(home, '.claude', 'projects', '-Users-someone-repo');
   mkdirSync(dir, { recursive: true });
   for (const [session, usage] of Object.entries(sessions)) {
@@ -345,7 +345,7 @@ test('--slug writes to a task that is not the active one', () => {
 });
 
 test('with no config the script is silent and exits 0 — hooks rely on this', () => {
-  const bare = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-bare-')));
+  const bare = tempDir('hodos-bare-');
   const out = run(bare, 'add', 'Compact: session compacted');
 
   assert.equal(out.status, 0);
@@ -590,7 +590,7 @@ test('claim on a task that does not exist exits 1 and writes nothing', () => {
 });
 
 test('claim with no config exits 0 and says nothing was claimed', () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-ledger-')));
+  const root = tempDir('hodos-ledger-');
   const out = runAs(root, 'sess-b', 'claim', 'orders-summary');
 
   assert.equal(out.status, 0);
@@ -719,7 +719,7 @@ test('sessions --gc removes a pointer whose session transcript is gone', () => {
 
 test('sessions --gc keeps every pointer when it cannot see any transcript at all', () => {
   const root = started();
-  const home = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-home-'))); // no .claude/projects
+  const home = tempDir('hodos-home-'); // no .claude/projects
   assert.equal(runIn(root, home, 'sess-a', 'claim', 'orders-summary').status, 0);
 
   const out = runIn(root, home, 'sess-a', 'sessions', '--gc');
@@ -731,7 +731,7 @@ test('sessions --gc keeps every pointer when it cannot see any transcript at all
 test('sessions --gc collects a pointer that names no task, transcripts readable or not', () => {
   // Both arms: with the transcripts in reach the pointer looks live by every
   // other test, and without them no test but this one can call it dead.
-  const homes = [transcripts({ 'sess-a': 1 }), realpathSync(mkdtempSync(join(tmpdir(), 'hodos-home-')))];
+  const homes = [transcripts({ 'sess-a': 1 }), tempDir('hodos-home-')];
   for (const home of homes) {
     const root = started();
     assert.equal(runIn(root, home, 'sess-a', 'claim', 'orders-summary').status, 0);
@@ -1170,7 +1170,7 @@ test('nothing returns to inert once the task is past its verdict', () => {
 
 test('writeAtomic retries a rename Windows refused while another process held the target', async () => {
   const { writeAtomic } = await import('./ledger.mjs');
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-atomic-')));
+  const dir = tempDir('hodos-atomic-');
   const target = join(dir, 'state.json');
   let calls = 0;
   const busy = (code) => (from, to) => {
@@ -1189,7 +1189,7 @@ test('writeAtomic retries a rename Windows refused while another process held th
 
 test('writeAtomic gives up after its bound, removes its temporary file, and retries nothing else', async () => {
   const { writeAtomic } = await import('./ledger.mjs');
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-atomic-')));
+  const dir = tempDir('hodos-atomic-');
   const target = join(dir, 'state.json');
   let calls = 0;
   const always = (code) => () => {

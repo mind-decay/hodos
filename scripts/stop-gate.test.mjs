@@ -2,13 +2,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { openItem } from './stop-gate.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const GATE = fileURLToPath(new URL('./stop-gate.mjs', import.meta.url));
 
@@ -23,7 +23,7 @@ const STATE = {
 };
 
 function project({ gate = true, state = {} } = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-stop-')));
+  const root = tempDir('hodos-stop-');
   mkdirSync(join(root, '.git'), { recursive: true });
   const taskDir = join(root, '.claude', 'hodos', 'tasks', 'orders-summary');
   mkdirSync(taskDir, { recursive: true });
@@ -65,7 +65,7 @@ test('the gate is off by default', () => {
 });
 
 test('with no config it exits 0 silently', () => {
-  const bare = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-nostop-')));
+  const bare = tempDir('hodos-nostop-');
   const out = run(bare);
 
   assert.equal(out.status, 0);
@@ -139,7 +139,7 @@ test('--help exits 0', () => {
 });
 
 test('a ledger event in the same second still resets the count', () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-stopreal-')));
+  const root = tempDir('hodos-stopreal-');
   mkdirSync(join(root, '.claude', 'hodos'), { recursive: true });
   writeFileSync(
     join(root, '.claude', 'hodos', 'config.json'),

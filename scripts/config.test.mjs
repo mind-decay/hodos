@@ -2,19 +2,20 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { DETECTOR_IDS, activeTask, resolveTask, checkConfig, findConfig, forFiles, gitRoot, isFunctionSource, merge, positionalReach, preflight, readState } from './config.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const CONFIG = fileURLToPath(new URL('./config.mjs', import.meta.url));
 
 function tree(files) {
   // realpath: macOS tmpdir is a symlink, and the walk compares directory paths.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-config-')));
+  const root = tempDir('hodos-config-');
   for (const [rel, content] of Object.entries(files)) {
     const abs = join(root, rel);
     mkdirSync(dirname(abs), { recursive: true });

@@ -1,14 +1,17 @@
 // The test collector of `npm test`. Its own failure mode is silence — a run
 // that finds nothing reports 0 tests and looks like a green suite — so the
-// collector refuses an empty root rather than returning an empty list.
+// collector refuses an empty root rather than returning an empty list. The
+// runner's is the same silence about what a run leaves in the temp dir, so a
+// leftover fails a run whose tests all passed.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
-import { collect, collectRoots, presentRoots, ROOTS } from './run-tests.mjs';
+import { collect, collectRoots, presentRoots, ROOTS, runIsolated, verdict } from './run-tests.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 /** A tree of files, written under a temp root. */
 function tree(files) {
@@ -93,4 +96,105 @@ test('presentRoots keeps the roots this tree carries, in the order given', () =>
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+/**
+ * `runIsolated` as `npm test` calls it, from a process that is not itself a
+ * test: a `node --test` spawned from inside one inherits NODE_TEST_CONTEXT
+ * and exits 0 whatever its tests did (PLATFORM-NOTES.md fact 64).
+ */
+function isolated(file, base) {
+  const context = process.env.NODE_TEST_CONTEXT;
+  delete process.env.NODE_TEST_CONTEXT;
+  try {
+    return runIsolated([file], { cwd: dirname(file), base, stdio: 'pipe' });
+  } finally {
+    if (context !== undefined) process.env.NODE_TEST_CONTEXT = context;
+  }
+}
+
+/** A fixture test file whose tests are `body`, and an empty directory for its run's `base`. */
+function fixture(body) {
+  const file = join(tempDir('hodos-runtests-'), 'fixture.test.mjs');
+  writeFileSync(
+    file,
+    `import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+${body}
+`,
+  );
+  return { file, base: tempDir('hodos-runtests-base-') };
+}
+
+test('runIsolated names a directory a passing run left in its temp dir', () => {
+  const { file, base } = fixture(`test('leaves a directory', () => { mkdirSync(join(tmpdir(), 'left-dir')); });`);
+
+  assert.deepEqual(isolated(file, base), { status: 0, leftovers: ['left-dir'] });
+  assert.deepEqual(readdirSync(base), []);
+});
+
+test('runIsolated names a plain file too: anything a run leaves is a leak', () => {
+  const { file, base } = fixture(`test('leaves a file', () => { writeFileSync(join(tmpdir(), 'left-file'), ''); });`);
+
+  assert.deepEqual(isolated(file, base), { status: 0, leftovers: ['left-file'] });
+  assert.deepEqual(readdirSync(base), []);
+});
+
+test('runIsolated reports nothing for a run that left nothing', () => {
+  const { file, base } = fixture(`test('leaves nothing', () => {});`);
+
+  assert.deepEqual(isolated(file, base), { status: 0, leftovers: [] });
+  assert.deepEqual(readdirSync(base), []);
+});
+
+test('runIsolated keeps the status of a run whose test failed', () => {
+  const { file, base } = fixture(`test('fails', () => { assert.fail('on purpose'); });`);
+
+  assert.deepEqual(isolated(file, base), { status: 1, leftovers: [] });
+  assert.deepEqual(readdirSync(base), []);
+});
+
+test('the run sees TMPDIR, TMP and TEMP at its own sandbox, which is gone once it returns', () => {
+  const seen = join(tempDir('hodos-runtests-notes-'), 'env.json');
+  const { file, base } = fixture(
+    `test('records its environment', () => {
+  const { TMPDIR, TMP, TEMP } = process.env;
+  writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ TMPDIR, TMP, TEMP }));
+});`,
+  );
+
+  assert.deepEqual(isolated(file, base), { status: 0, leftovers: [] });
+  const env = JSON.parse(readFileSync(seen, 'utf8'));
+  const sandbox = env.TMPDIR;
+  assert.deepEqual(env, { TMPDIR: sandbox, TMP: sandbox, TEMP: sandbox });
+  assert.equal(dirname(sandbox), base);
+  assert.ok(basename(sandbox).startsWith('hodos-tests-'), sandbox);
+  assert.equal(existsSync(sandbox), false);
+  assert.deepEqual(readdirSync(base), []);
+});
+
+test('verdict: a leftover fails a run whose tests passed, one line per name', () => {
+  assert.deepEqual(verdict({ status: 0, leftovers: [] }), { code: 0, lines: [] });
+
+  const left = verdict({ status: 0, leftovers: ['hodos-config-a1', 'stray.txt'] });
+  assert.equal(left.code, 1);
+  assert.equal(left.lines.length, 2);
+  assert.match(left.lines[0], /hodos-config-a1/);
+  assert.match(left.lines[1], /stray\.txt/);
+});
+
+test('verdict: a failed run keeps its own code, and still names what it left', () => {
+  assert.deepEqual(verdict({ status: 2, leftovers: [] }), { code: 2, lines: [] });
+
+  const both = verdict({ status: 2, leftovers: ['hodos-ledger-b2'] });
+  assert.equal(both.code, 2);
+  assert.equal(both.lines.length, 1);
+  assert.match(both.lines[0], /hodos-ledger-b2/);
+
+  // No status: the spawn failed or a signal ended it, which is not a pass.
+  assert.deepEqual(verdict({ status: null, leftovers: [] }), { code: 1, lines: [] });
 });

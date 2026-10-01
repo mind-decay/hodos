@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing a plugin install loads has changed since 0.2.2: no skill, agent, hook or engine script. What changed is the repository's own test support, and the record of hodos building itself (`docs/BUILD-PLAN.md`, Stage 12d-3).
+
+### Changed
+
+- **`npm test` fails a run that leaves anything in its temp directory.** It points `TMPDIR`, `TMP` and `TEMP` at a sandbox of its own, names every entry left there, and removes the sandbox whatever the run did. Every test file makes its temp directories through `scripts/temp-dir.mjs`, which removes them when the file ends, a failed test's included (decision 0186).
+
 ## [0.2.2] — 2026-09-30
 
 The fixes of 12d-2's second review. The `inert` upgrade had one path on which a line the reviewer called behaviour stayed unreviewed.

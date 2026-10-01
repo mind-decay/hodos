@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { buildReport, checkKey, loadCases, scoreHoldout } from './run.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const RUN = fileURLToPath(new URL('./run.mjs', import.meta.url));
@@ -14,7 +14,7 @@ const run = (...args) => spawnSync(process.execPath, [RUN, ...args], { encoding:
 
 /** A copy of the committed set, to break one thing in. */
 function setCopy() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodos-holdout-'));
+  const dir = tempDir('hodos-holdout-');
   cpSync(HERE, dir, { recursive: true, filter: (src) => !src.includes('pilot-cache') && !src.includes('/runs/') });
   return dir;
 }
@@ -148,7 +148,7 @@ test('a defect the review names at its file:line only in ## Spec is reported apa
 
 /** A run directory holding a verdicts.json and a measurements.json. */
 function runFiles(packages, measured) {
-  const dir = mkdtempSync(join(tmpdir(), 'hodos-holdout-run-'));
+  const dir = tempDir('hodos-holdout-run-');
   writeFileSync(join(dir, 'verdicts.json'), JSON.stringify({ packages }));
   writeFileSync(join(dir, 'measurements.json'), JSON.stringify(measured));
   return dir;

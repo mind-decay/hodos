@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
@@ -17,20 +16,11 @@ import {
   scoreRows,
   THRESHOLDS,
 } from './run.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'run.mjs');
 const SET = join(HERE, 'set.json');
-
-const made = [];
-after(() => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true });
-});
-const temp = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodos-router-'));
-  made.push(dir);
-  return dir;
-};
 
 const run = (args, options = {}) =>
   execFileSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', ...options });
@@ -189,7 +179,7 @@ describe('set.json', () => {
     assert.deepEqual(set.thresholds, THRESHOLDS);
     const bent = structuredClone(set);
     bent.thresholds.path = 0.5;
-    const path = join(temp(), 'set.json');
+    const path = join(tempDir('hodos-router-'), 'set.json');
     writeFileSync(path, JSON.stringify(bent));
     assert.throws(() => loadSet(path), /threshold/);
   });
@@ -244,7 +234,7 @@ describe('the command line', () => {
   });
 
   it('exits 1 when a label does not follow from its rows', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const set = JSON.parse(readFileSync(SET, 'utf8'));
     set.cases[0].expect.path = set.cases[0].expect.path === 'deep' ? 'quick' : 'deep';
     const path = join(dir, 'set.json');
@@ -261,7 +251,7 @@ describe('the command line', () => {
   });
 
   it('scores a verdicts file against the thresholds', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const set = loadSet(SET);
     const path = join(dir, 'verdicts.json');
     writeFileSync(path, JSON.stringify(set.cases.map((c) => ({ id: c.id, ...c.expect }))));
@@ -278,7 +268,7 @@ describe('the command line', () => {
   it('does not run itself when another script of the same name imports it', () => {
     // COMPONENTS.md §7 names two future siblings called run.mjs:
     // bench/review/run.mjs (Stage 6) and bench/noop/run.mjs (Stage 11).
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const sibling = join(dir, 'run.mjs');
     writeFileSync(
       sibling,
@@ -302,7 +292,7 @@ describe('--json', () => {
     }));
 
   it('every metric carries its kind, and the three axes are gates', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const file = join(dir, 'verdicts.json');
     writeFileSync(file, JSON.stringify(verdictsFor(41)));
     const printed = run(['--verdicts', file, '--json']);
@@ -317,7 +307,7 @@ describe('--json', () => {
   });
 
   it('the measurements file is folded in, labeled measurement and never thresholded', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const verdicts = join(dir, 'verdicts.json');
     const measurements = join(dir, 'measurements.json');
     writeFileSync(verdicts, JSON.stringify(verdictsFor(41)));
@@ -338,7 +328,7 @@ describe('--json', () => {
   });
 
   it('--verdicts twice is a mixed score, and the report says which came from where', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const carried = join(dir, 'carried.json');
     const fresh = join(dir, 'fresh.json');
     const set = loadSet(SET);
@@ -360,7 +350,7 @@ describe('--json', () => {
   });
 
   it('a failing gate is in the report and in the exit code', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-router-');
     const file = join(dir, 'verdicts.json');
     writeFileSync(file, JSON.stringify(verdictsFor(0)));
     assert.throws(() => run(['--verdicts', file, '--json']), (error) => {

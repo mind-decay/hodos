@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -17,22 +16,11 @@ import {
   seedPair,
 } from './pair-seed.mjs';
 import { frontier, parseMap } from '../../scripts/campaigns.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'pair-seed.mjs');
 const MAP_REL = `.claude/hodos/campaigns/${SLUG}.md`;
-
-/** Temp directories this file made, removed when it ends. */
-const made = [];
-const temp = (prefix) => {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
-  made.push(dir);
-  return dir;
-};
-
-after(() => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true });
-});
 
 // stderr piped rather than inherited: `git fetch` narrates to it, and this
 // file's output is read as a test report.
@@ -43,7 +31,7 @@ const git = (cwd, ...args) =>
 let pair;
 const seeded = () => {
   if (!pair) {
-    const into = join(temp('hodos-pair-test-'), 'ws');
+    const into = join(tempDir('hodos-pair-test-'), 'ws');
     pair = seedPair({ into, modules: false });
   }
   return pair;
@@ -159,7 +147,7 @@ describe('the seeded pair', () => {
     // One fetch on a copy of its own: the read this proves is criterion 7's,
     // and doing it on the shared workspace would leave the ref behind for the
     // test above.
-    const into = join(temp('hodos-pair-fetch-'), 'ws');
+    const into = join(tempDir('hodos-pair-fetch-'), 'ws');
     const { mono } = seedPair({ into, modules: false });
     git(mono, 'fetch', '--no-tags', 'origin');
     assert.equal(
@@ -180,14 +168,14 @@ describe('the seeded pair', () => {
   });
 
   it('refuses a workspace directory that already holds something', () => {
-    const dir = temp('hodos-pair-used-');
+    const dir = tempDir('hodos-pair-used-');
     mkdirSync(join(dir, 'ws'), { recursive: true });
     writeFileSync(join(dir, 'ws', 'stray.txt'), 'x');
     assert.throws(() => seedPair({ into: join(dir, 'ws'), modules: false }), /not empty/);
   });
 
   it('prints the workspace as JSON from the command line', () => {
-    const into = join(temp('hodos-pair-cli-'), 'ws');
+    const into = join(tempDir('hodos-pair-cli-'), 'ws');
     const out = execFileSync(process.execPath, [SCRIPT, '--into', into, '--no-modules'], { encoding: 'utf8' });
     const json = JSON.parse(out);
     assert.equal(json.workspace, into);
@@ -207,7 +195,7 @@ describe('a claim over the seeded claim', () => {
       encoding: 'utf8',
     });
   const fetched = () => {
-    const into = join(temp('hodos-pair-claim-'), 'ws');
+    const into = join(tempDir('hodos-pair-claim-'), 'ws');
     const ws = seedPair({ into, modules: false });
     git(ws.mono, 'fetch', '--no-tags', 'origin');
     return ws;

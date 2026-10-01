@@ -2,13 +2,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, utimesSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { digest, compactLine } from './state-digest.mjs';
+import { tempDir } from './temp-dir.mjs';
 import { findConfig } from './config.mjs';
 
 const DIGEST = fileURLToPath(new URL('./state-digest.mjs', import.meta.url));
@@ -16,7 +16,7 @@ const DIGEST = fileURLToPath(new URL('./state-digest.mjs', import.meta.url));
 const CAP_CHARS = 300 * 4; // AUTHORING.md §7: 300 tokens, counted as chars/4
 
 function project(config = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-digest-')));
+  const root = tempDir('hodos-digest-');
   mkdirSync(join(root, '.git'), { recursive: true });
   mkdirSync(join(root, '.claude', 'hodos', 'tasks'), { recursive: true });
   writeFileSync(
@@ -44,7 +44,7 @@ const setActive = (root, slug) => writeFileSync(join(root, '.claude', 'hodos', '
 const run = (root, ...args) => spawnSync(process.execPath, [DIGEST, ...args], { cwd: root, encoding: 'utf8' });
 
 test('no config prints nothing and exits 0', () => {
-  const bare = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-nodigest-')));
+  const bare = tempDir('hodos-nodigest-');
   const out = run(bare);
 
   assert.equal(out.status, 0);
@@ -183,10 +183,10 @@ test('a node naming another repository is reported like any other (Stage 9b)', (
 });
 
 test("a map in another repository is a row of this project's digest", () => {
-  const away = project({ campaigns: { external: ['../home/.claude/hodos/campaigns'] } });
   // The two are siblings, which is what `externalEntry` in the pair seed
   // produces and what `FORMATS.md §2`'s repo-relative path means.
-  const home = join(away, '..', 'home');
+  const home = tempDir('hodos-digest-home-');
+  const away = project({ campaigns: { external: [`../${basename(home)}/.claude/hodos/campaigns`] } });
   mkdirSync(join(home, '.git'), { recursive: true });
   campaign(home, 'badge-rollout', { ready: 2, blocked: 0, fog: 1 });
 
@@ -254,13 +254,13 @@ function withOrigin({ ready = 2 } = {}) {
 
   // A directory of its own: two tests in this file seed a pair, and one of
   // them removes its origin.
-  const bare = join(realpathSync(mkdtempSync(join(tmpdir(), 'hodos-origin-'))), 'origin.git');
+  const bare = join(tempDir('hodos-origin-'), 'origin.git');
   git(root, 'clone', '--quiet', '--bare', root, bare);
   git(root, 'remote', 'add', 'origin', bare);
 
   // The claim is made in a clone of the origin, so this copy holds neither the
   // commit nor a remote-tracking ref for it until it fetches.
-  const clone = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-claimer-')));
+  const clone = tempDir('hodos-claimer-');
   git(clone, 'clone', '--quiet', bare, clone);
   git(clone, 'checkout', '--quiet', '-b', 'feature/ready-1');
   writeFileSync(
@@ -337,7 +337,7 @@ test('--help names the flag, and an unknown one is still exit 2', () => {
 
 /** A real repository on `feat/orders`, one commit ahead of its upstream. */
 function gitProject(config = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-offer-')));
+  const root = tempDir('hodos-offer-');
   const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
   git('init', '-q', '-b', 'main');
   git('config', 'user.email', 'test@example.com');
@@ -475,7 +475,7 @@ test('the offer is the first line the cap drops, never a row of state', () => {
 
 /** A repository with a committed rule layer, `scanSha` at that commit. */
 function scannedProject(files) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-decay-')));
+  const root = tempDir('hodos-decay-');
   const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
   git('init', '-q', '-b', 'main');
   git('config', 'user.email', 'test@example.com');

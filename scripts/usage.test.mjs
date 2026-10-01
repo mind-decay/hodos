@@ -2,13 +2,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { summarize, transcriptPath } from './usage.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const USAGE = fileURLToPath(new URL('./usage.mjs', import.meta.url));
 
@@ -37,7 +37,7 @@ function message(id, usage, { sidechain = false, blocks = 1 } = {}) {
  * session's `subagents` keyed by agent file name, where Claude Code writes them.
  */
 function home(transcripts, subagents = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-usage-')));
+  const root = tempDir('hodos-usage-');
   const projects = join(root, '.claude', 'projects', '-Users-someone-repo');
   mkdirSync(projects, { recursive: true });
   for (const [session, lines] of Object.entries(transcripts)) {

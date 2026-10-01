@@ -1,12 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { rmSync } from 'node:fs';
 import { auditSource, auditTree } from './assert-audit.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
-const dir = () => mkdtempSync(join(tmpdir(), 'hodos-assertaudit-'));
+const dir = () => tempDir('hodos-assertaudit-');
 
 test('a bare assert! is bare, and one with a message is not', () => {
   const r = auditSource('assert!(a);\nassert!(a, "why");\n');
@@ -57,7 +56,6 @@ test('auditTree reports one row per file, sorted by bare count descending', () =
   assert.equal(rows[0].file, 'crates/a/tests/one.rs');
   assert.equal(rows[0].bare, 2);
   assert.equal(rows[1].bare, 0);
-  rmSync(root, { recursive: true, force: true });
 });
 
 test('a raw string is a string: its quotes and commas do not leak into the scan', () => {
@@ -145,7 +143,6 @@ test('auditTree reads only the files under a tests directory', () => {
   const rows = auditTree(root);
   assert.deepEqual(rows.map((r) => r.file), ['crates/a/tests/it.rs']);
   assert.equal(rows[0].bare, 1);
-  rmSync(root, { recursive: true, force: true });
 });
 
 test('a whole macro call is `assert` + `!` + `(`, and nothing else counts', () => {

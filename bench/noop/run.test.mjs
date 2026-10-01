@@ -2,27 +2,17 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { checkScenarios, evaluate, pluginFor, score, scoreScenario } from './run.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'run.mjs');
 const ROOT = join(HERE, '..', '..');
-
-const made = [];
-after(() => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true });
-});
-const temp = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodos-noop-'));
-  made.push(dir);
-  return dir;
-};
 
 const observation = (over = {}) => ({
   id: 's1',
@@ -147,7 +137,7 @@ describe('checkScenarios — the set is self-consistent', () => {
   };
 
   it('a home whose replaceWith is the line itself is a problem: the control keeps the rule', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     writeFileSync(join(dir, 'one.md'), 'the rule line\n');
     const file = write(dir, {
       threshold: null,
@@ -165,7 +155,7 @@ describe('checkScenarios — the set is self-consistent', () => {
   });
 
   it('a rule the control copy still states is a problem, found without a model call', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     writeFileSync(join(dir, 'one.md'), 'the rule line\n');
     writeFileSync(join(dir, 'elsewhere.md'), 'the rule, said again\n');
     const file = write(dir, {
@@ -185,7 +175,7 @@ describe('checkScenarios — the set is self-consistent', () => {
   });
 
   it('a probe hit the scenario declares is not a problem', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     writeFileSync(join(dir, 'one.md'), 'the rule line\n');
     writeFileSync(join(dir, 'elsewhere.md'), 'the rule, said again\n');
     const file = write(dir, {
@@ -210,7 +200,7 @@ describe('checkScenarios — the set is self-consistent', () => {
   });
 
   it('a line no file carries is a problem', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     const file = write(dir, {
       threshold: null,
       scenarios: [{ id: 'x', lines: [{ file: 'README.md', line: 'a line nothing carries' }], check: { kind: 'transcript', pattern: '.' } }],
@@ -221,7 +211,7 @@ describe('checkScenarios — the set is self-consistent', () => {
   });
 
   it('a pattern that does not compile is a problem, caught before a run is scored against it', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     const file = write(dir, {
       threshold: null,
       scenarios: [{ id: 'x', lines: [{ file: 'README.md', line: '# hodos' }], check: { kind: 'transcript', pattern: '(?m)^Path:' } }],
@@ -232,7 +222,7 @@ describe('checkScenarios — the set is self-consistent', () => {
   });
 
   it('a line the file carries twice is a problem: removing it would remove two behaviors', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     writeFileSync(join(dir, 'twice.md'), 'the same line\nthe same line\n');
     const file = write(dir, {
       threshold: null,
@@ -252,7 +242,7 @@ describe('the two arms differ', () => {
       .filter((line) => line.trim() === one.line.trim()).length;
 
   it('the control loses every copy of the rule, not only the authored line', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     // Run 1 (2026-09-03) scored 0/6 because the plugin ships its own
     // specification: deleting one skill line left the rule in docs/. A scenario
     // now names every home of its rule and the control loses all of them.
@@ -267,7 +257,7 @@ describe('the two arms differ', () => {
   });
 
   it('a home the rule shares with other rules is rewritten, not deleted', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     const scenario = set.scenarios.find((one) => one.lines.some((l) => l.replaceWith));
     assert.ok(scenario, 'the shipped set has a scenario with an embedded home');
     const cut = pluginFor(scenario, 'without', dir);
@@ -278,8 +268,29 @@ describe('the two arms differ', () => {
     }
   });
 
+  it('the control copy carries neither the build repository\'s CLAUDE.md nor its .claude/ layer, and the probe reads neither', () => {
+    // Decisions 0102 and 0185: neither ships, so no installing machine has them.
+    // A review package in a gitignored task directory quotes the diff, rule
+    // lines included, and made the sweep fail on a dogfooded checkout.
+    const dir = tempDir('hodos-noop-');
+    writeFileSync(join(dir, 'one.md'), 'the rule line\n');
+    writeFileSync(join(dir, 'CLAUDE.md'), 'the rule, in the build repository\'s map\n');
+    mkdirSync(join(dir, '.claude/hodos/tasks/some-task'), { recursive: true });
+    writeFileSync(join(dir, '.claude/hodos/tasks/some-task/review-input.md'), '+the rule, quoted by a diff\n');
+    const scenario = { id: 'x', lines: [{ file: 'one.md', line: 'the rule line' }], probe: 'the rule', check: { kind: 'transcript', pattern: '.' } };
+    const file = join(dir, 'scenarios.json');
+    writeFileSync(file, JSON.stringify({ threshold: null, scenarios: [scenario] }));
+
+    const problems = checkScenarios(JSON.parse(execFileSync(process.execPath, [SCRIPT, '--print-set', '--scenarios', file], { encoding: 'utf8' })), { root: dir });
+    assert.deepEqual(problems, []);
+    const out = tempDir('hodos-noop-');
+    const cut = pluginFor(scenario, 'without', out, { root: dir });
+    assert.equal(existsSync(join(cut, '.claude')), false);
+    assert.equal(existsSync(join(cut, 'CLAUDE.md')), false);
+  });
+
   it('the plugin copy excludes what decision 0064 does not publish', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     const kept = pluginFor(set.scenarios[0], 'with', dir);
     assert.equal(existsSync(join(kept, 'docs/stages')), false);
     assert.equal(existsSync(join(kept, 'research')), false);
@@ -295,7 +306,7 @@ describe('the command line', () => {
   });
 
   it('--dry-run prints both arms of every scenario and calls nothing', () => {
-    const printed = run(['--invoke', '--out', temp(), '--dry-run']);
+    const printed = run(['--invoke', '--out', tempDir('hodos-noop-'), '--dry-run']);
     const set = JSON.parse(run(['--print-set']));
     for (const scenario of set.scenarios) {
       for (const arm of ['with', 'without']) {
@@ -305,7 +316,7 @@ describe('the command line', () => {
   });
 
   it('--json before a threshold exists is refused, because a gate would be reported that nobody set', () => {
-    const dir = temp();
+    const dir = tempDir('hodos-noop-');
     const observations = join(dir, 'observations.json');
     writeFileSync(observations, JSON.stringify([]));
     assert.throws(() => run(['--observations', observations, '--json']), (error) => {

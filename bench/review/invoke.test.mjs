@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { groupPackages, parseReview, placeOf, prepare, resolveAnchors, commandFor } from './invoke.mjs';
+import { tempDir } from '../../scripts/temp-dir.mjs';
 
 const INVOKE = fileURLToPath(new URL('./invoke.mjs', import.meta.url));
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -125,7 +126,7 @@ test('parseReview survives a review with no Standards table', () => {
 });
 
 test('resolveAnchors finds each defect where it ended up in the applied copy', () => {
-  const copy = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-anchors-')));
+  const copy = tempDir('hodos-anchors-');
   mkdirSync(join(copy, 'src'), { recursive: true });
   writeFileSync(join(copy, 'src/a.ts'), ['const a = 1;', '', 'const b = 2;', 'const c = 3;'].join('\n'));
   const defects = [
@@ -140,7 +141,7 @@ test('resolveAnchors finds each defect where it ended up in the applied copy', (
 });
 
 test('--reparse rebuilds the verdicts from the reviews already on disk, dispatching nothing', () => {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-reparse-')));
+  const dir = tempDir('hodos-reparse-');
   writeFileSync(join(dir, 'p1-review.md'), REVIEW);
   writeFileSync(
     join(dir, 'verdicts.json'),

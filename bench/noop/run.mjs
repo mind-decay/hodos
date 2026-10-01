@@ -293,7 +293,9 @@ export function loadSet(path = DEFAULT_SET) {
  *
  * `docs/stages/` and `research/` are left out of the copy for the same reason
  * the published repository will not carry them (decision 0064): a stage report
- * quoting a rule is a home no installing machine has.
+ * quoting a rule is a home no installing machine has. So are `CLAUDE.md` and the
+ * `.claude/` layer this repository is dogfooded with (decisions 0102, 0185),
+ * whose gitignored task directories hold review packages that quote the diff.
  */
 export function pluginFor(scenario, arm, outDir, { root = ROOT } = {}) {
   const dir = join(outDir, `plugin-${scenario.id}-${arm}`);
@@ -304,6 +306,7 @@ export function pluginFor(scenario, arm, outDir, { root = ROOT } = {}) {
     if (entry === '.git' || entry === 'node_modules') continue;
     if (entry === 'bench') continue; // the fixtures are large and no kernel reads them
     if (entry === 'research') continue; // decision 0064: not published
+    if (entry === 'CLAUDE.md' || entry === '.claude') continue; // decisions 0102, 0185: not published
     cpSync(join(ROOT, entry), join(dir, entry), { recursive: true });
   }
   rmSync(join(dir, 'docs/stages'), { recursive: true, force: true }); // decision 0064

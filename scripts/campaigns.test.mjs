@@ -2,12 +2,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseMap, parseNodeLine, rewriteNode } from './campaigns.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const CAMPAIGNS = fileURLToPath(new URL('./campaigns.mjs', import.meta.url));
 
@@ -46,7 +46,7 @@ Home: shop.example/Shop.Web/spa
 `;
 
 export function mapDir(text = MAP, slug = 'state-migration') {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-camp-')));
+  const root = tempDir('hodos-camp-');
   mkdirSync(join(root, '.git'), { recursive: true });
   mkdirSync(join(root, '.claude', 'hodos', 'campaigns'), { recursive: true });
   writeFileSync(join(root, '.claude', 'hodos', 'config.json'), JSON.stringify({ version: 1 }));
@@ -193,7 +193,7 @@ test('a subproject map comes before the root map it sits under', () => {
 });
 
 test('no maps is not an error — status calls find on every project', () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-camp-')));
+  const root = tempDir('hodos-camp-');
   mkdirSync(join(root, '.git'), { recursive: true });
   assert.deepEqual(findMaps(root), []);
   const cli = run(['find'], root);
@@ -208,7 +208,7 @@ test('no maps is not an error — status calls find on every project', () => {
  * tests build it themselves so that they depend on no bench file.
  */
 function pair({ homeMap = MAP, awayMap = null, external = '../home/.claude/hodos/campaigns' } = {}) {
-  const ws = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-pair-')));
+  const ws = tempDir('hodos-pair-');
   const repo = (name, config, maps) => {
     const root = join(ws, name);
     mkdirSync(join(root, '.git'), { recursive: true });
@@ -317,7 +317,7 @@ const SLUG_PATH = join('.claude', 'hodos', 'campaigns', 'state-migration.md');
  * before a merge, and the one no working-tree read can see.
  */
 function claimedRepo({ node = 'users-list', claimed = true, remote = false } = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-claim-')));
+  const root = tempDir('hodos-claim-');
   const git = (...args) =>
     execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', '-c', 'commit.gpgsign=false', ...args], {
       cwd: root,
@@ -645,7 +645,7 @@ test('set still has no --name: a rename is a replacement (decision 0136)', () =>
 
 /** Two sibling repositories that are real git repositories, the map in `home`. */
 function realPair(text = MAP, homeConfig = { version: 1 }) {
-  const ws = realpathSync(mkdtempSync(join(tmpdir(), 'hodos-home-')));
+  const ws = tempDir('hodos-home-');
   const make = (name, config, maps) => {
     const root = join(ws, name);
     mkdirSync(join(root, '.claude', 'hodos', 'campaigns'), { recursive: true });
