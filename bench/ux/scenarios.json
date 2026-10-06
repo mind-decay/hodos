@@ -154,6 +154,10 @@
     {
       "file": "scripts/temp-dir.mjs",
       "why": "the test suite's temporary directories; prints nothing a developer reads"
+    },
+    {
+      "file": "scripts/permissions.mjs",
+      "why": "called by state-digest.mjs --repoint (decision 0204) and prints nothing; what it moved reaches the developer as the digest's permissions row, scenario digest-permissions-repoint"
     }
   ],
   "scenarios": [
@@ -509,6 +513,17 @@
       "channel": "both",
       "where": {
         "file": "scripts/config.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "digest-permissions-repoint",
+      "journey": "set-up",
+      "touchpoint": "the digest's permissions row after a plugin update",
+      "trigger": "a session starts, resumes or clears after an update, and the scripts rule init wrote names the previous version",
+      "channel": "unverified",
+      "where": {
+        "file": "scripts/state-digest.mjs"
       },
       "findings": []
     },

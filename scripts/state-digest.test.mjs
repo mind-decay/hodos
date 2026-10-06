@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -234,6 +234,102 @@ test('digest of a notFound config is empty', () => {
 test('--help exits 0, an unknown option exits 2', () => {
   assert.equal(spawnSync(process.execPath, [DIGEST, '--help'], { encoding: 'utf8' }).status, 0);
   assert.equal(spawnSync(process.execPath, [DIGEST, '--wat'], { encoding: 'utf8' }).status, 2);
+});
+
+// ── The scripts rule re-point (decision 0204) ──────────────────────────────
+// The engine runs from a copy at `<tmp>/cache/hodos/hodos/9.9.9/`, the layout a
+// plugin update leaves, so the rule init wrote for 9.9.8 is another version of
+// the running plugin.
+
+let cached = null;
+/** The engine's scripts and adapters, copied once into a plugin cache version directory. */
+function cachedEngine() {
+  if (cached) return cached;
+  const cache = join(tempDir('hodos-cache-'), 'cache', 'hodos', 'hodos');
+  const root = join(cache, '9.9.9');
+  for (const dir of ['scripts', 'adapters']) cpSync(fileURLToPath(new URL(`../${dir}`, import.meta.url)), join(root, dir), { recursive: true });
+  cached = { root, staleRule: `Bash(node ${join(cache, '9.9.8')}/scripts/*)`, rule: `Bash(node ${root}/scripts/*)` };
+  return cached;
+}
+
+const runCached = (root, ...args) =>
+  spawnSync(process.execPath, [join(cachedEngine().root, 'scripts', 'state-digest.mjs'), ...args], { cwd: root, encoding: 'utf8' });
+
+const settingsFile = (root) => join(root, '.claude', 'settings.local.json');
+const withStaleRule = (root) => {
+  writeFileSync(settingsFile(root), `${JSON.stringify({ permissions: { allow: [cachedEngine().staleRule] } }, null, 2)}\n`);
+  return readFileSync(settingsFile(root), 'utf8');
+};
+
+const MOVED = '- permissions: hodos scripts rule moved 9.9.8 → 9.9.9 in .claude/settings.local.json';
+
+test('--repoint moves a stale scripts rule to the running version and says so under the header', () => {
+  const root = project();
+  withStaleRule(root);
+  const out = runCached(root, '--repoint');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout.split('\n')[1], MOVED);
+  assert.deepEqual(JSON.parse(readFileSync(settingsFile(root), 'utf8')).permissions.allow, [cachedEngine().rule]);
+});
+
+test('without --repoint the digest leaves the settings file alone and prints no permissions row', () => {
+  const root = project();
+  const before = withStaleRule(root);
+  const out = runCached(root);
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.doesNotMatch(out.stdout, /^- permissions:/m);
+  assert.equal(readFileSync(settingsFile(root), 'utf8'), before);
+});
+
+test('the permissions row sits after the chat line and survives a cap that drops rows', () => {
+  const root = project();
+  for (let i = 0; i < 30; i += 1) task(root, `task-${i}`, {});
+  task(root, 'orders-summary', { chat: 'ru' });
+  setActive(root, 'orders-summary');
+  withStaleRule(root);
+  const bare = runCached(root, '--repoint').stdout;
+
+  assert.equal(bare.split('\n')[1], chatOf('ru', 'en'));
+  assert.equal(bare.split('\n')[2], MOVED);
+  assert.match(bare, /- … and \d+ more — \/hodos:status$/m);
+  assert.ok(bare.length <= CAP_CHARS, `${bare.length} chars`);
+});
+
+test('a write the file system refuses is reported and fails nothing', { skip: process.platform === 'win32' && 'chmod 0o555 does not make a directory unwritable on Windows' }, () => {
+  const root = project();
+  const before = withStaleRule(root);
+  chmodSync(join(root, '.claude'), 0o555);
+  let out;
+  try {
+    out = runCached(root, '--repoint');
+  } finally {
+    chmodSync(join(root, '.claude'), 0o755);
+  }
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(
+    out.stdout,
+    /^- permissions: could not move the hodos scripts rule 9\.9\.8 → 9\.9\.9 in \.claude\/settings\.local\.json \(EACCES\) — script calls will prompt$/m,
+  );
+  assert.equal(readFileSync(settingsFile(root), 'utf8'), before);
+});
+
+test('--repoint in a project with no hodos layer reads nothing and prints nothing', () => {
+  const bare = tempDir('hodos-nodigest-');
+  mkdirSync(join(bare, '.git'));
+  mkdirSync(join(bare, '.claude'));
+  const before = withStaleRule(bare);
+  const out = runCached(bare, '--repoint');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout, '');
+  assert.equal(readFileSync(settingsFile(bare), 'utf8'), before);
+});
+
+test('--help lists --repoint', () => {
+  assert.match(spawnSync(process.execPath, [DIGEST, '--help'], { encoding: 'utf8' }).stdout, /^ {2}--repoint {2,}\S/m);
 });
 
 // --- campaigns (FORMATS.md §12, Stage 9a)

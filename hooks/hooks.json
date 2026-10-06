@@ -9,7 +9,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs", "--repoint"],
             "timeout": 10
           }
         ]

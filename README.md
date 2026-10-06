@@ -6,7 +6,7 @@ hodos is a Claude Code plugin that installs a complete development workflow into
 
 The developer is the driver of ideas and decisions. hodos is the driver of the *process*: it asks the right questions, refuses to guess where the plan is silent, reviews with fresh eyes, verifies by running, and cleans up after itself.
 
-**Status: 0.3.0.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
+**Status: 0.3.1.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
 
 | | hodos |
 |---|---|
@@ -124,7 +124,7 @@ The project layer is split on purpose, and the split is what makes it shareable.
 
 **Per machine, and gitignored:** `.claude/hodos/tasks/`, `active`, `sessions/`, `env/`, `history.jsonl`, and `.claude/settings.local.json`.
 
-**A second developer**, on their own machine, installs the plugin and approves the `permissions.allow` entry themselves. That entry names one machine's plugin root, so it lives in `settings.local.json`, which Claude Code gitignores — it does not arrive with a pull, and declining it costs one permission prompt per script call rather than breaking anything.
+**A second developer**, on their own machine, installs the plugin and approves the `permissions.allow` entry themselves. That entry names one machine's plugin root, so it lives in `settings.local.json`, which Claude Code gitignores — it does not arrive with a pull, and declining it costs one permission prompt per script call rather than breaking anything. The entry follows the installed version: after `claude plugin update`, the next session start moves it to the new plugin root and says so in the digest, so nobody approves it twice.
 
 **A teammate without hodos** still gets the rules and the map: `.claude/rules/*.md` load from a plain Claude Code session with no plugin at all, and they load when a file matching their `paths:` is opened with the Read tool. What that teammate does not get is every command, and every hook the plugin ships — those exit 0 wherever no `config.json` is found, so the repository behaves for them exactly as it did before.
 

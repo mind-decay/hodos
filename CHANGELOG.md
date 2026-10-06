@@ -5,6 +5,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-06
+
+After a plugin update, the scripts rule `init` wrote still named the previous version's directory, so every script call prompted again. This patch moves the rule with the installed version.
+
+### Fixed
+
+- **A plugin update keeps the scripts permission `init` wrote.** At each session start, resume and `/clear`, the SessionStart hook runs `state-digest.mjs --repoint`. It finds the rule `init` writes, `Bash(node <plugin root>/scripts/*)`, in `.claude/settings.local.json` at the project root, and when that rule names another version directory of the running plugin it moves the rule to the running version, several such rules converging on one. Claude Code reloads the permission in the same session. The digest says what moved in one row, `- permissions: hodos scripts rule moved 0.3.0 → 0.3.1 in .claude/settings.local.json`, or why it could not, and the cap never drops that row. Nothing is added where no rule was approved, no other entry or key changes, a session still running the version an update replaced moves nothing, and a `--plugin-dir` checkout is never taken for a version. A narrower rule the permission dialog wrote stays as it is (decision 0204).
+
 ## [0.3.0] — 2026-10-06
 
 What a plugin install loads has changed since 0.2.2 in eleven skills, sixteen phase references, two agents, six engine scripts and the hooks manifest, which gains a hooks module. `run` can be resumed by a go-ahead in words, `ledger.mjs claim` keeps S2 out of the session that approved the plan, and `finish` now says plainly that it commits a campaign map in the same repository. Every exit the UX audit named ends on one `Next:` line, `ledger.mjs next` names what continues any task, `/hodos:task <slug>` resumes a task stopped before approval, and a third red check blocks the task on its question. Every gate the audit named leads with what the developer decides, and every option set it offers marks one recommended. Both reviewers leave a partial file when they reach their turn bound, at bounds measured from every saved dispatch, the commit gate lets a fix pass commit once it has recorded its checks green, and the Stop hook names a verify fix pass by its own number. Landing is asked rather than handed off: after the report, one question with the exact commands in each option, run on the answer, and `/hodos:handoff` asks the same way about its file. The digest, `/hodos:status` and the wait-what re-pitch each say where the work is and the one step that continues it, and an interactive session shows both in a band above the prompt. The lines the audit found printing the engine's own vocabulary now say what they mean, and the instructions the model reads keep their words. The chat speaks the developer's language in every session of a task, and what a program reads stays as written. The rest is the repository's own tooling: the UX audit, the test support, and the record of hodos building itself (`docs/BUILD-PLAN.md`, Stage 12d-3).
@@ -153,7 +161,8 @@ First release. The engine is complete and measured against the four projects in
 
 - `state.json` and the two claim pointers are written through a temp file and a rename, and a write refuses a ledger it could not read instead of deriving a beginning state from zero events (decision 0101).
 
-[Unreleased]: https://github.com/mind-decay/hodos/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mind-decay/hodos/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mind-decay/hodos/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mind-decay/hodos/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/mind-decay/hodos/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/mind-decay/hodos/compare/v0.2.0...v0.2.1

@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { claimsOnRefs, findMaps, formatFrontier, frontier, parseMap, refsOf, shortCounts } from './campaigns.mjs';
 import { activeTask, findConfig, readState } from './config.mjs';
 import { nextFacts, nextStep } from './ledger.mjs';
+import { repointFile } from './permissions.mjs';
 import { anchors, barePaths, citations, verifyAnchors, verifyFile } from './verify-citations.mjs';
 
 const TOKEN_CAP = 300; // AUTHORING.md §7
@@ -27,7 +28,7 @@ const CHAR_CAP = TOKEN_CAP * CHARS_PER_TOKEN;
 const DEFAULT_STALE_DAYS = 14;
 const FETCH_TIMEOUT_MS = 5000; // decision 0138
 
-const USAGE = `Usage: node scripts/state-digest.mjs [--full|--compact|--row]
+const USAGE = `Usage: node scripts/state-digest.mjs [--full|--compact|--row] [--repoint]
 
 Prints the hodos state of the current project as context (FORMATS.md §12).
 
@@ -43,6 +44,10 @@ Prints the hodos state of the current project as context (FORMATS.md §12).
               repository one lives in, so a claim made on another branch is
               seen. Refs only, ${FETCH_TIMEOUT_MS / 1000} seconds, failing
               open. Passed by /hodos:status and by no hook (decision 0080).
+  --repoint   first move the scripts rule init wrote for another version of
+              this plugin, in .claude/settings.local.json, to the running
+              one; the digest says what moved. Passed by the session-start
+              hook entry and by no kernel (decision 0204).
   --help      print this and exit 0.
 
 With no config, prints nothing. Exit codes: 0 — always; 2 — bad invocation.`;
@@ -434,7 +439,7 @@ function rank({ session, active, stale, maps }) {
   return nextOverall({ session, active, stale: stale.map((t) => ({ ...t, resume: resumeOf(t) })), maps });
 }
 
-export function digest(found, { full = false, fetch = false } = {}) {
+export function digest(found, { full = false, fetch = false, moved } = {}) {
   if (found.notFound) return '';
   const facts = gather(found, { fetch });
   const { config, projectRoot, all, stale, active, maps, failed, session } = facts;
@@ -448,7 +453,9 @@ export function digest(found, { full = false, fetch = false } = {}) {
   // Under the header and outside the row budget, as the header is: a row the
   // cap drops must not take the language with it.
   const chat = chatLine(currentTask({ session, active, stale }), config);
-  const top = chat ? [header, chat] : [header];
+  // Beside it for the same reason: a write to the developer's permission file
+  // is not a row the cap may drop (decision 0204).
+  const top = [header, chat, permissionsRow(moved)].filter(Boolean);
 
   const rows = [
     ...active.map((t) => `- ${t.slug} [${t.state.phase}] last: "${t.state.lastEvent ?? '—'}" — resume with ${t.resume}`),
@@ -488,6 +495,15 @@ export function digest(found, { full = false, fetch = false } = {}) {
   return [...top, ...kept].join('\n');
 }
 
+/** What `repointFile` did, as one row, or null when it moved nothing. */
+function permissionsRow(moved) {
+  if (!moved || moved.from.length === 0) return null;
+  const what = `${moved.from.join(', ')} → ${moved.to} in .claude/settings.local.json`;
+  return moved.error
+    ? `- permissions: could not move the hodos scripts rule ${what} (${moved.error}) — script calls will prompt`
+    : `- permissions: hodos scripts rule moved ${what}`;
+}
+
 // The session's task, not the project's: `activeTask` reads
 // sessions/<id> first (decision 0047). The id comes from the environment
 // rather than a hook payload because this script is also the `!` injection of
@@ -525,6 +541,7 @@ export function rowLine(found) {
 function main(argv) {
   let mode = 'bare';
   let fetch = false;
+  let repoint = false;
   for (const arg of argv) {
     if (arg === '--help' || arg === '-h') {
       process.stdout.write(`${USAGE}\n`);
@@ -532,6 +549,7 @@ function main(argv) {
     }
     if (arg === '--full' || arg === '--compact' || arg === '--row') mode = arg.slice(2);
     else if (arg === '--fetch') fetch = true;
+    else if (arg === '--repoint') repoint = true;
     else {
       process.stderr.write(`state-digest: unknown option: ${arg}\n${USAGE}\n`);
       return 2;
@@ -539,10 +557,11 @@ function main(argv) {
   }
 
   const found = findConfig(process.cwd());
+  const moved = repoint && !found.notFound ? repointFile(found.projectRoot) : undefined;
   const text =
     mode === 'compact' ? compactLine(found)
       : mode === 'row' ? rowLine(found)
-        : digest(found, { full: mode === 'full', fetch });
+        : digest(found, { full: mode === 'full', fetch, moved });
   if (text !== '') process.stdout.write(`${text}\n`);
   return 0;
 }

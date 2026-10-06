@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -38,13 +38,30 @@ test('the manifest carries the six entries of COMPONENTS.md §4', () => {
   const shape = entries().map((e) => `${e.event}${e.matcher ? `(${e.matcher})` : ''}: ${e.hook.args.join(' ')}`);
 
   assert.deepEqual(shape, [
-    'SessionStart(startup|resume|clear): ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs',
+    'SessionStart(startup|resume|clear): ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs --repoint',
     'SessionStart(compact): ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs --compact',
     'PreCompact: ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add Compact: session compacted',
     'PostToolUse(Write|Edit): ${CLAUDE_PLUGIN_ROOT}/scripts/lint.mjs --hook',
     'PreToolUse(Bash): ${CLAUDE_PLUGIN_ROOT}/scripts/git-guard.mjs',
     'Stop: ${CLAUDE_PLUGIN_ROOT}/scripts/stop-gate.mjs',
   ]);
+});
+
+// The re-point writes the developer's settings file, so only the session-start
+// entry passes it: a kernel's `!` injection of the same script stays a read
+// (decision 0204).
+test('no skill passes --repoint to the digest', () => {
+  const passing = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (readFileSync(path, 'utf8').includes('--repoint')) passing.push(path.slice(ROOT.length));
+    }
+  };
+  walk(join(ROOT, 'skills'));
+
+  assert.deepEqual(passing, []);
 });
 
 test('every entry uses the exec form with a timeout of at most 10 seconds', () => {
