@@ -49,7 +49,7 @@
       "lines": [
         {
           "file": "skills/task/references/route.md",
-          "line": "Print the checklist and the verdict before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:"
+          "line": "Print the verdict, then the checklist it rests on, before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. The verdict leads because it is what the developer confirms; the table below it is what they check it against (decision **0194**). A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:"
         },
         {
           "file": "skills/task/references/route.md",
@@ -194,7 +194,7 @@
     },
     {
       "id": "reviewer-writes-one-file",
-      "behavior": "the reviewer leaves the working tree as it found it, with review.md the only file it wrote",
+      "behavior": "the reviewer leaves the working tree as it found it, with review.md and its review.partial.md the only files it wrote",
       "incident": "DESIGN.md §2 principle 2 — the reviewer is not the author; a reviewer that edits the code has reviewed its own work",
       "setup": {
         "kind": "review-package",
@@ -207,26 +207,26 @@
       "check": {
         "kind": "file",
         "path": "@git-status",
-        "pattern": "^(\\?\\? review-input\\.md\\n)?\\?\\? review\\.md$",
+        "pattern": "^(\\?\\? review-input\\.md\\n)?\\?\\? review\\.md(\\n\\?\\? review\\.partial\\.md)?$",
         "flags": ""
       },
       "lines": [
         {
           "file": "agents/hodos-reviewer.md",
-          "line": "One pass. No subagents. Write exactly one file, `review.md`, and change nothing else — not the tree, not the index, not HEAD, not a branch. Bash is for the three checks and for reading; every command you run leaves the repository as you found it."
+          "line": "One pass. No subagents. Write `review.partial.md` at steps 1 and 3 and `review.md` at step 7, and change nothing else — not the tree, not the index, not HEAD, not a branch. Bash is for the three checks and for reading; every command you run leaves the repository as you found it."
         },
         {
           "file": "docs/COMPONENTS.md",
-          "line": "`model: opus` (overridden per dispatch by `config.models.review`) · `tools: Read, Grep, Glob, Bash, Write` · the prompt restricts `Write` to `review.md` and forbids any change to the tree, index, HEAD, or branches.",
-          "replaceWith": "`model: opus` (overridden per dispatch by `config.models.review`) · `tools: Read, Grep, Glob, Bash, Write`."
+          "line": "`model: opus` (overridden per dispatch by `config.models.review`) · `tools: Read, Grep, Glob, Bash, Write` · `maxTurns: 80` · the prompt restricts `Write` to `review.partial.md` and `review.md` and forbids any change to the tree, index, HEAD, or branches.",
+          "replaceWith": "`model: opus` (overridden per dispatch by `config.models.review`) · `tools: Read, Grep, Glob, Bash, Write` · `maxTurns: 80`."
         },
         {
           "file": "agents/hodos-plan-reviewer.md",
-          "line": "One pass. No subagents. Write exactly one file, `plan-review.md`, and change nothing else — not the plan, not the tree, not the index.",
+          "line": "One pass. No subagents. Write `plan-review.partial.md` at step 3 and `plan-review.md` at step 5, and change nothing else — not the plan, not the tree, not the index.",
           "replaceWith": "One pass. No subagents."
         }
       ],
-      "probe": "exactly one file"
+      "probe": "change nothing else|forbids any change to the tree"
     },
     {
       "id": "run-unknown-slug",
@@ -255,8 +255,8 @@
         },
         {
           "file": "docs/FORMATS.md",
-          "line": "**The pickup** (`skills/run/SKILL.md`): a slug with no task directory but a handoff file is an offer, never an automatic restore. On the developer's yes, `run` writes `plan.md` from `## Plan`, records `Init:` and `Plan: approved --tasks <n> --branch <name>` — from the default branch, so `base` is the fork point rather than the branch tip — checks the branch out, and deletes the handoff file, which is part of the same commit the developer makes next. On no, it prints the file's path and stops.",
-          "replaceWith": "**The pickup** (`skills/run/SKILL.md`): a handoff file is an offer, never an automatic restore. On the developer's yes, `run` writes `plan.md` from `## Plan`, records `Init:` and `Plan: approved --tasks <n> --branch <name>` — from the default branch, so `base` is the fork point rather than the branch tip — checks the branch out, and deletes the handoff file, which is part of the same commit the developer makes next. On no, it prints the file's path and stops."
+          "line": "**The pickup** (`skills/run/SKILL.md`): a slug with no task directory but a handoff file is an offer, never an automatic restore. On the developer's yes, `run` writes `plan.md` from `## Plan`, records `Init:` and `Plan: approved --tasks <n> --branch <name> --handoff` — from the default branch, so `base` is the fork point rather than the branch tip, and with `--handoff`, so the approval stores no session and the session picking the work up can claim it (§6) — checks the branch out, and deletes the handoff file, which is part of the same commit the developer makes next. On no, it prints the file's path and stops.",
+          "replaceWith": "**The pickup** (`skills/run/SKILL.md`): a handoff file is an offer, never an automatic restore. On the developer's yes, `run` writes `plan.md` from `## Plan`, records `Init:` and `Plan: approved --tasks <n> --branch <name> --handoff` — from the default branch, so `base` is the fork point rather than the branch tip, and with `--handoff`, so the approval stores no session and the session picking the work up can claim it (§6) — checks the branch out, and deletes the handoff file, which is part of the same commit the developer makes next. On no, it prints the file's path and stops."
         }
       ],
       "note": "The harness deletes prose, never code. `scripts/ledger.mjs` refuses `claim` for a slug with no task directory (`ledger: <slug> has no task directory`), so this rule has a second enforcement the control keeps: a control that passes says the line is redundant with the script, which is a true answer and not a harness defect. `skills/task/SKILL.md:48` shares the words for a different rule — a campaign verdict opens no task directory — and `docs/BUILD-PLAN.md` Stage 11c shares them for a third: `/hodos:review` creates no task directory for a diff hodos did not write. Neither is a home for this rule; both are prose the control cannot delete. Stage 11c added the rule's one exception — a handoff file (`FORMATS.md §16`) — so the kernel's Pickup section and the format's pickup paragraph are homes for it too.",

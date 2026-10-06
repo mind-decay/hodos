@@ -58,7 +58,7 @@ Positive recipes throughout — what to do, not what to avoid. 100 lines is the 
 node ${CLAUDE_PLUGIN_ROOT}/scripts/lint.mjs --project
 ```
 
-Cap, frontmatter subset, and every `file:line` in the file. Fix what it finds before returning.
+Cap, frontmatter subset, and every `file:line` in the file. Fix what it finds before returning, then end on `Next: /<name> <its argument-hint>`, the invocation filled in from the file just written (decision **0191**).
 
 ## Completion
 

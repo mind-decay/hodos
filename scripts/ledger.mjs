@@ -22,10 +22,11 @@ import {
   writeFileSync,
   existsSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import { findMaps } from './campaigns.mjs';
 import { activeTask, findConfig, hodosDir, sessionOf } from './config.mjs';
 import { projectsDir, summarize, transcriptPath } from './usage.mjs';
 
@@ -48,19 +49,21 @@ const COUNT_OPTIONS = ['net', 'tasks'];
 const GRAMMAR = `Ledger grammar (FORMATS.md §6) — the CLI forms:
 
   init <slug> --path <quick|standard|deep> --type <feature|bug|refactor|question|spike|upgrade>
-       [--shape <inert|mechanical>] [--campaign <c/n>]
+       [--shape <inert|mechanical>] [--campaign <c/n>] [--chat <xx>]
   add "Route: <path> <type> [<shape>]"
-  add "Plan: approved" --tasks <n> --branch <name>
+  add "Plan: approved" --tasks <n> --branch <name> [--handoff]
   add "Task <n>: started"
   add "Task <n>: test red"
   add "Task <n>: mutation" --tests <k>
   add "Task <n>: done" --sha <sha> [--tests <visual|glue|infra|no-harness> | --inert]
   add "Task <n>: red-check attempt <k>/3 — <text>"
+  add "Task <n>: blocked — <question>"    (after its attempt 3/3)
   add "Ruling: <what> — <why> — <cost if wrong>"
   add "Gap: <what the plan lacked> — <resolution>"
   add "Upgrade: <from>→<to> — <why>"      (<from> is the task's rung, inert included)
   add "Simplify: done" --sha <sha> --net <n>
   add "Review <k>: <ACCEPT|NEEDS_WORK|REJECT> <b>/<m>/<mi>"
+  add "Fix <k>: green"                    (in fix, once the pass's checks pass)
   add "Fix <k>: done" --sha <sha>
   add "Verify <k>: <PASS|FAIL> <n> claims, <s> skipped"
   add "Breaker: <review|verify> — <accept|manual|rollback T<n>>"
@@ -76,18 +79,32 @@ The one writer of ledger.md and state.json for a hodos task.
   init <slug>   create the task directory, claim it as claim does, and
                 record Init. Normalizes the slug and appends -2, -3 on
                 collision; prints the final slug.
-                --path, --type required; --shape <inert|mechanical> and
-                --campaign <campaign/node> optional.
+                --path, --type required; --shape <inert|mechanical>,
+                --campaign <campaign/node> and --chat <xx>, the language
+                the developer is speaking, optional.
   claim <slug> point this session at an existing task: write
                 .claude/hodos/sessions/<session-id>, or .claude/hodos/active
                 where no session id is reachable (decision 0171).
-                Used by the run kernel when it takes up a task.
+                Used by the run kernel when it takes up a task; refused, with
+                nothing written, in the session that approved its plan
+                (decision 0190).
+  next [<slug>] print one JSON line, {"slug", "step", "next"}: the step that
+                continues the task and the command or words that take it
+                (decision 0192). With no slug, the most recently touched task
+                neither done nor manual; --done answers for a task finishing
+                now and needs a slug. A done answer adds "land": null, or the
+                options of the landing question, each with the exact commands
+                it runs, read from git (decision 0197). --handoff <file>, with
+                a slug, answers /hodos:handoff's question about committing and
+                pushing that file instead. Writes nothing, not even a pointer.
   sessions      list .claude/hodos/sessions/<id> and the task each names;
                 --gc deletes a pointer whose task directory is gone or whose
                 session transcript is gone. Run by /hodos:status.
   add "<line>"  validate a ledger line, append it with an ISO-8601 timestamp,
                 and re-derive state.json.
                 --sha, --tasks, --branch, --net fill the script's parts;
+                --handoff on "Plan: approved" stores no session, for an
+                approval made where the work is picked up (decision 0190);
                 --tests is a whole number of new tests on a mutation row and
                 the plan's test-first exemption on done; --inert marks the
                 done of a task whose shape is inert (decision 0183);
@@ -102,7 +119,7 @@ ${GRAMMAR}
 
 Exit codes: 0 — written, or nothing to write (no config, or no active task:
 hooks rely on this); 1 — a line the grammar rejects, a missing option, or a
-claim on a task that does not exist; 2 — bad invocation.`;
+claim or a next on a task that does not exist; 2 — bad invocation.`;
 
 // FORMATS.md §6, in table order. `cli` matches what the model passes, `stored`
 // what lands in ledger.md, `re` re-reads the stored form during derivation with
@@ -126,8 +143,14 @@ const RULES = [
     id: 'plan-approved',
     cli: /^Plan: approved$/,
     needs: ['tasks', 'branch'],
-    stored: (line, o, ctx) => `Plan: approved (${ctx.headSha()}, ${o.tasks} tasks, ${o.branch})`,
-    re: /^Plan: approved \(([^,]+), (\d+) tasks, (.+)\)$/,
+    // The session that approved the plan, so that `claim` never starts S2
+    // inside it (decision 0190). `--handoff` stores none: the Pickup approves
+    // in the session that runs the work, for a plan written elsewhere.
+    stored: (line, o, ctx) => {
+      const session = o.handoff ? null : ctx.session();
+      return `Plan: approved (${ctx.headSha()}, ${o.tasks} tasks, ${o.branch}${session ? `, session ${session}` : ''})`;
+    },
+    re: /^Plan: approved \(([^,]+), (\d+) tasks, (.+?)(?:, session ([^)\s]+))?\)$/,
     phase: () => 'approved',
   },
   { id: 'task-started', cli: /^Task (\d+): started$/, stored: (line) => line, phase: () => 'execute' },
@@ -164,6 +187,9 @@ const RULES = [
     stored: (line) => line,
     phase: () => 'execute',
   },
+  // The third red check stops on one question, and the stop is a phase of its
+  // own so the digest and a resumed run show it (decision 0193).
+  { id: 'task-blocked', cli: /^Task (\d+): blocked — (.+)$/, stored: (line) => line, phase: () => 'blocked' },
   { id: 'ruling', cli: /^Ruling: (.+) — (.+) — (.+)$/, stored: (line) => line, phase: () => null },
   { id: 'gap', cli: /^Gap: (.+) — (.+)$/, stored: (line) => line, phase: () => null },
   {
@@ -199,6 +225,9 @@ const RULES = [
       return ctx.shape() === 'inert' ? 'finish' : 'verify';
     },
   },
+  // The fix pass's checks passed, which the commit gate reads before it lets the
+  // pass commit in `fix` (decision 0195). It moves no phase.
+  { id: 'fix-green', cli: /^Fix (\d+): green$/, stored: (line) => line, phase: () => null },
   {
     id: 'fix-done',
     cli: /^Fix (\d+): done$/,
@@ -311,10 +340,14 @@ export function deriveState(events, stamps, seed) {
     shape: seed.shape ?? null,
     phase: 'plan',
     campaign: seed.campaign ?? null,
+    chat: seed.chat ?? null,
     branch: null,
     base: null,
+    planSession: null,
     tasks: { total: 0, done: 0, current: 1 },
     redCheckAttempts: 0,
+    blockedOn: null,
+    fixGreen: null,
     review: { iteration: 0, verdict: null },
     verify: { iteration: 0, verdict: null },
     lastCommit: null,
@@ -363,6 +396,7 @@ export function deriveState(events, stamps, seed) {
         state.base = m[1];
         state.tasks.total = Number(m[2]);
         state.branch = m[3];
+        state.planSession = m[4] ?? null;
         break;
       case 'upgrade':
         state.path = m[2];
@@ -376,9 +410,20 @@ export function deriveState(events, stamps, seed) {
       case 'simplify':
         state.lastCommit = m[1];
         break;
+      case 'task-blocked':
+        state.blockedOn = m[2];
+        break;
+      case 'task-started':
+        state.blockedOn = null;
+        break;
+      case 'fix-green':
+        state.fixGreen = Number(m[1]);
+        break;
       default:
         break;
     }
+    // One meaning for its one reader: the pass now in `fix` has run green.
+    if (state.phase !== 'fix') state.fixGreen = null;
 
     if (i < from) return; // counters read only what follows the last rollback
 
@@ -437,6 +482,27 @@ function inertRefusal(taskDir, n, options) {
   const { shape } = deriveState(events, stamps, { slug: null });
   if (shape === 'inert') return null;
   return `"Task ${n}: done" --inert needs a task whose confirmed verdict carries Shape: inert, and this one carries ${shape ?? 'no shape'} (decision 0183)`;
+}
+
+// The third red check is what earns the stop (decision 0193). Blocked at any
+// other point, the line would be the Gates rule for an unsettled fork under a
+// second name, and the bound of DESIGN.md §4.5 would mean nothing. The
+// attempts are the task's since it last started: a restart is a fresh bound.
+function blockedRefusal(taskDir, n) {
+  const { events } = readLedger(taskDir);
+  const since = events.lastIndexOf(`Task ${n}: started`);
+  if (events.slice(since + 1).some((e) => e.startsWith(`Task ${n}: red-check attempt 3/3 — `))) return null;
+  return `"Task ${n}: blocked" needs "Task ${n}: red-check attempt 3/3" before it (decision 0193)`;
+}
+
+// The green line belongs to a fix pass (decision 0195). Outside `fix` there is
+// no pass whose checks it could report, and a line the gate never reads is a
+// record that says something happened when nothing did.
+function greenRefusal(taskDir, n) {
+  const { events, stamps } = readLedger(taskDir);
+  const { phase } = deriveState(events, stamps, { slug: null });
+  if (phase === 'fix') return null;
+  return `"Fix ${n}: green" is recorded in phase fix, once the pass's checks pass, and this task is in ${phase} (decision 0195)`;
 }
 
 /**
@@ -527,7 +593,7 @@ function readLedger(taskDir) {
 function seedOf(taskDir, fallback) {
   try {
     const prev = JSON.parse(readFileSync(join(taskDir, 'state.json'), 'utf8'));
-    return { slug: prev.slug, path: prev.path, type: prev.type, shape: prev.shape, campaign: prev.campaign };
+    return { slug: prev.slug, path: prev.path, type: prev.type, shape: prev.shape, campaign: prev.campaign, chat: prev.chat };
   } catch {
     return fallback;
   }
@@ -563,10 +629,314 @@ export function append(taskDir, stored, seed, io = {}) {
   return state;
 }
 
-/** Options that take no value; everything else needs one. */
-const BOOLEAN_OPTIONS = new Set(['gc', 'inert']);
+// --- what continues a task (decision 0192)
+//
+// One table answers "which step continues task X", so task's S1 resume, run's
+// resume rows, the digest's resume line and every exit that concludes no work
+// of its own read it rather than keeping copies of the rule. `nextStep` is the
+// table and decides nothing from the disk; `nextFacts` collects what it reads.
 
-function parseOptions(argv) {
+/** The phases `/hodos:run` resumes. */
+const RUN_PHASES = ['approved', 'execute', 'review', 'fix', 'verify', 'finish'];
+
+/** `{ step, next }` for a task's derived state, or for no task at all; a done answer adds `land`. */
+export function nextStep(state, facts = {}) {
+  if (!state) return { step: 'none', next: '/hodos:task <description>' };
+  const { slug, phase, branch } = state;
+  if (facts.handoff) return { step: 'handoff', ...handing(state, facts) };
+  if (facts.done || phase === 'done') return { step: 'done', ...landing(state, facts) };
+  if (phase === 'manual') return { step: 'manual', next: `/hodos:review ${branch}` };
+  if (phase === 'blocked' || RUN_PHASES.includes(phase)) {
+    return { step: phase === 'blocked' ? 'blocked' : 'run', next: `/hodos:run ${slug}` };
+  }
+
+  // Phase `plan`: S1 resumes at the first step whose output is missing.
+  if (facts.rerouted) return { step: 'reroute', next: '/hodos:task <the symptom, as a question or a spike>' };
+  const s1 = (step) => ({ step, next: `/hodos:task ${slug}` });
+  if (!facts.brief) return s1('route');
+  if (state.shape === 'inert' && !facts.plan) return s1('inert');
+  if (facts.upgradedFromInert) return s1('plan');
+  if (state.path === 'deep' && !facts.research) return s1('research');
+  if (!facts.plan || facts.openQuestions) return s1('plan');
+  return s1('approve');
+}
+
+// --- what lands a finished task (decision 0197)
+//
+// The done answer's `land` is the one question the land phase asks: each
+// option carries the commands it runs, so what the developer is shown is what
+// runs. It is built from git facts alone, never from a ledger line, so a resume
+// never offers a landing a reset, a push or a colleague already settled.
+
+/** The question: the options, then leave, which runs nothing and ends on `next`. */
+const question = (options, notes, next) => ({
+  options: [...options, { label: 'leave it', run: [], next }],
+  note: notes.length ? notes.join('; ') : null,
+});
+/** The paths a note names: five, then a count of the rest. */
+const named = (paths) => (paths.length > 5 ? `${paths.slice(0, 5).join(', ')} +${paths.length - 5}` : paths.join(', '));
+
+/** `{ next, land }` for a finished task: `land` is null, or `{ options, note }` with leave last. */
+function landing(state, facts) {
+  const { slug, branch: b, campaign, type } = state;
+  const [map, nodeName] = campaign?.split('/') ?? [];
+  const after = campaign ? `/hodos:campaign ${map}` : '/hodos:task <description>';
+  const none = (next = after) => ({ next, land: null });
+  // `options[0]` is the recommendation, and leave, last, ends on its commands —
+  // or, when nothing can run, on the words of what blocks it.
+  const ask = (options, notes, blocked) => {
+    const next = options.length ? options[0].run.join(' && ') : blocked;
+    return { next, land: question(options, notes, next) };
+  };
+  if (!b || type === 'question') return none();
+  const words = `merge ${b} into the branch it came from`;
+  if (!facts.repo) return none(type === 'spike' ? after : words);
+  if (!facts.branchExists) return none();
+  const d = facts.defaultBranch;
+  const r = facts.remote;
+  if (type === 'spike') {
+    // land.md asks this only when the spike's exit was "branch deleted" (finish §8a).
+    if (!d) return { next: after, land: question([], ['no default branch found'], after) };
+    return { next: after, land: question([{ label: `delete ${b}`, run: [`git switch ${d}`, `git branch -D ${b}`], next: after }], [], after) };
+  }
+  if (facts.merged) {
+    return r && facts.defaultAhead > 0 ? ask([{ label: `push ${d} to ${r}`, run: [`git push ${r} ${d}`], next: after }], []) : none();
+  }
+  if (facts.head !== b) {
+    return ask([], [`HEAD is ${facts.head ?? 'detached'}, not ${b}`], `git switch ${b}, then /hodos:run ${slug}`);
+  }
+  // With remotes, a local-only merge is a guess about the project's flow.
+  if (facts.remotes && !r) return ask([], ['no remote git would push to — set remote.pushDefault'], `push ${b} to its remote`);
+
+  const { dirty } = facts;
+  const moved = Boolean(d) && !facts.ffable;
+  // A node's map commit rides the fast-forward; after a rebase it names a
+  // commit that no longer exists, so node-done re-points it first (D7). A map
+  // in another repository is committed there, never here (decisions 0090, 0137).
+  const rebaseHere = !moved || !campaign || facts.mapLocal;
+  const push = r && !facts.pushed ? { label: `push ${b} to ${r}`, run: [`git push -u ${r} ${b}`], next: after } : null;
+  let merge = null;
+  if (d && dirty.length === 0 && rebaseHere) {
+    const run = moved ? [`git rebase ${d}`] : [];
+    if (moved && campaign) {
+      const campaigns = join(facts.pluginRoot, 'scripts', 'campaigns.mjs');
+      run.push(`node "${campaigns}" node-done ${map} ${nodeName} --sha HEAD~1`, `git add .claude/hodos/campaigns/${map}.md`, 'git commit -m "{subject}"');
+    }
+    run.push(`git switch ${d}`, `git merge --ff-only ${b}`);
+    if (r) run.push(`git push ${r} ${d}`);
+    const label = moved
+      ? r ? `rebase onto ${d}, land and push it` : `rebase onto ${d} and merge`
+      : r ? `land on ${d} and push it` : `merge into ${d}`;
+    merge = { label, run, next: after };
+  }
+  const elsewhere = facts.mapRepo ?? 'another repository';
+  const notes = [];
+  if (dirty.length) notes.push(`uncommitted changes in ${named(dirty)} — merging needs a clean tree`);
+  if (!d) notes.push('no default branch found');
+  if (!rebaseHere) notes.push(`${d} moved past ${b} and the map lives in ${elsewhere} — rebase by hand, then node-done`);
+  const blocked = dirty.length
+    ? `commit or stash ${named(dirty)}, then /hodos:run ${slug}`
+    : !d
+      ? words
+      : `rebase ${b} onto ${d} by hand, then node-done in ${elsewhere}`;
+  const order = facts.land === 'default' ? [merge, push] : [push, merge];
+  return ask(order.filter(Boolean), notes, blocked);
+}
+
+/**
+ * `{ next, land }` for `/hodos:handoff`'s file: commit it, push the branch, or
+ * leave both. The commit names its path, so work already staged on an
+ * unfinished task is not swept into it (fact 74).
+ */
+function handing(state, facts) {
+  const { slug, branch: b } = state;
+  const file = facts.handoff;
+  const r = facts.remote;
+  const there = `/hodos:run ${slug} on the other machine`;
+  if (!facts.repo || !b) return { next: there, land: null };
+  if (facts.head !== b) {
+    const words = `git switch ${b}, then /hodos:handoff ${slug}`;
+    return { next: words, land: question([], [`HEAD is ${facts.head ?? 'detached'}, not ${b}`], words) };
+  }
+  const run = [`git add ${file}`, `git commit -m "{subject}" -- ${file}`];
+  const pushLater = r ? `git push -u ${r} ${b}` : facts.remotes ? `push ${b} to its remote` : `push ${b}`;
+  const commit = { label: 'commit', run, next: `${pushLater}, then ${there}` };
+  const options = r ? [{ label: 'commit and push', run: [...run, `git push -u ${r} ${b}`], next: there }, commit] : [commit];
+  const notes = facts.remotes && !r ? ['no remote git would push to — set remote.pushDefault'] : [];
+  return { next: there, land: question(options, notes, options[0].run.join(' && ')) };
+}
+
+/** stdout of a git read, or null for any non-zero exit (PLATFORM-NOTES.md fact 68). */
+function gitRead(cwd, args) {
+  try {
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `plan.md`'s `## Open questions` holds anything but blank lines. */
+function openQuestionsIn(planFile) {
+  let text;
+  try {
+    text = readFileSync(planFile, 'utf8');
+  } catch {
+    return false;
+  }
+  const m = /^## Open questions[ \t]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(text);
+  return m !== null && m[1].trim() !== '';
+}
+
+/** The plugin's own root: the node-done a land option runs is this checkout's. */
+const PLUGIN_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
+/**
+ * The branch a landing goes to (decision 0197): the one `<remote>/HEAD` names,
+ * when a local branch carries it, and otherwise `init.defaultBranch`, main,
+ * then master, each only when it exists here.
+ */
+function defaultOf(read, remote, heads) {
+  if (remote) {
+    // Only a clone or `remote set-head` writes `<remote>/HEAD` (fact 72).
+    const named = read(['symbolic-ref', '--short', `refs/remotes/${remote}/HEAD`])?.trim();
+    const name = named?.startsWith(`${remote}/`) ? named.slice(remote.length + 1) : null;
+    if (heads.has(name)) return name;
+  }
+  // An unset `init.defaultBranch` exits 1 (fact 68), and main, then master, follow.
+  const configured = read(['config', 'init.defaultBranch'])?.trim();
+  return [configured, 'main', 'master'].find((name) => heads.has(name)) ?? null;
+}
+
+/**
+ * What `nextStep` reads from the task directory, its ledger and git. Git is
+ * read only for a `done` answer, and `git: false` skips it there too: the
+ * digest lists no finished task and spawns nothing per row. The reads stop at
+ * the first row of the landing table they settle, so a fact a later row needs
+ * keeps its default where an earlier row already answered.
+ */
+export function nextFacts(taskDir, state, { done = false, git = true, handoff = null } = {}, { gitRead: read = gitRead } = {}) {
+  const { events } = readLedger(taskDir);
+  const facts = {
+    brief: existsSync(join(taskDir, 'brief.md')),
+    research: existsSync(join(taskDir, 'research.md')),
+    plan: existsSync(join(taskDir, 'plan.md')),
+    openQuestions: openQuestionsIn(join(taskDir, 'plan.md')),
+    rerouted: events.some((e) => e.startsWith('Ruling: not reproducible here — ')),
+    upgradedFromInert: events.some((e) => e.startsWith('Upgrade: inert→')),
+    remote: null,
+    remotes: 0,
+    defaultBranch: null,
+    done,
+    handoff,
+    repo: false,
+    branchExists: false,
+    head: null,
+    dirty: [],
+    ffable: false,
+    merged: false,
+    pushed: false,
+    defaultAhead: 0,
+    land: null,
+    mapLocal: false,
+    mapRepo: null,
+    pluginRoot: PLUGIN_ROOT,
+  };
+  if (!git || !(done || handoff || state.phase === 'done')) return facts;
+  const at = (args) => read(taskDir, args);
+
+  // No remote prints nothing and exits 0 (fact 54); outside a repository it
+  // exits 128 (fact 68), and nothing else is read.
+  const listed = at(['remote']);
+  if (listed === null) return facts;
+  facts.repo = true;
+  const remotes = listed.split('\n').map((name) => name.trim()).filter((name) => name !== '');
+  facts.remotes = remotes.length;
+  if (remotes.length) {
+    // `git remote` sorts the names, so the remote is the one git pushes a new
+    // branch to: `remote.pushDefault`, then origin, then the only one (fact 68).
+    const pushDefault = at(['config', 'remote.pushDefault'])?.trim();
+    facts.remote = pushDefault || (remotes.includes('origin') ? 'origin' : remotes.length === 1 ? remotes[0] : null);
+  }
+  const b = state.branch;
+  if (!b) return facts;
+  // Detached, `symbolic-ref -q` exits 1 (fact 72).
+  facts.head = at(['symbolic-ref', '--short', '-q', 'HEAD'])?.trim() ?? null;
+  if (handoff) return facts;
+  // One read lists the local branches, which the default's chain and the
+  // branch itself are looked up in, so the call stays at ten reads (fact 72).
+  const heads = new Set(
+    (at(['for-each-ref', '--format=%(refname)', 'refs/heads']) ?? '')
+      .split('\n')
+      .filter((ref) => ref.startsWith('refs/heads/'))
+      .map((ref) => ref.slice('refs/heads/'.length)),
+  );
+  facts.branchExists = heads.has(b);
+  if (!facts.branchExists) return facts;
+  const root = resolve(taskDir, '..', '..', '..', '..');
+  const found = findConfig(root);
+  facts.land = found.config?.conventions?.land ?? null;
+  facts.defaultBranch = defaultOf(at, facts.remote, heads);
+  const d = facts.defaultBranch;
+  if (state.type === 'spike') return facts;
+
+  // `merge-base --is-ancestor` exits 0 for yes and 1 for no (fact 72).
+  const isAncestor = (a, z) => at(['merge-base', '--is-ancestor', a, z]) !== null;
+  // `rev-list --count` over a ref that is not there exits 128 (fact 72).
+  const ahead = (range) => at(['rev-list', '--count', range])?.trim() ?? null;
+  if (d) facts.merged = isAncestor(b, d);
+  if (facts.merged) {
+    if (facts.remote) facts.defaultAhead = Number(ahead(`${facts.remote}/${d}..${d}`) ?? 1);
+    return facts;
+  }
+  if (facts.head !== b || (facts.remotes && !facts.remote)) return facts;
+
+  // Tracked changes only, each path from the repository root and a rename's
+  // new name (fact 72): an untracked file blocks neither switch nor rebase.
+  const status = at(['status', '--porcelain', '--untracked-files=no']) ?? '';
+  facts.dirty = status.split('\n').filter((line) => line !== '').map((line) => line.slice(3).split(' -> ').at(-1));
+  if (d) facts.ffable = isAncestor(d, b);
+  if (facts.remote) facts.pushed = ahead(`${facts.remote}/${b}..${b}`) === '0';
+  if (state.campaign) {
+    const map = state.campaign.split('/')[0];
+    facts.mapLocal = existsSync(join(root, '.claude', 'hodos', 'campaigns', `${map}.md`));
+    if (!facts.mapLocal && d && !facts.ffable) {
+      const entry = findMaps(root, found.config ?? {}).find((m) => m.slug === map);
+      facts.mapRepo = entry ? basename(entry.root) : null;
+    }
+  }
+  return facts;
+}
+
+/** Rule W: the most recently touched task neither done nor manual, or null. */
+export function latestTask(projectRoot) {
+  const tasksDir = join(hodosDir(projectRoot), 'tasks');
+  let names;
+  try {
+    names = readdirSync(tasksDir);
+  } catch {
+    return null;
+  }
+  let latest = null;
+  for (const name of names) {
+    let state;
+    try {
+      state = JSON.parse(readFileSync(join(tasksDir, name, 'state.json'), 'utf8'));
+    } catch {
+      continue; // no state is no task in flight
+    }
+    if (state.phase === 'done' || state.phase === 'manual') continue;
+    if (!latest || state.updatedAt > latest.updatedAt) latest = { slug: name, updatedAt: state.updatedAt };
+  }
+  return latest?.slug ?? null;
+}
+
+/** Options that take no value; everything else needs one. */
+const BOOLEAN_OPTIONS = new Set(['done', 'gc', 'handoff', 'inert']);
+/** Per command, a boolean elsewhere that takes a value here: `next --handoff <file>` (decision 0197). */
+const VALUED = { next: new Set(['handoff']) };
+
+function parseOptions(argv, command) {
+  const valued = VALUED[command] ?? new Set();
   const options = {};
   const rest = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -574,7 +944,7 @@ function parseOptions(argv) {
     if (arg === '--help' || arg === '-h') return { help: true };
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
-      if (BOOLEAN_OPTIONS.has(key)) {
+      if (BOOLEAN_OPTIONS.has(key) && !valued.has(key)) {
         options[key] = true;
         continue;
       }
@@ -717,11 +1087,40 @@ function cmdSessions(options, rest, projectRoot) {
 function cmdClaim(options, rest, projectRoot) {
   const slug = rest[0];
   if (!slug) return { code: 2, err: `ledger: claim needs a slug\n${USAGE}` };
-  if (!existsSync(join(hodosDir(projectRoot), 'tasks', slug))) {
-    return { code: 1, err: `ledger: ${slug} has no task directory` };
+  const taskDir = join(hodosDir(projectRoot), 'tasks', slug);
+  if (!existsSync(taskDir)) return { code: 1, err: `ledger: ${slug} has no task directory` };
+  // S2 starts clean, so never in the session that approved the plan: `/clear`
+  // starts a new id (PLATFORM-NOTES.md fact 65) and the id is the session's
+  // own (fact 37), so an equal one is S1's context still open, resumed or not.
+  // With no id there is nothing to compare, and the claim goes ahead as a
+  // typed command always did (decision 0190). An unreadable ledger throws
+  // here, before any pointer is written (decision 0101).
+  const session = sessionOf();
+  const { events, stamps } = readLedger(taskDir);
+  if (session && session === deriveState(events, stamps, { slug }).planSession) {
+    return { code: 1, err: `ledger: ${slug} was planned in this session — /clear, then /hodos:run ${slug}` };
   }
   claimFor(projectRoot, slug);
   return { code: 0, out: slug };
+}
+
+/** `next [<slug>] [--done | --handoff <file>]`: one JSON line naming what continues the task, and no write (decision 0192). */
+function cmdNext(options, rest, projectRoot) {
+  if (options.done && options.handoff) return { code: 2, err: `ledger: next takes --done or --handoff <file>, not both\n${USAGE}` };
+  let slug = rest[0];
+  if (!slug) {
+    if (options.done || options.handoff) {
+      return { code: 2, err: `ledger: next ${options.done ? '--done' : '--handoff'} needs a slug\n${USAGE}` };
+    }
+    slug = latestTask(projectRoot);
+    if (!slug) return { code: 0, out: JSON.stringify({ slug: null, ...nextStep(null) }) };
+  }
+  const taskDir = join(hodosDir(projectRoot), 'tasks', slug);
+  if (!existsSync(taskDir)) return { code: 1, err: `ledger: no task ${slug}` };
+  const { events, stamps } = readLedger(taskDir);
+  const state = deriveState(events, stamps, seedOf(taskDir, { slug }));
+  const step = nextStep(state, nextFacts(taskDir, state, { done: options.done === true, handoff: options.handoff ?? null }));
+  return { code: 0, out: JSON.stringify({ slug, ...step }) };
 }
 
 function cmdInit(options, rest, projectRoot) {
@@ -732,6 +1131,9 @@ function cmdInit(options, rest, projectRoot) {
   if (options.shape !== undefined) {
     const refusal = shapeRefusal(options.path, options.type, options.shape);
     if (refusal) return { code: 1, err: `ledger: ${refusal}` };
+  }
+  if (options.chat !== undefined && !/^[a-z]{2}$/.test(options.chat)) {
+    return { code: 1, err: 'ledger: --chat must be two lowercase letters, as config.language is' };
   }
 
   const base = normalizeSlug(raw);
@@ -751,6 +1153,7 @@ function cmdInit(options, rest, projectRoot) {
     type: options.type,
     shape: options.shape ?? null,
     campaign: options.campaign ?? null,
+    chat: options.chat ?? null,
   });
   return { code: 0, out: slug };
 }
@@ -772,6 +1175,9 @@ function cmdAdd(options, rest, projectRoot) {
   const hit = matchCli(line);
   if (!hit) return { code: 1, err: `ledger: line rejected: ${line}\n\n${GRAMMAR}` };
   const { rule, m } = hit;
+  if (options.handoff && rule.id !== 'plan-approved') {
+    return { code: 1, err: 'ledger: --handoff belongs to "Plan: approved" only' };
+  }
 
   for (const need of rule.needs ?? []) {
     if (options[need] === undefined) return { code: 1, err: `ledger: "${line}" needs --${need}\n\n${GRAMMAR}` };
@@ -795,10 +1201,19 @@ function cmdAdd(options, rest, projectRoot) {
     const refusal = options.inert ? inertRefusal(taskDir, m[1], options) : testFirstRefusal(taskDir, m[1], options.tests);
     if (refusal) return { code: 1, err: `ledger: ${refusal}` };
   }
+  if (rule.id === 'task-blocked') {
+    const refusal = blockedRefusal(taskDir, m[1]);
+    if (refusal) return { code: 1, err: `ledger: ${refusal}` };
+  }
+  if (rule.id === 'fix-green') {
+    const refusal = greenRefusal(taskDir, m[1]);
+    if (refusal) return { code: 1, err: `ledger: ${refusal}` };
+  }
 
   const ctx = {
     headSha: () =>
       execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: projectRoot, encoding: 'utf8' }).trim(),
+    session: sessionOf,
   };
 
   let stored;
@@ -841,7 +1256,7 @@ function cmdAdd(options, rest, projectRoot) {
 }
 
 function main(argv) {
-  const parsed = parseOptions(argv.slice(1));
+  const parsed = parseOptions(argv.slice(1), argv[0]);
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h' || parsed.help) {
     process.stdout.write(`${USAGE}\n`);
     return 0;
@@ -851,7 +1266,7 @@ function main(argv) {
     return 2;
   }
   const command = argv[0];
-  if (!['init', 'add', 'claim', 'sessions'].includes(command)) {
+  if (!['init', 'add', 'claim', 'sessions', 'next'].includes(command)) {
     process.stderr.write(`ledger: unknown command: ${command}\n${USAGE}\n`);
     return 2;
   }
@@ -859,7 +1274,7 @@ function main(argv) {
   const found = findConfig(process.cwd());
   if (found.notFound) return 0; // silent: the plugin is enabled in projects that never ran init
 
-  const commands = { init: cmdInit, add: cmdAdd, claim: cmdClaim, sessions: cmdSessions };
+  const commands = { init: cmdInit, add: cmdAdd, claim: cmdClaim, sessions: cmdSessions, next: cmdNext };
   let result;
   try {
     result = commands[command](parsed.options, parsed.rest, found.projectRoot);

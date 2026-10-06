@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { DETECTOR_IDS, activeTask, resolveTask, checkConfig, findConfig, forFiles, gitRoot, isFunctionSource, merge, positionalReach, preflight, readState } from './config.mjs';
+import { DETECTOR_IDS, activeTask, resolveTask, checkConfig, findConfig, fixPass, forFiles, gitRoot, isFunctionSource, merge, positionalReach, preflight, readState } from './config.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const CONFIG = fileURLToPath(new URL('./config.mjs', import.meta.url));
@@ -882,6 +882,31 @@ test('conventions.commit accepts custom:<pattern> and rejects anything else', ()
   assert.equal(checkConfig(bad).errors[0].path, 'conventions.commit');
 });
 
+test('conventions.land accepts branch and default', () => {
+  for (const land of ['branch', 'default']) {
+    const config = validConfig();
+    config.conventions.land = land;
+    assert.deepEqual(checkConfig(config), { errors: [], warnings: [] }, land);
+  }
+});
+
+test('conventions.land outside branch | default is an error naming the field', () => {
+  const config = validConfig();
+  config.conventions.land = 'merge';
+
+  const { errors } = checkConfig(config);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].path, 'conventions.land');
+  assert.match(errors[0].message, /branch, default/);
+});
+
+test('conventions.land absent is clean', () => {
+  const config = validConfig();
+  assert.equal('land' in config.conventions, false);
+  assert.deepEqual(checkConfig(config), { errors: [], warnings: [] });
+});
+
 test('check exits 1 on an error and names the file', () => {
   const config = validConfig();
   config.gates.denyDangerousGits = true;
@@ -976,6 +1001,14 @@ test('readState parses a task state and returns null for what it cannot', () => 
 
   assert.equal(readState(root, 'orders-summary').phase, 'execute');
   assert.equal(readState(root, 'no-such-task'), null);
+});
+
+test('fixPass names the loop whose fix pass this is, and its iteration, at least 1 (decision 0195)', () => {
+  const review = { iteration: 2, verdict: 'NEEDS_WORK' };
+  assert.deepEqual(fixPass({ review, verify: { iteration: 0, verdict: null } }), { kind: 'review', iteration: 2 });
+  assert.deepEqual(fixPass({ review, verify: { iteration: 1, verdict: 'FAIL' } }), { kind: 'verify', iteration: 1 });
+  assert.deepEqual(fixPass({ review: { iteration: 0 }, verify: { iteration: 0 } }), { kind: 'review', iteration: 1 });
+  assert.deepEqual(fixPass({}), { kind: 'review', iteration: 1 }, 'a state with no counters reads as the first review pass');
 });
 
 // --- preflight (decision 0058)

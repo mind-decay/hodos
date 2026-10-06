@@ -287,6 +287,18 @@ export function readState(projectRoot, slug) {
   }
 }
 
+/**
+ * The loop a task in `fix` is fixing for, and that loop's iteration (decision
+ * 0195). A verify iteration exists only after the review accepted, and the
+ * review loop does not run again until a rollback restarts both counters, so
+ * the counters answer it whatever line came last.
+ * States: `kind` is `review | verify`.
+ */
+export function fixPass(state) {
+  const kind = state.verify?.iteration > 0 ? 'verify' : 'review';
+  return { kind, iteration: Math.max(state[kind]?.iteration ?? 0, 1) };
+}
+
 // --- check: the schema of FORMATS.md §2, hand-rolled.
 //
 // Incident: a misspelled `gates.denyDangerousGits` parses, merges, and leaves
@@ -516,7 +528,10 @@ const SCHEMA = {
   },
   // Decision 0065: what the review package leaves out, and the cap behind it.
   review: { closed: { generated: { type: 'string[]' }, maxBytes: { type: 'number' } } },
-  conventions: { closed: { commit: { commit: true }, branch: { type: 'string' } } },
+  // Decision 0197: which landing the land phase recommends; unset is `branch`.
+  conventions: {
+    closed: { commit: { commit: true }, branch: { type: 'string' }, land: { enum: ['branch', 'default'] } },
+  },
   models: {
     closed: Object.fromEntries(
       ['review', 'planReview', 'verify', 'preparer', 'research', 'initScan'].map((role) => [role, { type: 'string' }]),

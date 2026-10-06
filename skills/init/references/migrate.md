@@ -50,7 +50,7 @@ Rows are approved one at a time, with the proposal and its alternatives — exce
 
 Every instruction has a settlement with its evidence; every non-`retain` row names what is lost; every approved row is applied or listed in the report as not done with its reason.
 
-The table's own shape is checked before the approval, by printing four numbers (decision **0150**): **columns printed, of six** — `Approved` is the seventh and step 5's *done when* is where it is checked — **rows**, **distinct `file:line` the rows name** — equal to the first, because one row per instruction is the rule — and **rows whose Evidence carries no count**, which is zero. All six columns are present, and `Approved` is added at step 5. A run that cannot print those four numbers has a ledger nobody can check, which is how a table's shape ends up being the first thing a long run compresses.
+The table's own shape is checked before the approval, by printing four numbers (decision **0150**) as one line under the ledger's rows — after the rows the developer decides and before the question (decision **0194**): `shape: <c>/6 columns · <r> rows · <d> distinct file:line · <z> rows without a count`. The four are **columns printed, of six** — `Approved` is the seventh and step 5's *done when* is where it is checked — **rows**, **distinct `file:line` the rows name** — equal to the first, because one row per instruction is the rule — and **rows whose Evidence carries no count**, which is zero. All six columns are present, and `Approved` is added at step 5. A run that cannot print those four numbers has a ledger nobody can check, which is how a table's shape ends up being the first thing a long run compresses.
 
 ## Anti-pattern
 

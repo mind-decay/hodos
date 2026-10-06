@@ -1,7 +1,7 @@
 ---
 name: task
-description: Session 1 of a hodos task — route the request, research what is unknown, grill the design into a plan, get it approved, hand off to /hodos:run. A change no program reads is carried through its commit and one review here instead. The developer runs it as /hodos:task <description>; the campaign skill invokes it as <campaign>/<node> to open one node of a map. Opening a task is the developer's decision, so it is not invoked on your own reading of a request.
-argument-hint: "<description> | <campaign>/<node>"
+description: Session 1 of a hodos task — route the request, research what is unknown, grill the design into a plan, get it approved, hand off to /hodos:run. A change no program reads is carried through its commit and one review here instead. Invoked by the developer as /hodos:task <description>, by the campaign skill as <campaign>/<node>, or by a go-ahead in words to a task hodos itself just proposed. A request hodos did not propose is the developer's to route with /hodos:task.
+argument-hint: "<description> | <campaign>/<node> | <slug>"
 allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 
@@ -34,7 +34,7 @@ Decide what will be built and why, and write it down so session 2 can build it w
 | 4b | Reproduce | `references/reproduce.md` | type `bug` whose red-loop candidates are not commands that fail today: a red-capable command in `brief.md`, or a `Ruling:` that says it is not reproducible here |
 | 5 | Research | `references/research.md` | every question carries citations, or is marked open for grilling |
 | 6 | Grill and plan | `references/plan.md`, `references/design.md` | the frontier is empty, ten design fields non-empty, every task a tracer bullet with an acceptance criterion — a `spike` carries the question, the timebox and the exit instead of tasks (`references/plan.md §4`) |
-| 7 | Plan review | — | `deep` only: `plan-review.md` folded, then deleted |
+| 7 | Plan review | — | `deep` only: `plan-review.md`, or at the reviewer's bound `plan-review.partial.md`, folded, then deleted |
 | 8 | Approve | *Approval*, below | `state.phase == approved` and the handoff line printed |
 
 Step 2i replaces steps 4–8 for the one shape that carries no behaviour: the edit, its commands, one commit and one fresh reviewer run in this session, and no second session follows. Step 4b runs only for a `bug` the router left with no command that fails today (`references/route.md §7`), and its second exit ends the session: a symptom nothing here can contradict is not a `bug` the red loop can carry, and re-routing it is the developer's call. Step 4 is an exit: it ends the session on its own terms. Step 3 is a handoff — the `campaign` skill takes over in this session and may invoke this one back for a node. Step 5 runs when the path is `deep`, and whenever grilling hits a fact — a question about what the code or a library already does, rather than about what to build.
@@ -44,6 +44,21 @@ Step 2i replaces steps 4–8 for the one shape that carries no behaviour: the ed
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/config.mjs find`. A config with `notFound` means the project has no hodos layer: say `run /hodos:init first` and stop. Everything below reads `config.commands`, `config.conventions`, `config.models`, `config.verify.recipes` and `config.autonomy` from what this step returned.
 
 Invoked as `<campaign>/<node>`, the argument is already a scoped node: step 1 routes it like any description, and step 3 is skipped — a node that re-entered the campaign skill would loop.
+
+An argument that is one kebab-case token — lowercase letters, digits and hyphens, nothing else — may name a task this project already has. Run `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs next <argument>`. Exit 1 means there is no such task, and the argument is routed as a description, like any other. Exit 0 goes to *Resume*, below, with the JSON the script printed (decision **0192**).
+
+## Resume
+
+A task this session's step 0 found continues where S1 left it, and is never opened again as `<slug>-2`. The `step` the script printed decides where. Before entering a step, run `ledger.mjs claim <slug>`, which writes the pointer this session's ledger lines find the task by, then read the task's `brief.md`, `research.md` and `plan.md` where they exist. The task exists, so `ledger.mjs init` never runs here.
+
+| `step` | Where the session goes |
+|---|---|
+| `route` | step 1, for this slug: its verdict writes `brief.md`, a verdict that differs from the ledger's `Init:` is recorded as `Route: …`, and `references/route.md §6` skips its `init` |
+| `inert` | step 2i |
+| `research` | step 5 |
+| `plan` | step 6. A `bug` first re-checks the condition of `references/route.md §7`, and goes to step 4b while no command fails today |
+| `approve` | step 8 |
+| any other | print `Next: <next>`, with the `next` the script printed, and stop. The task is past S1, and this session claims nothing |
 
 ## Step 3 — campaign
 
@@ -55,12 +70,12 @@ That skill invokes this one back, as `<campaign>/<node>`. A node is not a campai
 
 ## Step 4 — question
 
-Type `question` answers in chat and writes no plan: the answer, then the sources it rests on — `path:line` for the repository, a URL with its version for a library. Close with `ledger.mjs add "Finish: report delivered"`. A question that turns out to need code is re-routed, not answered: say so and start again with the work as the description.
+Type `question` answers in chat and writes no plan: the answer, then the sources it rests on — `path:line` for the repository, a URL with its version for a library. Close with `ledger.mjs add "Finish: report delivered"`, then one `Next:` line: `/hodos:task <the change the answer points to>` where it points to one, and otherwise the `next` of `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs next` (decision **0191**). A question that turns out to need code is re-routed, not answered: say so and start again with the work as the description.
 
 ## Step 8 — approval
 
 1. Present the summary: the goal in one paragraph, the decisions with their choices, the tasks with their acceptance criteria, and what the plan explicitly does not do.
-2. Ask for approval with `AskUserQuestion`. A plan with a non-empty `## Open questions` is not presented — those questions are the round that has not been asked yet.
+2. Ask for approval with `AskUserQuestion` and three options (decision **0194**): **approve** *(Recommended)*; **change** — the developer names the row or the task, and that fork is grilled again before the plan is presented again; **stop here** — the task stays at phase `plan`, and the session ends on `Next:` with the `next` of `ledger.mjs next <slug>`, which is `/hodos:task <slug>`. After a plan review that stopped at its turn bound, a fourth: **re-dispatch the plan reviewer**, the one repeat (`references/plan.md §9`). A plan with a non-empty `## Open questions` is not presented — those questions are the round that has not been asked yet.
 3. On approval, create the branch from `config.conventions.branch` with the slug substituted. A branch that already exists is a question, never a checkout. The exception is a task upgraded out of `inert`, which keeps the branch it is on (`references/inert.md §7`).
 4. `ledger.mjs add "Plan: approved" --tasks <n> --branch <name>` — the script records `base` from HEAD and moves the phase to `approved`.
 5. Print exactly, as the last two lines of the session:

@@ -671,7 +671,7 @@ function realPair(text = MAP, homeConfig = { version: 1 }) {
 
 test('node-done in another repository writes the map and commits nothing there', () => {
   const { home, away } = realPair();
-  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', 'abc1234'], away.root);
+  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', 'HEAD'], away.root);
   assert.equal(cli.status, 0, cli.stderr);
 
   // The instruction: the repository, the file, and the command to run there.
@@ -684,14 +684,28 @@ test('node-done in another repository writes the map and commits nothing there',
 
   // The write landed, and it is the developer's to commit.
   const after = readFileSync(join(home.root, '.claude', 'hodos', 'campaigns', 'state-migration.md'), 'utf8');
-  assert.match(after, /- \[done\] users-list — users list to TanStack .* · ref: sha:abc1234/);
+  const short = away.git('rev-parse', '--short', 'HEAD').trim();
+  assert.match(after, new RegExp(`- \\[done\\] users-list — users list to TanStack .* · ref: sha:${short}`));
   assert.equal(home.git('log', '--format=%s').trim(), 'chore: the layer');
   assert.match(home.git('status', '--porcelain'), /^ M \.claude\/hodos\/campaigns\/state-migration\.md$/m);
 });
 
+test('a decision close from another repository takes the sha of the map commit, which only the map\'s repository has (decision 0197)', () => {
+  // campaign map.md §8: the node closes with the commit that carried the map
+  // change, and for a map elsewhere that commit is in the home repository.
+  const { home, away } = realPair();
+  const sha = home.git('rev-parse', 'HEAD').trim();
+  const short = home.git('rev-parse', '--short', 'HEAD').trim();
+  assert.equal(spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: away.root }).status, 128, 'control: away does not have it');
+  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', sha], away.root);
+  assert.equal(cli.status, 0, cli.stderr);
+  const after = readFileSync(join(home.root, '.claude', 'hodos', 'campaigns', 'state-migration.md'), 'utf8');
+  assert.match(after, new RegExp(`- \\[done\\] users-list — .* · ref: sha:${short}`));
+});
+
 test('the same close in the map\'s own repository prints no such instruction', () => {
   const { home } = realPair();
-  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', 'abc1234'], home.root);
+  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', 'HEAD'], home.root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.doesNotMatch(cli.stdout, /commit it there/);
 });
@@ -726,7 +740,7 @@ test('a home repository that is conventional gets a subject its commit-msg check
 
 test('a home repository with a ticket prefix gets the add and its convention named, not a subject nobody can fill', () => {
   const { away } = realPair(MAP, { version: 1, conventions: { commit: 'ticket-prefix' } });
-  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', 'abc1234'], away.root);
+  const cli = run(['node-done', 'state-migration', 'users-list', '--sha', 'HEAD'], away.root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /git -C .*home add \.claude\/hodos\/campaigns\/state-migration\.md/);
   assert.match(cli.stdout, /ticket-prefix/);
@@ -857,23 +871,88 @@ test('claim takes the task slug when it is not the node name (decision 0054)', (
 
 test('node-done sets done, points ref at the sha, and re-measures (criterion 3)', posix, () => {
   const root = counted('7');
+  const short = commits(root)('rev-parse', '--short', 'HEAD');
   run(['claim', 'counted', 'first-node', '@you', 'feature/first'], root);
   writeFileSync(join(root, 'count.txt'), '5\n'); // the node moved the number
-  const cli = run(['node-done', 'counted', 'first-node', '--sha', 'a1b2c3d'], root);
+  const cli = run(['node-done', 'counted', 'first-node', '--sha', 'HEAD'], root);
   assert.equal(cli.status, 0, cli.stderr);
   const after = readMap(root).split('\n');
-  assert.match(after.find((l) => l.includes('first-node')), /^- \[done\] first-node — .* · ref: sha:a1b2c3d · metric: —$/);
+  assert.match(after.find((l) => l.includes('first-node')), new RegExp(`^- \\[done\\] first-node — .* · ref: sha:${short} · metric: —$`));
   assert.match(after.find((l) => l.startsWith('| widgets')), /\| 5 \(\d{4}-\d{2}-\d{2}\) \|$/);
   assert.match(after.find((l) => l.includes('second-node')), /^- \[ready\] second-node/); // untouched
 });
 
 test('node-done on a node no map carries changes nothing', () => {
   const root = counted();
+  commits(root);
   const before = readMap(root);
-  const cli = run(['node-done', 'counted', 'no-such-node', '--sha', 'a1b2c3d'], root);
+  const cli = run(['node-done', 'counted', 'no-such-node', '--sha', 'HEAD'], root);
   assert.equal(cli.status, 1);
   assert.match(cli.stderr, /no-such-node/);
   assert.equal(readMap(root), before);
+});
+
+/**
+ * `root` made a real repository holding `n` empty commits, for the `--sha` a
+ * close resolves (decision 0197). A `mapDir` root's `.git` is an empty
+ * directory, which `git init` fills in place.
+ */
+function commits(root, n = 1) {
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', '-c', 'commit.gpgsign=false', ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  git('init', '-q', '-b', 'main');
+  for (let i = 1; i <= n; i += 1) git('commit', '-q', '--allow-empty', '-m', `chore: commit ${i}`);
+  return git;
+}
+
+test('node-done --sha takes a ref and records the short sha it names (decision 0197)', () => {
+  const root = mapDir(COUNTED, 'counted');
+  const git = commits(root, 2);
+  const cli = run(['node-done', 'counted', 'first-node', '--sha', 'HEAD~1'], root);
+  assert.equal(cli.status, 0, cli.stderr);
+  const short = git('rev-parse', '--short', 'HEAD~1');
+  assert.match(readMap(root), new RegExp(`^- \\[done\\] first-node — .* · ref: sha:${short} ·`, 'm'));
+  assert.match(cli.stdout, new RegExp(`done, sha:${short}$`, 'm'));
+});
+
+test('node-done --sha with a ref that names no commit exits 1 and leaves the map byte-identical', () => {
+  const root = mapDir(COUNTED, 'counted');
+  commits(root);
+  const before = readMap(root);
+  const cli = run(['node-done', 'counted', 'first-node', '--sha', 'nope'], root);
+  assert.equal(cli.status, 1);
+  assert.match(cli.stderr, /^node-done: nope is not a commit here$/m);
+  assert.equal(readMap(root), before);
+});
+
+test('node-done from a subdirectory of the map\'s own repository refuses a bad ref as a local map (review 2)', () => {
+  const root = mapDir(COUNTED, 'counted');
+  const git = commits(root);
+  const sub = join(root, 'spa');
+  mkdirSync(sub);
+  const before = readMap(root);
+  const bad = run(['node-done', 'counted', 'first-node', '--sha', 'nope'], sub);
+  assert.equal(bad.status, 1);
+  assert.equal(bad.stderr, 'node-done: nope is not a commit here\n', 'the map is here, so no other repository is named');
+  assert.equal(readMap(root), before);
+
+  const good = run(['node-done', 'counted', 'first-node', '--sha', 'HEAD'], sub);
+  assert.equal(good.status, 0, good.stderr);
+  assert.match(readMap(root), new RegExp(`· ref: sha:${git('rev-parse', '--short', 'HEAD')} ·`));
+});
+
+test('node-done --sha with a full sha records its short form', () => {
+  const root = mapDir(COUNTED, 'counted');
+  const git = commits(root);
+  const full = git('rev-parse', 'HEAD');
+  const cli = run(['node-done', 'counted', 'first-node', '--sha', full], root);
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.match(readMap(root), new RegExp(`· ref: sha:${git('rev-parse', '--short', 'HEAD')} ·`));
+  assert.doesNotMatch(readMap(root), new RegExp(full));
 });
 
 test('claim and node-done need their arguments', () => {
@@ -896,18 +975,21 @@ test('the frontier is the ready nodes whose dependencies are done', () => {
   assert.equal(f.counts, '1 ready / 1 blocked / 1 fog');
 });
 
-test('a ready node with an open dependency is held, not proposed (decision 0053)', () => {
+test('a ready node with an open dependency is waiting, not proposed (decisions 0053, 0199)', () => {
   const text = COUNTED; // second-node depends on first-node, which is ready
   const f = frontier(parseMap(text));
   assert.deepEqual(f.ready.map((n) => n.name), ['first-node']);
   assert.deepEqual(f.held.map((h) => [h.node.name, h.by]), [['second-node', ['first-node']]]);
-  assert.equal(f.counts, '1 ready / 1 held / 0 blocked / 0 fog');
+  assert.equal(f.counts, '1 ready / 1 waiting / 0 blocked / 0 fog');
+  const lines = formatFrontier('counted', f, { byName: new Set(['first-node', 'second-node']) });
+  assert.match(lines, /^waiting: second-node — .* · on: first-node$/m);
+  assert.doesNotMatch(lines, /^held: /m);
 });
 
-test('a dependency the map does not carry holds the node and says so', () => {
+test('a dependency the map does not carry keeps the node waiting and says so', () => {
   const f = frontier(parseMap(COUNTED.replace('deps: first-node', 'deps: ghost-node')));
   assert.deepEqual(f.held.map((h) => h.by), [['ghost-node']]);
-  assert.match(formatFrontier('counted', f), /ghost-node \(no such node\)/);
+  assert.match(formatFrontier('counted', f), / · on: ghost-node \(no such node\)$/m);
 });
 
 test('a dropped dependency does not hold anything', () => {
@@ -984,7 +1066,8 @@ test('set refuses a status the grammar does not have, and a call with no field',
 
 test('node-done names the lines that still point at the node it closed (decision 0056)', () => {
   const root = chained();
-  const cli = run(['node-done', 'counted', 'first-node', '--sha', 'a1b2c3d'], root);
+  commits(root);
+  const cli = run(['node-done', 'counted', 'first-node', '--sha', 'HEAD'], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /second-node, third-node still name first-node in deps: or by:/);
   assert.doesNotMatch(cli.stdout, /fourth-node/);
@@ -992,15 +1075,18 @@ test('node-done names the lines that still point at the node it closed (decision
 
 test('a close nothing points at says nothing about stale lines', () => {
   const root = chained();
-  const cli = run(['node-done', 'counted', 'fourth-node', '--sha', 'a1b2c3d'], root);
+  commits(root);
+  const cli = run(['node-done', 'counted', 'fourth-node', '--sha', 'HEAD'], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.doesNotMatch(cli.stdout, /still name/);
 });
 
 test('node-done changes no status but the one it was given', () => {
   const root = chained();
-  run(['node-done', 'counted', 'first-node', '--sha', 'a1b2c3d'], root);
+  commits(root);
+  assert.equal(run(['node-done', 'counted', 'first-node', '--sha', 'HEAD'], root).status, 0);
   const after = readMap(root);
+  assert.match(after, /^- \[done\] first-node/m);
   assert.match(after, /^- \[blocked\] third-node/m); // decision 0053: a human's judgement stands
   assert.match(after, /^- \[ready\] second-node/m);
 });
@@ -1014,7 +1100,8 @@ test('a hyphen is not a word boundary: closing `errors` leaves `web-errors` alon
 - [blocked] real — waits on this one · deps: — · owner: — · branch: — · ref: — · metric: — · by: errors landing
 `;
   const root = mapDir(text, 'counted');
-  const cli = run(['node-done', 'counted', 'errors', '--sha', 'a1b2c3d'], root);
+  commits(root);
+  const cli = run(['node-done', 'counted', 'errors', '--sha', 'HEAD'], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /real still name errors in deps: or by: — 1 line may be stale/);
   assert.doesNotMatch(cli.stdout, /other/);

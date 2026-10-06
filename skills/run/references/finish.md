@@ -1,12 +1,12 @@
 # finish — the fold, the report, the proposals, the deletion
 
-1. Inputs and outputs · 2. What the ledger says happened · 3. The fold into `plan.md#Outcome` · 3a. The pins · 4. The campaign node · 5. Rule and hook proposals · 5a. The tracker link · 5b. Anchors this branch moved · 5c. The one offer · 6. The report · 7. The ledger line · 8. The task directory · 8a. A spike ends here · 9. Completion · 10. Anti-pattern
+1. Inputs and outputs · 2. What the ledger says happened · 3. The fold into `plan.md#Outcome` · 3a. The pins · 4. The campaign node · 5. Rule and hook proposals · 5a. The tracker link · 5b. Anchors this branch moved · 5c. The one offer · 6. The report · 7. The ledger line · 8a. A spike ends here · 9. Completion · 10. Anti-pattern
 
 ## 1. Inputs and outputs
 
 **Reads.** `plan.md`; `ledger.md` and `state.json`; `review.md` and `verify.md` as the last loop left them — including `verify.md`'s `## Claim feedback` and its `pass · pin` rows, both copied out in §3 before that section's own deletion step, printed by §6 and written by §3a; `env.md` where a layer of the environment would not come up; `config.conventions`; `.claude/rules/*.md` and what `verify-citations.mjs` prints over them (§5b).
 
-**Writes.** `plan.md`, one appended `## Outcome` section. `verify.recipes[<ui>].checks[]` in the project's own `config.json`, on the developer's approval and nowhere else (§3a). The transient files, deleted. One ledger line. The report, in chat. Nothing in the code, and nothing in `.claude/rules/` except through the `rule` skill or as a precedent re-pointed on the developer's approval (§5b).
+**Writes.** `plan.md`, one appended `## Outcome` section. `verify.recipes[<ui>].checks[]` in the project's own `config.json`, on the developer's approval and nowhere else (§3a). The transient files, deleted. One ledger line. The report, in chat. For a campaign node whose map is in this repository, one commit holding the map alone (§4). Nothing in the code, and nothing in `.claude/rules/` except through the `rule` skill or as a precedent re-pointed on the developer's approval (§5b).
 
 **Entered** at phase `finish`: the ledger holds `Verify <k>: PASS`, or a `Breaker: … — accept`, or, on an `inert` task, `Review <k>: ACCEPT`, whose verify fields read as `skills/task/references/inert.md` §6 says (decision **0183**).
 
@@ -45,7 +45,7 @@ The numbers are the two headers' own, copied rather than recomputed: `review.md`
 
 Copy `verify.md`'s `## Claim feedback` out first — three lines, verbatim — because §6 prints them and the next paragraph is where the file they are in stops existing (decision **0092**). Copy the `pass · pin` rows out with them, route and predicate and value each: §3a is what puts them to the developer, and it runs before the deletion for the same reason.
 
-Then delete the transient files of `DESIGN.md §5.1` — `review.md`, `verify.md`, `env.md`, `review-input.md`, `plan-review.md`, `stop-count` — from the task directory. `evidence/` stays: the Outcome cites it. This deletion needs no confirmation; those files have just been folded, and `plan.md` is where they now live.
+Then delete the transient files of `DESIGN.md §5.1` — `review.md`, `review.partial.md`, `verify.md`, `env.md`, `review-input.md`, `plan-review.md`, `plan-review.partial.md`, `stop-count` — from the task directory. `evidence/` stays: the Outcome cites it. This deletion needs no confirmation; those files have just been folded, and `plan.md` is where they now live.
 
 ## 3a. The pins
 
@@ -76,14 +76,14 @@ A row marked `pin` that does not carry all three of route, predicate and value (
 For a campaign node — `state.campaign` is `<campaign>/<node>` — close the node on the map:
 
 ```
-node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs node-done <campaign> <node> --sha <the sha of the finish commit>
+node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs node-done <campaign> <node> --sha <HEAD: the task's last commit>
 ```
 
 It sets the node `done`, points its `ref:` at that sha, and re-measures the campaign's done-metrics — the one place a campaign's numbers move on their own. Report the metric that moved and by how much: that number is what the campaign is for, and the node is the evidence it moved. A row whose ` · repo:` names a repository nothing here resolves keeps its previous number with the date it was true on and says `no repository named <name> — known: <the names it does know>`: report that row as unmeasured rather than as a move, carry the known names into the report because they are what the correction is made from, and the close itself is unaffected (decision **0139**).
 
-**Where the map lives decides who commits it.** A map in *this* repository is committed with the finish commit: a node closed in a file nobody pushed is closed for one machine. A map in **another** repository — the home repository of a cross-repository campaign (`DESIGN.md §9`) — is written by `node-done`, which then prints that repository, the file and what to run there: the `git -C … add`, and the `git -C … commit` with an unscoped `chore: …` subject where that repository's `conventions.commit` is `conventional` or unstated, or its convention named where it is not (decisions **0174**, **0181**). Carry that line into the report as it came and run nothing from it: this phase does not commit in a repository the task was not opened in, whatever the state of its tree, and no config key makes it (decisions **0137**, **0090**).
+**Where the map lives decides who commits it.** A map in *this* repository is committed by this phase, right after `node-done`: one commit in `config.conventions.commit` holding the map alone, whose subject names the node closed. The sha `node-done` records is the task's last commit, the one this commit sits on, because a commit cannot carry its own sha. A node closed in a file nobody committed is closed for one machine. A map in **another** repository — the home repository of a cross-repository campaign (`DESIGN.md §9`) — is written by `node-done`, which then prints that repository, the file and what to run there: the `git -C … add`, and the `git -C … commit` with an unscoped `chore: …` subject where that repository's `conventions.commit` is `conventional` or unstated, or its convention named where it is not (decisions **0174**, **0181**). Carry that line into the report as it came and run nothing from it: this phase does not commit in a repository the task was not opened in, whatever the state of its tree, and no config key makes it (decisions **0137**, **0090**).
 
-A `node-done` that fails — no map, or a node the map does not carry — is one reported line and the finish continues. A finished task is finished whether or not its index could be updated.
+A `node-done` that fails — no map, or a node the map does not carry — is one reported line and the finish continues. A finished task is finished whether or not its index could be updated. Which node comes next is not this phase's to pick: the `Next:` that `land.md` prints after the landing proposes `/hodos:campaign <campaign>`, whose frontier, claim and question decide it (decision **0191**).
 
 ## 5. Rule and hook proposals
 
@@ -130,29 +130,30 @@ To chat, in this order, every section present even when empty:
 
 ```
 <slug> — <n> tasks, <n> commits, branch <name>
-Done: <one line per task, from the plan's titles>
-Simplify: net -<n> lines · markers: <hodos: lines, or none>
-Gaps (<n>): <each Gap: line>
-Rulings (<n>): <each Ruling: line>
-Upgrades (<n>): <each Upgrade: line>
 Review: <verdict> after <n> fix passes · Verify: <verdict>, <n> claims, <s> skipped
 Verify failures by severity: <b> blocker / <m> major / <mi> minor · flaky <n> · pre-existing <n>   (or: —)
+Done: <one line per task, from the plan's titles>
+Simplified: <n> lines shorter · limits marked in code: <hodos: lines, or none>
+Decisions the plan missed (<n>): <each Gap: line>
+Decided without asking (<n>): <each Ruling: line>
+Upgrades (<n>): <each Upgrade: line>
 Pinned: <route> — <predicate> = <value>, one line each, and any check warning against it (or: —)
-Re-pointed: <rule> <file:line> → :<line>, one per line, for the developer's docs(rules) commit (or: —)
-Claim feedback: <verify.md's three lines, verbatim>
+Rule citations moved: <rule> <file:line> → :<line>, one per line, for the developer's docs(rules) commit (or: —)
+Verifier on the plan's claims: <verify.md's three lines, verbatim>
 Tracker: <the link written, or Skip: tracker unavailable>
 Fixed after the last review: <the verify fix passes, which no reviewer saw>
 Open minors (<n>): <each>
 Proposals: <rule or convention proposals with both counts, hook proposals, observations — or none>
+Next: printed by land.md after the landing — the next of the option taken
 ```
 
-`Claim feedback` is copied from `verify.md`'s own section, verbatim and unranked (decision **0092**): the verifier's reading of the claim *set* — unfalsifiable, redundant, absent — which moved no row and no verdict and would otherwise go with the file this phase deletes. It is not a finding and gets no proposal of its own: what it can earn is a claim in the next plan, and §5's two `Grep` counts are what turn a repeat into a rule.
+`Verifier on the plan's claims` is copied from `verify.md`'s `## Claim feedback`, verbatim and unranked (decision **0092**): the verifier's reading of the claim *set* — unfalsifiable, redundant, absent — which moved no row and no verdict and would otherwise go with the file this phase deletes. It is not a finding and gets no proposal of its own: what it can earn is a claim in the next plan, and §5's two `Grep` counts are what turn a repeat into a rule.
 
 `Verify failures by severity` is copied from the rows, not recounted from an impression: the word on each `fail` row came out of a table (decisions **0097**, **0108**), and a `pre-existing` row is a defect this task **found and did not introduce**, which is the one line that says so before `verify.md` is deleted (decision **0119**). `Pinned` names what §3a wrote, or `—` where the developer declined or nothing was marked.
 
 `Fixed after the last review` is not optional: a verify fix is committed after the review that would have judged it, by design (`DESIGN.md §4.5`), and this line is the only place the developer sees it.
 
-An empty section is written as `—`. A section left out because it was empty reads, to the developer, as a section nobody checked.
+An empty section is written as `—`. A section left out because it was empty reads, to the developer, as a section nobody checked. The verdict is the second line because whether the work passed is what the report is read for (decision **0194**). The report's last line is not printed here: `land.md` asks the landing first, with the exact commands in each option, and prints `Next:` after it (decision **0197**). It names one step, `/hodos:campaign <campaign>` for a campaign node, so a go-ahead in words reaches the map, and `/hodos:task <description>` otherwise (decision **0191**).
 
 ## 7. The ledger line
 
@@ -162,26 +163,20 @@ After the report and after any accepted proposal has been written:
 node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Finish: report delivered"
 ```
 
-That one line moves the phase to `done`, appends this task's summary to `.claude/hodos/history.jsonl` — counts, the router override, the gap texts and the token usage of the sessions that worked it — and deletes the task's session pointers and `active`. It is written once, and only after the report is in the chat: it is the record that the report was delivered.
-
-## 8. The task directory
-
-The directory is deleted **only on the developer's confirmation** — it is a destructive action, and `DESIGN.md §4.4` stops on those under every autonomy setting. `AskUserQuestion`: delete `.claude/hodos/tasks/<slug>/`, or keep it. Name what goes with it: the plan and its Outcome, the ledger, the evidence. What survives either way is `history.jsonl` and the commits.
-
-A session with no `AskUserQuestion` — a headless run — asks in chat, deletes nothing, and says the directory is kept for want of an answer. The branch stays in both cases; push and merge are the developer's.
+That one line moves the phase to `done`, appends this task's summary to `.claude/hodos/history.jsonl` — counts, the router override, the gap texts and the token usage of the sessions that worked it — and deletes the task's session pointers and `active`. It is written once, and only after the report is in the chat: it is the record that the report was delivered. Then read `${CLAUDE_PLUGIN_ROOT}/skills/run/references/land.md` and run it: the landing, the task directory and the `Next:` line are its.
 
 ## 8a. A spike ends here, and merges nothing
 
 A task of type `spike` reaches this phase from `approved` — there is no review and no verify to have passed, because there are no tasks (decision **0084**). Sections 3, 4, 5a and 5c run as they do for any task; sections 2 and 6 read differently:
 
 1. **The exit is the outcome.** `## Outcome` carries the question, the answer, and which of the two exits the plan named was taken: the scratch branch **deleted**, or a **follow-up task opened** with its slug. One of the two, named — "we learned a lot" is not an exit.
-2. `ledger.mjs add "Ruling: spike <question, in five words> — <the answer>, <the exit taken: branch deleted, or follow-up <slug> opened> — <what it costs if the answer is wrong>"` before the `Finish` line, so the answer **and its exit** survive the task directory. It is the only durable record a spike leaves besides the commits it did not make, and `## Outcome` — where step 1 also names the exit — lives inside the directory §8 offers to delete. The exit rides in the answer segment: the grammar is closed at three (`FORMATS.md §6`, decision **0084**), so this form adds no fourth.
-3. **The branch.** Deleting it is the developer's, like every other git action here: name it, say the answer is recorded in the ruling and in `## Outcome`, and leave the command to them.
+2. `ledger.mjs add "Ruling: spike <question, in five words> — <the answer>, <the exit taken: branch deleted, or follow-up <slug> opened> — <what it costs if the answer is wrong>"` before the `Finish` line, so the answer **and its exit** survive the task directory. It is the only durable record a spike leaves besides the commits it did not make, and `## Outcome` — where step 1 also names the exit — lives inside the directory `land.md §4` offers to delete. The exit rides in the answer segment: the grammar is closed at three (`FORMATS.md §6`, decision **0084**), so this form adds no fourth.
+3. **The branch:** `land.md` asks to delete it, with the command, and its `Next:` names what follows. That is the `delete <branch>` option where the exit deleted it, and `Next: /hodos:task <the follow-up>` where the exit opened one.
 4. A rule proposal from a spike is possible and rare: it needs the same two counts as any other (§5), and "we tried X and it did not work" is an observation line, not a convention.
 
 ## 9. Completion
 
-`Finish: report delivered` in the ledger, the report in the chat, `## Outcome` in `plan.md`, every accepted pin in the config with `config.mjs check` run after it, every accepted re-point in its rule, the transient files gone, and the task directory deleted or explicitly kept.
+`Finish: report delivered` in the ledger, the report in the chat, `## Outcome` in `plan.md`, a campaign node's map committed where it lives in this repository, every accepted pin in the config with `config.mjs check` run after it, every accepted re-point in its rule, and the transient files gone. Then `land.md`.
 
 ## 10. Anti-pattern
 
@@ -191,8 +186,6 @@ A proposal from one occurrence of everything. Two is the threshold on one side o
 
 Offering a convention proposal as though the code already agreed with it. It is a target the code contradicts, and the developer answering it is deciding, not confirming.
 
-Fixing an open minor here, or committing anything. The loops that judge code have closed.
-
-Deleting the task directory because the task is finished. Finished is why it is offered, not why it is done.
+Fixing an open minor here, or committing code. The loops that judge code have closed, and the one commit this phase makes is a map in this repository (§4).
 
 Writing a pin the developer was not asked about, or one whose row does not carry its own value. The config is the team's declaration, and a pin is an assertion that outlives this task.

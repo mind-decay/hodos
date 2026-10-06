@@ -9,6 +9,7 @@ One pass, no subagents. Every line gets a value or the word `absent`.
 | Line | Where it comes from |
 |---|---|
 | git root, branch, HEAD | `git rev-parse --show-toplevel`, `git branch --show-current`, `git rev-parse HEAD` |
+| remotes | `git remote` — the names, or `absent` when it prints nothing (PLATFORM-NOTES.md fact 68). Interview question 4 asks how a branch lands only where one is listed (decision **0201**) |
 | manifests | `git ls-files` filtered to `package.json`, `*.csproj`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `build.gradle*`, `Gemfile` |
 | lockfiles | `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, … — every dependency version quoted later comes from here |
 | workspaces | `workspaces` in the manifest, `pnpm-workspace.yaml`, `[workspace]`, `*.sln` |

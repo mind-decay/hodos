@@ -32,7 +32,7 @@ Learn the project once; write the layer every later phase reads. Each phase's pr
 | 1 | Scan by area | `references/scan.md` | five area briefs answered, each fact with `path:line` |
 | 2 | Best practice | `references/rules.md` | the detected stacks' `sources/*.md` fetched; candidates carry their URL |
 | 3 | Interview | `references/interview.md` | every open question has an answer or an owner |
-| 4 | Report | `references/rules.md`, `references/migrate.md` | four tables shown: config, rules, CLAUDE.md, migration ledger |
+| 4 | Report | `references/rules.md`, `references/migrate.md` | four tables built: config, rules, CLAUDE.md, migration ledger; step 5 prints them, under its `Approve:` line (decision **0194**) |
 | 5 | Approval | — | every row approved, deferred, or dropped; the batch is `retain` and `relocate` only (decision **0152**), each of its rows named in the option's text; every other settlement and every contested rule asked on its own |
 | 6 | Write | *Write*, below | the approved rows are on disk and nothing else moved |
 | 7 | Self-check | *Self-check*, below | lint exits 0 — or every finding still standing traces to a row the developer declined (decision **0133**) — and every recorded command ran green, bar those carrying `unrun: true` (decision **0148**) |
@@ -42,7 +42,7 @@ The warning is for the colleague who starts Claude Code from a launcher rather t
 
 ## Approval (step 5)
 
-Present the four tables, then ask. `AskUserQuestion` carries the decisions — the batch, then each contested rule on its own with the three questions of `references/rules.md`. A row the developer defers is dropped from this run and named in the report; a row they reject is not asked again.
+Open with one line that says what is asked — `Approve: <n> in one batch · <k> asked one at a time` — then the four tables it rests on, then ask (decision **0194**). `AskUserQuestion` carries the decisions — the batch, then each contested rule on its own with the three questions of `references/rules.md`. A row the developer defers is dropped from this run and named in the report; a row they reject is not asked again.
 
 ## Write (step 6)
 
@@ -61,7 +61,7 @@ Exact shapes: `references/config.md` for the config, and `${CLAUDE_PLUGIN_ROOT}/
 - `node ${CLAUDE_PLUGIN_ROOT}/scripts/lint.mjs --project` → exit 0. A finding is fixed here, not reported as a caveat — **unless the developer declined the fix**, and then it is a caveat named in the report beside the row that declined it, because step 6 writes only what is approved and a decline is a first-class answer there (decision **0133**). Any other finding is fixed.
 - `node ${CLAUDE_PLUGIN_ROOT}/scripts/verify-citations.mjs .claude/rules/*.md` → every precedent resolves.
 - Run each recorded command once in this session. One that fails is corrected or recorded as `null`. A command that **cannot** run in a session — gated behind a corpus download, a device, a paid account — is recorded with `unrun: true` on the approval that says so, and `config.mjs check` warns about it by name (decision **0148**, `references/config.md`); recorded unrun and **unmarked** is what stays forbidden.
-- Report: what was written, what the developer declined, what step 8 left in place, and the count of rules with their sources.
+- Report: what was written, what the developer declined, what step 8 left in place, and the count of rules with their sources. It ends on `Next: /hodos:task <the first change to build>`, with the change filled in where the developer named one: a set-up exists for the first task (decision **0191**).
 
 ## --refresh
 
@@ -72,7 +72,8 @@ The layer exists; this run re-verifies it against everything that changed since 
 3. Drift: for each rule, count the places the code no longer follows it. A rule the code has left is a decision for the developer, never a silent edit.
 4. Pins: every `verify.recipes[].checks[]` entry whose `route` no longer resolves — the project's route table does not carry it, or the component it named is gone — is a **prune proposal** naming the route, the predicate and when it was written (decision **0094**). A pin whose route resolves is left alone whatever the predicate looks like: whether it still holds is the verify phase's answer, not this one's, and a check removed here is a regression nobody will notice. A `checks[]` entry `config.mjs check` warns about — a predicate over a class or an id, a walk from a queried element, or a bare expression where the adapter runs a function (decisions **0118**, **0129**, **0130**) — is reported beside the prunes as a re-point proposal, in the same words a rotted citation gets. **A route does not leave `verify.recipes[].routes` while a `checks[]` entry names it** (decision **0131**): the sweep is what evaluates a pin, so dropping the route retires the check in silence instead of proposing it. The prune is presented first, the routes row names its dependency, and a routes row approved without its prune is refused with that reason and stays a report line.
 5. New areas: directories added since `scanSha` that no rule and no precedent covers → candidates, through the same three-question filter.
-6. Present the delta as the step-4 report and write only what is approved. The two pointers answer different questions and move on different conditions (decision **0132**): **`verifiedAt`** is the day the recorded commands last ran green, so it moves when they did, whatever else this run left undone; **`scanSha`** is the left end of the next delta, so it moves only where this delta leaves **no unresolved proposal** — a declined or unfixed row holds it, and the report names the row holding it. Moving it past a finding buries the finding, because the next `--refresh` starts after it.
+6. Landing: a config whose repository lists a remote and carries no `conventions.land` predates the question (decision **0201**). Ask the landing half of interview question 4 once, and the answer is a row of the delta's config table, recommended as step 5 recommends it.
+7. Present the delta as the step-4 report and write only what is approved. The two pointers answer different questions and move on different conditions (decision **0132**): **`verifiedAt`** is the day the recorded commands last ran green, so it moves when they did, whatever else this run left undone; **`scanSha`** is the left end of the next delta, so it moves only where this delta leaves **no unresolved proposal** — a declined or unfixed row holds it, and the report names the row holding it. Moving it past a finding buries the finding, because the next `--refresh` starts after it.
 
 ## Completion
 

@@ -13,8 +13,8 @@ Every question carries the finding that raised it ("the scan found two error sha
 1. What does Claude get wrong in this project? The concrete cases, not a category.
 2. How is the app run so a change can be seen working — command, port, auth, seeded data, the routes or endpoints that matter?
 3. What must not be touched — generated files, vendored code, a module under migration, anything with a story behind it?
-4. Which tracker, which branch naming, which commit convention? (The scan proposes one from `git log`; this confirms or overrides it.)
-5. In which language are rules, plans and reports written? (English identifiers and commands regardless.)
+4. Which tracker, which branch naming, which commit convention — and, where the inventory lists a remote, how a finished branch lands: through a merge request, or straight onto the default branch? (The scan proposes the commit convention from `git log`; this confirms or overrides it.)
+5. In which language are rules, plans and reports written? (English identifiers and commands regardless; the chat follows the language you write in.)
 
 ## Batch 2 — what the scan raised
 

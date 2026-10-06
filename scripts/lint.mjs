@@ -71,8 +71,10 @@ const COVERED_LINES = ['matrix', 'skips', 'residue'];
 // the executor needs, so this warns and never fails.
 const PLAN_ADVISORY = 250;
 
-// Decision 0016: these three are call targets and stay model-invocable.
-const MODEL_INVOCABLE = new Set(['task', 'campaign', 'rule']);
+// Decisions 0016 and 0190: these four are call targets and stay model-invocable.
+// `run` joined them once `ledger.mjs claim` carried the fresh-context guarantee
+// its gate used to, so a go-ahead in words to the resume hodos proposed reaches it.
+const MODEL_INVOCABLE = new Set(['task', 'campaign', 'rule', 'run']);
 
 const USAGE = `Usage: node scripts/lint.mjs [paths...] [--project] [--hook] [--rules]
 
@@ -270,7 +272,7 @@ function checkSkill(relPath, fm, findings) {
         file: relPath,
         line: fm.lines['disable-model-invocation'],
         severity: 'error',
-        message: `${slug} is a call target (decision 0016) and must omit disable-model-invocation`,
+        message: `${slug} is a call target (decisions 0016, 0190) and must omit disable-model-invocation`,
       });
     }
   } else if (gate !== 'true') {
@@ -278,7 +280,7 @@ function checkSkill(relPath, fm, findings) {
       file: relPath,
       line: fm.lines['disable-model-invocation'] ?? 1,
       severity: 'error',
-      message: 'disable-model-invocation: true is required on every skill outside task, campaign, rule',
+      message: 'disable-model-invocation: true is required on every skill outside the four call targets: task, campaign, rule and run',
     });
   }
 }

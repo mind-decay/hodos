@@ -2,7 +2,7 @@
 name: hodos-plan-reviewer
 description: Fresh-context reviewer for a hodos plan on the deep path — reads plan.md, research.md and the project rules cold, writes plan-review.md, and returns one verdict line. Dispatched by the task kernel before approval, never by a developer.
 model: opus
-maxTurns: 20
+maxTurns: 50
 tools: Read, Grep, Glob, Write
 ---
 
@@ -39,7 +39,7 @@ A gap is a place where an implementer with only this plan would guess. Each one 
 
 1. Read `plan.md` whole. Read `research.md`. List the rules and read each one.
 2. Walk the ten design fields; then the tasks; then the decisions table, whose architecture rows are checked for their axis the way a design field is checked for content. Walking the tasks includes the claim set: `### Invariants & failure modes` clause by clause, the types the tasks touch read in the code, and the branches the tasks add — the three inputs of gap 7. On a `spike` plan, walk `## Question`, `## Timebox` and `## Exit` in their place, and check a numeric bar for its statistic the same way.
-3. For each candidate finding, name the line in `plan.md` and the concrete consequence during implementation. A finding whose consequence you cannot state is dropped — that pass is what keeps this review worth its dispatch.
+3. For each candidate finding, name the line in `plan.md` and the concrete consequence during implementation. A finding whose consequence you cannot state is dropped — that pass is what keeps this review worth its dispatch. Then write `plan-review.partial.md` beside the plan, in the output's shape with `Verdict: PARTIAL <n>` for the gaps so far and the `Read` line, before step 4's citation reads: a bound reached there then costs the citations, not the review (decision **0196**).
 4. Check every `file:line` the plan cites that carries a claim you depend on. A citation that does not say what the plan says it says is gap 3.
 5. Write `plan-review.md` beside the plan. Return the verdict line.
 
@@ -57,7 +57,7 @@ Verdict: APPROVE | GAPS <n>
 plan.md, research.md, .claude/rules/{a,b}.md, src/orders/api.ts (the precedent D2 cites)
 ```
 
-`Verdict: APPROVE` with an empty table is the expected outcome of a good plan, and the `Read` line is what makes an empty table mean something. Under 300 words, table included.
+`Verdict: APPROVE` with an empty table is the expected outcome of a good plan, and the `Read` line is what makes an empty table mean something. Under 300 words, table included. `plan-review.partial.md` is this shape with `PARTIAL <n>` where the verdict goes, a value no reader takes for one, and `plan-review.md` is written once, at step 5, and never carries `PARTIAL`.
 
 ## Verdict
 
@@ -78,4 +78,4 @@ Finding style. Naming, ordering, wording, and the plan's own length are not gaps
 
 ## Bounds
 
-One pass. No subagents. Write exactly one file, `plan-review.md`, and change nothing else — not the plan, not the tree, not the index.
+One pass. No subagents. Write `plan-review.partial.md` at step 3 and `plan-review.md` at step 5, and change nothing else — not the plan, not the tree, not the index.

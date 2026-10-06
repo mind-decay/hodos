@@ -28,7 +28,7 @@ The campaign maps of a project (FORMATS.md §11).
 
   find [dir]                     list the maps visible from dir, innermost first;
                                  prints nothing when the project has none.
-  frontier <slug>                the ready / held / blocked / fog nodes and the waits.
+  frontier <slug>                the ready / waiting / blocked / fog nodes and the waits.
   claim <slug> <node> <owner> <branch> [--ref task:<slug>] [--force]
                                  mark the node active and record who has it.
                                  A claim any other ref carries — another owner
@@ -39,14 +39,18 @@ The campaign maps of a project (FORMATS.md §11).
                                  --owner --branch --ref --metric --by on one
                                  node line. There is no --name: a node is
                                  renamed by being replaced (decision 0136).
-  node-done <slug> <node> --sha <sha>
-                                 mark the node done, point ref: at the sha, re-measure.
+  node-done <slug> <node> --sha <ref>
+                                 mark the node done, point ref: at the short sha
+                                 the ref resolves to here, or else in the map's
+                                 own repository, re-measure. A ref that names no
+                                 commit in either exits 1 and writes nothing.
   measure <slug>                 run the done-metric commands and update Current.
   --help                         print this and exit 0.
 
 Exit codes: 0 — done, a project with no maps included, and an unreadable
-metric row reported in place; 1 — a map that is not there, or a claim the
-refs already carry for someone else; 2 — bad invocation.`;
+metric row reported in place; 1 — a map that is not there, a claim the
+refs already carry for someone else, or a --sha that names no commit;
+2 — bad invocation.`;
 
 const SEP = ' · ';
 const EMPTY = '—';
@@ -282,8 +286,8 @@ const SETTLED = new Set(['done', 'dropped']);
  * What can be started, what cannot, and why (decision 0053). A node line
  * carries a status a human wrote and a `deps:` list nothing keeps in step with
  * it; the frontier is the intersection, and a `ready` node whose dependency is
- * still open is reported as held rather than proposed. `held` is a line in this
- * output, never a status written back into a map.
+ * still open is reported as waiting rather than proposed. `waiting` is a line in
+ * this output, never a status written back into a map.
  */
 export function frontier(map, { claims = null } = {}) {
   const byName = new Map(map.nodes.map((n) => [n.name, n]));
@@ -311,7 +315,7 @@ export function frontier(map, { claims = null } = {}) {
   out.counts = [
     `${out.ready.length} ready`,
     out.claimed.length > 0 ? `${out.claimed.length} claimed` : null,
-    out.held.length > 0 ? `${out.held.length} held` : null,
+    out.held.length > 0 ? `${out.held.length} waiting` : null,
     `${out.blocked.length} blocked`,
     `${out.fog.length} fog`,
   ].filter(Boolean).join(' / ');
@@ -329,7 +333,7 @@ export function shortCounts(f) {
   return [
     [f.ready.length, 'ready'],
     [f.claimed.length, 'claimed'],
-    [f.held.length, 'held'],
+    [f.held.length, 'waiting'],
     [f.blocked.length, 'blocked'],
     [f.fog.length, 'fog'],
   ].filter(([n]) => n > 0).map(([n, name]) => `${n} ${name}`).join(' / ') || 'nothing open';
@@ -350,7 +354,7 @@ export function formatFrontier(slug, f, { byName = null } = {}) {
   }
   for (const { node, by } of f.held) {
     const named = by.map((dep) => (known.has(dep) ? dep : `${dep} (no such node)`)).join(', ');
-    lines.push(`held: ${gist(node)} · by: ${named}`);
+    lines.push(`waiting: ${gist(node)} · on: ${named}`);
   }
   for (const node of f.blocked) {
     lines.push(`blocked: ${gist(node)}${node.fields.by ? ` · by: ${node.fields.by}` : ''}`);
@@ -748,11 +752,26 @@ function stillNaming(map, name) {
 }
 
 function cmdNodeDone(argv, dir) {
-  const what = 'node-done needs <slug> <node> --sha <sha>';
+  const what = 'node-done needs <slug> <node> --sha <ref>';
   const { positionals, flags } = parseArgs(argv, what);
   const [slug, node] = positionals;
-  const sha = need(flags.sha, what);
+  const ref = need(flags.sha, what);
   const entry = openMap(slug, dir);
+  // A ref, resolved where its commit is (decision 0197): first the repository
+  // the close runs in, where a rebase at landing gave the node's commit a sha
+  // nobody knew when the command was written; then the map's own, where a
+  // decision node's map commit lives (campaign map.md §8). Only the exit status
+  // is read (fact 71).
+  const resolveIn = (root) => git(root, ['rev-parse', '--short', '--verify', '--quiet', `${ref}^{commit}`])?.trim();
+  // The map is local when it sits in this git root, which a subdirectory's
+  // cwd is not; noteHomeMap draws the same line.
+  const local = entry.root === gitRoot(dir);
+  const sha = resolveIn(dir) || (local ? null : resolveIn(entry.root));
+  if (!sha) {
+    const where = local ? '' : ` or in ${entry.root}`;
+    process.stderr.write(`node-done: ${ref} is not a commit here${where}\n`);
+    return 1;
+  }
   const withNode = rewriteNode(entry.text, node, { status: 'done', ref: `sha:${sha}` });
   const { text } = measureMap(withNode, measureIn(entry, dir));
   writeFileSync(entry.path, text);

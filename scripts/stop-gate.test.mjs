@@ -83,7 +83,7 @@ test('phase execute blocks with the open task', () => {
 });
 
 test('a phase with nothing open does not block', () => {
-  for (const phase of ['plan', 'approved', 'finish', 'manual', 'done']) {
+  for (const phase of ['plan', 'approved', 'blocked', 'finish', 'manual', 'done']) {
     const { root } = project({ state: { phase } });
     assert.equal(run(root).status, 0, phase);
   }
@@ -129,6 +129,12 @@ test('openItem names the item of each open phase', () => {
     'Fix 2',
   );
   assert.equal(openItem({ ...STATE, phase: 'done' }), null);
+});
+
+test('openItem names a verify fix pass whatever line came last in it (decision 0195)', () => {
+  const pass = { ...STATE, phase: 'fix', review: { iteration: 1 }, verify: { iteration: 2 } };
+  assert.equal(openItem({ ...pass, lastEvent: 'Fix 2: green' }), 'Fix 2');
+  assert.equal(openItem({ ...pass, lastEvent: 'Gap: the plan named no fixture — reused the empty cart' }), 'Fix 2');
 });
 
 test('--help exits 0', () => {

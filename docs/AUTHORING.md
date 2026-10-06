@@ -24,7 +24,7 @@ For each sentence: **would the model behave differently without it?** The test i
 State the target shape; do not prohibit. "Don't think of an elephant" makes the elephant more available. In head-to-head tests the prohibition wording produced clearly more of the unwanted output than the recipe wording, and trended worse than the no-guidance control (`research/03 §(a)`).
 
 - **No nuance clauses.** "Don't X unless it matters" reopens the negotiation. A recipe leaves nothing to negotiate: the output matches the shape or it doesn't.
-- Prohibition is reserved for hard guardrails, and even then it is paired with the positive target: "push and merge are the human's; the branch stays."
+- Prohibition is reserved for hard guardrails, and even then it is paired with the positive target: "never force a push; a push git rejects is reported as it came, and the branch stays as it was."
 - Variance is a metric: five interpretations across five runs means the wording is not binding. Tighten the form before adding words.
 
 ## 4. Leading words
@@ -32,6 +32,8 @@ State the target shape; do not prohibit. "Don't think of an elephant" makes the 
 A **leading word** is a compact concept the model already holds (`frontier`, `fog`, `tracer bullet`, `red`, `tight`, `seam`, `precedent`). Repeated as a token, never as a sentence, it anchors a region of behavior for free. Use the glossary in `DESIGN.md §14`; add to it before coining anything new. A made-up word recruits no priors — you pay in definition tokens what a pretrained word gives free.
 
 Refactor triads into a word: "fast, deterministic, low-overhead" → *tight*. "A loop you believe in" → *red*.
+
+A leading word is for the model. A line printed to the developer takes the `Printed:` form `DESIGN.md §14` gives the word, and engine shorthand outside the glossary — `S1`, a row number, a question number — is never printed (decision **0199**). A name a program reads back from a stored file, such as a ledger line or a map status, stays as the file has it.
 
 ## 5. Completion criteria and named anti-patterns
 
@@ -74,14 +76,14 @@ Only these fields, in this order, flat `key: value`; lists as `- item` lines. Sk
 Skills:
 ```yaml
 ---
-name: run
-description: Execute an approved hodos task — implement, simplify, review, verify, finish.
+name: status
+description: Show the hodos state of this project and its hygiene — tasks, config, rules, pointers.
 disable-model-invocation: true
-argument-hint: "<slug>"
+argument-hint: "[--debt|--cost|--prune]"
 allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
 ```
-`disable-model-invocation: true` on every skill **except** the call targets `task`, `campaign`, `rule`, which another skill invokes through the Skill tool and which therefore must be model-invocable (decision 0016). Those three omit the field and their `description` names the caller and states that the skill is not to be invoked on the model's own initiative. The lint enforces the list, not a blanket rule; adding a skill to it is a decision. `context: fork` is never used for review or verify. Every kernel that calls scripts or injects state with `` !`…` `` carries `allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)` — an unmatched permission aborts the invocation silently (`PLATFORM-NOTES.md` fact 14).
+`disable-model-invocation: true` on every skill **except** the four call targets: `task`, `campaign` and `rule`, which another skill invokes through the Skill tool and which therefore must be model-invocable (decision 0016), and `run`, which a go-ahead in words to the resume hodos proposed must reach (decision 0190). Those four omit the field, and their `description` names every caller, a go-ahead in words to hodos's own proposal among them. `run`'s fresh context is not the description's to keep: `ledger.mjs claim` refuses it in the session that approved the plan. The lint enforces the list, not a blanket rule; adding a skill to it is a decision. `context: fork` is never used for review or verify. Every kernel that calls scripts or injects state with `` !`…` `` carries `allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)` — an unmatched permission aborts the invocation silently (`PLATFORM-NOTES.md` fact 14).
 
 Agents:
 ```yaml
@@ -89,11 +91,11 @@ Agents:
 name: hodos-reviewer
 description: Fresh-context reviewer for a hodos task; reads review-input.md, runs checks, writes review.md.
 model: opus
-maxTurns: 40
+maxTurns: 80
 tools: Read, Grep, Glob, Bash, Write
 ---
 ```
-Every agent name starts with `hodos-`. No `hooks`, `mcpServers`, `permissionMode` (plugin agents cannot declare them). `maxTurns` is a positive whole number and is the **only** place a dispatch bound can live: the Agent tool takes no such parameter, so a project cannot set one through `config.json` (decision 0044). A dispatch that reaches it comes back with no output at all, which the kernel reports as a stop rather than a verdict.
+Every agent name starts with `hodos-`. No `hooks`, `mcpServers`, `permissionMode` (plugin agents cannot declare them). `maxTurns` is a positive whole number and is the **only** place a dispatch bound can live: the Agent tool takes no such parameter, so a project cannot set one through `config.json` (decision 0044). A dispatch that reaches it comes back with no verdict line, which the kernel reports as a stop rather than a verdict.
 
 Project rules (written by `init` / `/hodos:rule`):
 ```yaml
@@ -106,7 +108,7 @@ No `paths` means always loaded — allowed only when the rule genuinely applies 
 
 ## 9. Language
 
-Engine: English. Project artifacts written by `init`: `config.language` — detected from existing docs and the developer's prompts, confirmed in the interview. Identifiers, commands, and skill descriptions are English everywhere.
+Engine: English. The files hodos writes in a project — rules, plans, reports: `config.language` — detected from existing docs and the developer's prompts, confirmed in the interview. The chat: the developer's language, recorded per task as `chat` and printed by the digest (decision **0200**); commands, slugs, paths and quoted file text stay as written, and the developer's latest message outranks the stored value. Identifiers, commands, and skill descriptions are English everywhere.
 
 ## 10. Writing a rule — the three-question test
 
@@ -174,6 +176,7 @@ Source `sources/<stack>.md`: one line per pointer — `URL — what it covers �
 - [ ] No-op test run on every changed sentence; deleted rather than trimmed
 - [ ] Positive form; no nuance clauses
 - [ ] Leading words from the glossary; no new coinages without a glossary entry
+- [ ] A line printed to the developer in the glossary's `Printed:` form; no engine shorthand printed
 - [ ] Each step has a completion criterion and a named anti-pattern
 - [ ] Invariants in the first 40 lines; references one level deep
 - [ ] Within caps; frontmatter in the allowed subset

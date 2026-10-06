@@ -62,7 +62,7 @@ The output above is the evidence and it stays; the file does not, so the project
 Three attempts, nothing red. This is a finding, not a failure of the phase: it says the symptom needs something this environment does not have — production data, a credential, a scale, a race, a browser the fixtures do not run — or that the symptom as stated is not what is happening.
 
 1. `ledger.mjs add "Ruling: not reproducible here — <what was tried, in one line> — <what would make it reproducible>"`.
-2. Say it to the developer with the three attempts and their output, and offer the two ways forward: **get what is missing** (a dump, an account, a failing pipeline to point `ci.failedRun` at) and come back, or **re-route** — a symptom that cannot be contradicted is not a `bug` the red loop can carry, and the honest types are `question` (find out what is happening) or `spike` (what would it take to observe this at all).
+2. Say it to the developer with the three attempts and their output, and offer the two ways forward: **get what is missing** (a dump, an account, a failing pipeline to point `ci.failedRun` at) and come back, or **re-route** — a symptom that cannot be contradicted is not a `bug` the red loop can carry, and the honest types are `question` (find out what is happening) or `spike` (what would it take to observe this at all). End on one `Next:` line for the way you recommend: `Next: /hodos:task <the symptom, as a question or a spike>`, or `Next: <what to bring>, then /hodos:task <the original prompt>` (decision **0191**).
 3. Write no plan. A `bug` plan with no red loop is the thing `DESIGN.md §4.1` forbids, and it is what this exit exists to stop.
 
 ## Completion

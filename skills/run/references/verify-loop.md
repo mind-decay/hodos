@@ -129,7 +129,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Verify <k>: <PASS|FAIL> <n> c
 
 `PASS` moves the phase to `finish` and this reference is done. `FAIL` moves it to `fix` and §7 runs.
 
-**A verifier that reached its turn bound** comes back with no verdict line. It may still have left a `verify.md` on disk, because it writes the table before the attacks (decision **0112**): name the file in the stop where it exists, so the developer reads what did run. Nothing reaches the ledger either way — no verdict came back, and a partial table is not one (decision 0044). Say that the bound was reached, name it, stop what §3 raised, and stop. The developer raises the bound in the definition or runs the claims by hand; a resumed agent is a second opinion from a context this session cannot audit (decision 0044).
+**A verifier that reached its turn bound** comes back with no verdict line. It may still have left a `verify.md` on disk, because it writes the table before the attacks (decision **0112**): name the file in the stop where it exists, so the developer reads what did run. Nothing reaches the ledger either way — no verdict came back, and a partial table is not one (decision 0044). Say that the bound was reached, name it, stop what §3 raised, and stop on `Next: /hodos:run <slug>`: the phase is still `verify`, so a new run dispatches a fresh verifier. The developer may instead raise the bound in the definition or run the claims by hand; a resumed agent is a second opinion from a context this session cannot audit (decision 0044).
 
 ## 7. The fix pass
 
@@ -139,7 +139,7 @@ A failing row whose cause is the test rather than the code is still a fix: a mut
 
 New behavior gets a test the way §3 of `execute.md` writes one: red first, then green.
 
-Run `config.commands.test` before committing — every project §2 named, each in its own directory. Iteration 2 re-runs the rows that failed and carries the rest forward (§8), so a fix that breaks a claim which had passed is not seen there — this is where it is seen.
+Run `config.commands.test` before committing — every project §2 named, each in its own directory. Iteration 2 re-runs the rows that failed and carries the rest forward (§8), so a fix that breaks a claim which had passed is not seen there — this is where it is seen. Green, `ledger.mjs add "Fix <k>: green"` (decision **0195**), then the commit.
 
 One commit for the pass, in `config.conventions.commit`. **Its body lists the rows it fixed in the order they were taken**, one line each, so the severity order above is a thing a reader can check rather than a thing the pass asserts (decision **0128**) — a pass that fixed rows 12, 4 and 9 in that order says so, and a reader who finds a `minor` above a `major` has found a defect. Then:
 
@@ -168,7 +168,7 @@ Two iterations is the bound. There is no third dispatch: a claim that failed, wa
 
 `FAIL` after iteration 2 reaches the breaker. It is a mandatory stop under both autonomy settings. A verdict that is `FAIL` only because a `pre-existing` claim is unmet reaches it like any other, through the fix pass and iteration 2 (decision **0120**): the bound is the bound, and shortening it for one status is a change to the loop rather than a reading of it.
 
-`AskUserQuestion` with the failing rows named **and the counts by severity** — `2 blockers · 1 major · 0 minors`, and the `flaky` and `pre-existing` counts beside them — because the counts are what the choice is about (decisions **0097**, **0108**). Then exactly three options:
+`AskUserQuestion` with the failing rows named **and the counts by severity** — `2 blockers · 1 major · 0 minors`, and the `flaky` and `pre-existing` counts beside them — because the counts are what the choice is about (decisions **0097**, **0108**). Then exactly three options, one of them marked *(Recommended)* with the one line that makes it right — the rows and the counts it rests on (decision **0194**):
 
 - **accept with open findings** — the task moves to finish; the failing claims go into the report, a `flaky` row included: accepting a flake is the one thing decision **0098** leaves to the developer, and the acceptance is the ledger line below rather than a change to the row.
 - **continue manually** — the task stops here and the developer takes the branch.

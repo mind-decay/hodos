@@ -1,0 +1,2083 @@
+{
+  "version": 1,
+  "note": "The UX audit's inventory: every place a developer meets hodos, as a journey crossed with a touchpoint, and the findings scored against the ten-item rubric README.md cites. A finding's fixedWhen states a property a binding row of the hodos-ux map already states; a finding no regex can settle is judged and never counted. Checked by node bench/ux/run.mjs.",
+  "rubric": [
+    {
+      "id": "R1",
+      "name": "state is visible",
+      "sources": [
+        "Nielsen 1",
+        "clig.dev: Make it easy to see the current state of the system."
+      ]
+    },
+    {
+      "id": "R2",
+      "name": "next step named",
+      "sources": [
+        "Nielsen 6",
+        "clig.dev: Suggest commands the user should run.",
+        "decision 0081"
+      ]
+    },
+    {
+      "id": "R3",
+      "name": "plain words",
+      "sources": [
+        "Nielsen 2",
+        "clig.dev: Human-first design"
+      ]
+    },
+    {
+      "id": "R4",
+      "name": "answer first",
+      "sources": [
+        "Nielsen 8",
+        "clig.dev: Consider where the user will look first.",
+        "clig.dev: Saying (just) enough"
+      ]
+    },
+    {
+      "id": "R5",
+      "name": "consistent",
+      "sources": [
+        "Nielsen 4",
+        "clig.dev: Consistency across programs"
+      ]
+    },
+    {
+      "id": "R6",
+      "name": "recover from errors",
+      "sources": [
+        "Nielsen 9",
+        "Nielsen 3",
+        "clig.dev: Catch errors and rewrite them for humans."
+      ]
+    },
+    {
+      "id": "R7",
+      "name": "cheap invoke, dismiss, correct",
+      "sources": [
+        "Amershi G7",
+        "Amershi G8",
+        "Amershi G9",
+        "Horvitz 6"
+      ]
+    },
+    {
+      "id": "R8",
+      "name": "act on clear intent, ask when unsure",
+      "sources": [
+        "Horvitz 2",
+        "Horvitz 5",
+        "Horvitz 8",
+        "Amershi G10"
+      ]
+    },
+    {
+      "id": "R9",
+      "name": "remember recent interactions",
+      "sources": [
+        "Amershi G12",
+        "Horvitz 11"
+      ]
+    },
+    {
+      "id": "R10",
+      "name": "say why and what changed",
+      "sources": [
+        "Amershi G11",
+        "Amershi G16",
+        "clig.dev: If you change state, tell the user."
+      ]
+    }
+  ],
+  "journeys": [
+    "set-up",
+    "start",
+    "continue",
+    "recover",
+    "orient",
+    "hand-over",
+    "review",
+    "campaign",
+    "lost-thread"
+  ],
+  "owners": [
+    "next-line",
+    "answer-first",
+    "plain-words",
+    "state-at-a-glance",
+    "continue-reenters",
+    "recover-at-bounds",
+    "land-on-yes",
+    "chat-language",
+    "init-asks-land",
+    "unowned"
+  ],
+  "exempt": [
+    {
+      "file": "skills/task/references/research.md",
+      "why": "dispatches Explore agents and writes research.md; the developer meets its open questions in the grilling round, scenario task-grill"
+    },
+    {
+      "file": "skills/task/references/design.md",
+      "why": "the ten design fields a plan carries; the developer meets them in the plan summary, scenario task-approval"
+    },
+    {
+      "file": "skills/init/references/config.md",
+      "why": "the key list init writes config.json from; the developer meets it as the step-4 config table, scenario init-approval"
+    },
+    {
+      "file": "skills/run/references/oracles.md",
+      "why": "the verifier's catalogue of admissible rows; the developer meets those rows in verify.md at the breaker, scenario run-verify-breaker"
+    },
+    {
+      "file": "scripts/env.mjs",
+      "why": "prints JSON the run kernel reads; the developer meets its result as the access question, scenario run-verify-access"
+    },
+    {
+      "file": "scripts/detectors.mjs",
+      "why": "prints JSON the verifier turns into rows of verify.md; nothing it prints reaches the developer as it stands"
+    },
+    {
+      "file": "scripts/matrix.mjs",
+      "why": "prints the pairwise covering set the verifier runs; nothing it prints reaches the developer as it stands"
+    },
+    {
+      "file": "scripts/usage.mjs",
+      "why": "called by ledger.mjs at Finish; its numbers reach the developer through /hodos:status --cost, scenario status-cost"
+    },
+    {
+      "file": "scripts/run-tests.mjs",
+      "why": "this repository's npm test runner; no kernel, hook or agent calls it"
+    },
+    {
+      "file": "scripts/temp-dir.mjs",
+      "why": "the test suite's temporary directories; prints nothing a developer reads"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "init-no-config",
+      "journey": "set-up",
+      "touchpoint": "the no-config stop, the same \"run /hodos:init first\" in nine kernels",
+      "trigger": "a kernel runs in a project with no hodos layer",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/SKILL.md",
+        "section": "## Step 0 — config"
+      },
+      "findings": []
+    },
+    {
+      "id": "init-refresh",
+      "journey": "set-up",
+      "touchpoint": "init --refresh's delta",
+      "trigger": "/hodos:init runs in a project that already has a config",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/SKILL.md",
+        "section": "## --refresh"
+      },
+      "findings": [
+        {
+          "id": "refresh-land-unasked",
+          "rubric": "R8",
+          "severity": "major",
+          "owner": "init-asks-land",
+          "says": "--refresh never asks a config written before the landing question, so a project set up earlier keeps a land phase that recommends the branch push whatever the project does (map D8)",
+          "evidence": {
+            "file": "skills/init/SKILL.md",
+            "line": "5. New areas: directories added since `scanSha` that no rule and no precedent covers → candidates, through the same three-question filter."
+          },
+          "fixedWhen": {
+            "file": "skills/init/SKILL.md",
+            "section": "## --refresh",
+            "present": "^6\\. Landing: [^\\n]*remote[^\\n]*no `conventions\\.land`[^\\n]*question 4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adapter-refused",
+      "journey": "set-up",
+      "touchpoint": "an adapter for a role outside the eight",
+      "trigger": "/hodos:adapter is asked for a role no phase reads",
+      "channel": "screen",
+      "where": {
+        "file": "skills/adapter/SKILL.md",
+        "section": "## 2. Does a phase call this role?"
+      },
+      "findings": []
+    },
+    {
+      "id": "init-approval",
+      "journey": "set-up",
+      "touchpoint": "init's approval of the four tables",
+      "trigger": "init has scanned, interviewed and drafted its writes",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/SKILL.md",
+        "section": "## Approval (step 5)"
+      },
+      "findings": [
+        {
+          "id": "init-tables-before-question",
+          "rubric": "R4",
+          "severity": "major",
+          "owner": "answer-first",
+          "says": "four tables are printed before the question, so the developer reads every row before learning what is asked of them",
+          "evidence": {
+            "file": "skills/init/SKILL.md",
+            "line": "| 4 | Report | `references/rules.md`, `references/migrate.md` | four tables shown: config, rules, CLAUDE.md, migration ledger |"
+          },
+          "fixedWhen": {
+            "file": "skills/init/SKILL.md",
+            "present": "^\\| 4 \\| Report \\|[^\\n]*four tables built[^\\n]*step 5 prints them[\\s\\S]*^Open with one line that says what is asked[\\s\\S]*then the four tables"
+          }
+        },
+        {
+          "id": "init-land-row-missing",
+          "rubric": "R8",
+          "severity": "major",
+          "owner": "init-asks-land",
+          "says": "the key table has no conventions.land row, so step 5 never offers the landing with a recommendation and the land phase recommends the branch push to every project (map D8)",
+          "evidence": {
+            "file": "skills/init/references/config.md",
+            "line": "| `conventions.branch` | the project's pattern, `{slug}` for the task's slug |"
+          },
+          "fixedWhen": {
+            "file": "skills/init/references/config.md",
+            "section": "## The keys, and what each admits",
+            "present": "^\\| `conventions\\.land` \\| `branch` · `default`[^\\n]*either answer[^\\n]*remote"
+          }
+        }
+      ]
+    },
+    {
+      "id": "init-report",
+      "journey": "set-up",
+      "touchpoint": "init's closing report",
+      "trigger": "init has written the approved layer and run its self-check",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/SKILL.md",
+        "section": "## Self-check (step 7)"
+      },
+      "findings": [
+        {
+          "id": "init-report-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the report ends on what was written and declined, and never names /hodos:task, the step a set-up exists for",
+          "evidence": {
+            "file": "skills/init/SKILL.md",
+            "line": "- Report: what was written, what the developer declined, what step 8 left in place, and the count of rules with their sources."
+          },
+          "fixedWhen": {
+            "file": "skills/init/SKILL.md",
+            "section": "## Self-check (step 7)",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "init-interview",
+      "journey": "set-up",
+      "touchpoint": "init's interview batches",
+      "trigger": "init has scanned and asks what reading could not answer",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/references/interview.md",
+        "section": "## Batch 1 — the standing questions"
+      },
+      "findings": [
+        {
+          "id": "init-language-writes-only",
+          "rubric": "R3",
+          "severity": "major",
+          "owner": "chat-language",
+          "says": "the language is asked for rules, plans and reports only, so nothing says the chat speaks the developer's language (map D4)",
+          "evidence": {
+            "file": "skills/init/references/interview.md",
+            "line": "5. In which language are rules, plans and reports written? (English identifiers and commands regardless.)"
+          },
+          "fixedWhen": {
+            "file": "skills/init/references/interview.md",
+            "section": "## Batch 1 — the standing questions",
+            "present": "the chat follows the language you write in"
+          }
+        },
+        {
+          "id": "init-land-unasked",
+          "rubric": "R8",
+          "severity": "major",
+          "owner": "init-asks-land",
+          "says": "question 4 asks the tracker, the branch naming and the commit convention but never how a finished branch lands, so conventions.land is never written and the land phase recommends the branch push to every project (map D8)",
+          "evidence": {
+            "file": "skills/init/references/interview.md",
+            "line": "4. Which tracker, which branch naming, which commit convention? (The scan proposes one from `git log`; this confirms or overrides it.)"
+          },
+          "fixedWhen": {
+            "file": "skills/init/references/interview.md",
+            "section": "## Batch 1 — the standing questions",
+            "present": "^4\\. [^\\n]*remote[^\\n]*lands[^\\n]*merge request[^\\n]*default branch"
+          }
+        },
+        {
+          "id": "init-remote-unread",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "init-asks-land",
+          "says": "the inventory does not read git remote, so nothing tells the interview where a landing question applies, and without the key the land phase recommends the branch push to every project (map D8)",
+          "evidence": {
+            "file": "skills/init/references/scan.md",
+            "line": "| git root, branch, HEAD | `git rev-parse --show-toplevel`, `git branch --show-current`, `git rev-parse HEAD` |"
+          },
+          "fixedWhen": {
+            "file": "skills/init/references/scan.md",
+            "section": "## Step 0 — the inventory",
+            "present": "^\\| remotes \\| `git remote` "
+          }
+        }
+      ]
+    },
+    {
+      "id": "init-install",
+      "journey": "set-up",
+      "touchpoint": "a candidate command that needs an install",
+      "trigger": "the scan finds a command that cannot run before an install",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/references/scan.md",
+        "section": "## Commands"
+      },
+      "findings": []
+    },
+    {
+      "id": "init-rule-table",
+      "journey": "set-up",
+      "touchpoint": "the rule table of init's report",
+      "trigger": "init shows its rule candidates at step 4",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/references/rules.md",
+        "section": "## The report (step 4)"
+      },
+      "findings": [
+        {
+          "id": "init-rule-table-codes",
+          "rubric": "R3",
+          "severity": "minor",
+          "owner": "plain-words",
+          "says": "the table heads its evidence columns Q1 (kind) · Q2 · Q3, numbers the developer has to look up to read the row they approve",
+          "evidence": {
+            "file": "skills/init/references/rules.md",
+            "line": "| Rule | `paths` | Precedents | Source | Q1 (kind) · Q2 · Q3 | Judgement | Form |"
+          },
+          "fixedWhen": {
+            "file": "skills/init/references/rules.md",
+            "section": "## The report (step 4)",
+            "absent": "\\bQ1\\b"
+          }
+        }
+      ]
+    },
+    {
+      "id": "init-migration-ledger",
+      "journey": "set-up",
+      "touchpoint": "the migration ledger's approval",
+      "trigger": "init settles the AI instructions the project already has",
+      "channel": "screen",
+      "where": {
+        "file": "skills/init/references/migrate.md",
+        "section": "## Completion"
+      },
+      "findings": [
+        {
+          "id": "init-ledger-shape-numbers",
+          "rubric": "R4",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "four numbers about the table's own shape are printed before the approval, bookkeeping the developer reads before the rows they decide",
+          "evidence": {
+            "file": "skills/init/references/migrate.md",
+            "line": "The table's own shape is checked before the approval, by printing four numbers (decision **0150**): **columns printed, of six** — `Approved` is the seventh and step 5's *done when* is where it is checked — **rows**, **distinct `file:line` the rows name** — equal to the first, because one row per instruction is the rule — and **rows whose Evidence carries no count**, which is zero. All six columns are present, and `Approved` is added at step 5. A run that cannot print those four numbers has a ledger nobody can check, which is how a table's shape ends up being the first thing a long run compresses."
+          },
+          "fixedWhen": {
+            "file": "skills/init/references/migrate.md",
+            "section": "## Completion",
+            "present": "as one line under the ledger's rows"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule-written",
+      "journey": "set-up",
+      "touchpoint": "a rule written or refused",
+      "trigger": "the developer runs /hodos:rule",
+      "channel": "screen",
+      "where": {
+        "file": "skills/rule/SKILL.md",
+        "section": "## 4. Confirm, write, check"
+      },
+      "findings": [
+        {
+          "id": "rule-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the run ends on the CLAUDE.md map line and names no next command",
+          "evidence": {
+            "file": "skills/rule/SKILL.md",
+            "line": "Then say one line for the CLAUDE.md map: the rules directory is listed there, and a rule nobody can find is a rule nobody applies."
+          },
+          "fixedWhen": {
+            "file": "skills/rule/SKILL.md",
+            "section": "## 4. Confirm, write, check",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "skill-written",
+      "journey": "set-up",
+      "touchpoint": "a project skill written or refused",
+      "trigger": "the developer runs /hodos:skill",
+      "channel": "screen",
+      "where": {
+        "file": "skills/skill/SKILL.md",
+        "section": "## 4. Confirm, write, register, check"
+      },
+      "findings": [
+        {
+          "id": "skill-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the run ends on lint and never says how the new skill is invoked",
+          "evidence": {
+            "file": "skills/skill/SKILL.md",
+            "line": "`AskUserQuestion` with the drafted file. On approval write it, then add one line to the project's `CLAUDE.md` map under the skills it lists — a skill nobody knows about is never invoked — and run:"
+          },
+          "fixedWhen": {
+            "file": "skills/skill/SKILL.md",
+            "section": "## 4. Confirm, write, register, check",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adapter-written",
+      "journey": "set-up",
+      "touchpoint": "a project adapter written or refused",
+      "trigger": "the developer runs /hodos:adapter",
+      "channel": "screen",
+      "where": {
+        "file": "skills/adapter/SKILL.md",
+        "section": "## 4. Confirm, write, check"
+      },
+      "findings": [
+        {
+          "id": "adapter-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the run says the file is tracked and which phase now calls it, and names no command — not even the commit",
+          "evidence": {
+            "file": "skills/adapter/SKILL.md",
+            "line": "Say that the file is tracked in git — an adapter is team knowledge, like a campaign map — and name the phase that now makes calls instead of reporting `Skip`."
+          },
+          "fixedWhen": {
+            "file": "skills/adapter/SKILL.md",
+            "section": "## 4. Confirm, write, check",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "config-check",
+      "journey": "set-up",
+      "touchpoint": "config.mjs check's findings",
+      "trigger": "/hodos:status, init or finish checks the config",
+      "channel": "both",
+      "where": {
+        "file": "scripts/config.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "task-route-verdict",
+      "journey": "start",
+      "touchpoint": "the router's verdict",
+      "trigger": "/hodos:task has filled the nine rows",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/references/route.md",
+        "section": "## 5. Print, then ask"
+      },
+      "findings": [
+        {
+          "id": "route-evidence-first",
+          "rubric": "R4",
+          "severity": "major",
+          "owner": "answer-first",
+          "says": "the printed form puts the nine-row table above the Path: line, so the verdict the developer confirms comes last (map D3)",
+          "evidence": {
+            "file": "skills/task/references/route.md",
+            "line": "Print the checklist and the verdict before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:"
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/route.md",
+            "section": "## 5. Print, then ask",
+            "present": "^Path: [\\s\\S]*^\\| Row \\| Evidence \\| Value \\|"
+          }
+        },
+        {
+          "id": "route-rows-by-number",
+          "rubric": "R3",
+          "severity": "major",
+          "owner": "plain-words",
+          "says": "the verdict line argues in row numbers and path names — \"quick fails on rows 1–2\" — that the developer decodes against a table they did not write",
+          "evidence": {
+            "file": "skills/task/references/route.md",
+            "line": "Path: standard — quick fails on rows 1–2 · deep not required: rows 3–5 are `no` with evidence"
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/route.md",
+            "section": "## 5. Print, then ask",
+            "absent": "rows \\d"
+          }
+        },
+        {
+          "id": "route-proposal-unmarked",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "the proposed path is the first option but is not marked recommended, unlike every grilling question",
+          "evidence": {
+            "file": "skills/task/references/route.md",
+            "line": "Then `AskUserQuestion`: the proposed path and type as the first option, each real alternative as its own option with the one line that would make it right (\"deep, if the summary endpoint is a new contract rather than a query on the existing one\"). The developer's override is recorded in `brief.md` as `Confirmed by user: overrode to <path>`."
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/route.md",
+            "section": "## 5. Print, then ask",
+            "present": "^Then `AskUserQuestion`: the proposed path and type as the first option, marked \\*\\(Recommended\\)\\*"
+          }
+        },
+        {
+          "id": "route-verdict-translated",
+          "rubric": "R5",
+          "severity": "minor",
+          "owner": "chat-language",
+          "says": "nothing says the checklist and the verdict lines stay English, so a chat in another language translates the Path: line and the row names that brief.md keeps and the router bench reads (map D4)",
+          "evidence": {
+            "file": "skills/task/references/route.md",
+            "line": "Path: standard — quick fails on files touched (5) and new module (yes) · deep not required: contract, dependency and migration are `no` with evidence"
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/route.md",
+            "section": "## 5. Print, then ask",
+            "present": "in English whatever language the chat is in"
+          }
+        }
+      ]
+    },
+    {
+      "id": "task-grill",
+      "journey": "start",
+      "touchpoint": "a grilling round",
+      "trigger": "the plan has decisions whose prerequisites are settled",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/references/plan.md",
+        "section": "## 1. Grilling rounds"
+      },
+      "findings": []
+    },
+    {
+      "id": "task-plan-review-cap",
+      "journey": "start",
+      "touchpoint": "the plan reviewer's return",
+      "trigger": "a deep plan is sent to hodos-plan-reviewer",
+      "channel": "context",
+      "where": {
+        "file": "skills/task/references/plan.md",
+        "section": "## 9. Plan review — `deep` only"
+      },
+      "findings": [
+        {
+          "id": "plan-review-no-answer-at-cap",
+          "rubric": "R6",
+          "severity": "blocker",
+          "owner": "recover-at-bounds",
+          "says": "the reviewer can stop at its 20-turn cap with no plan-review.md, and this step only says to wait and read the file — the session has nothing to do (docs/BACKLOG.md, the ux-audit S1 session)",
+          "evidence": {
+            "file": "skills/task/references/plan.md",
+            "line": "Dispatch `hodos:hodos-plan-reviewer` — the plugin-qualified name the Agent tool takes — with `model: config.models.planReview`, passing the paths: the plan, the research, the rules directory. Wait for the notification; read `plan-review.md`, not the transcript."
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/plan.md",
+            "section": "## 9. Plan review — `deep` only",
+            "present": "turn bound.*plan-review\\.partial\\.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "plan-reviewer-writes-last",
+      "journey": "start",
+      "touchpoint": "the plan review's file",
+      "trigger": "hodos-plan-reviewer runs",
+      "channel": "context",
+      "where": {
+        "file": "agents/hodos-plan-reviewer.md",
+        "section": "## Procedure"
+      },
+      "findings": [
+        {
+          "id": "plan-reviewer-file-last",
+          "rubric": "R6",
+          "severity": "major",
+          "owner": "recover-at-bounds",
+          "says": "plan-review.md is the last step, so a run that reaches the turn cap leaves nothing, where the verifier writes its file first",
+          "evidence": {
+            "file": "agents/hodos-plan-reviewer.md",
+            "line": "5. Write `plan-review.md` beside the plan. Return the verdict line."
+          },
+          "fixedWhen": {
+            "file": "agents/hodos-plan-reviewer.md",
+            "section": "## Procedure",
+            "present": "plan-review\\.partial\\.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "task-approval",
+      "journey": "start",
+      "touchpoint": "plan approval and the handoff",
+      "trigger": "the frontier is empty and the plan is written",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/SKILL.md",
+        "section": "## Step 8 — approval"
+      },
+      "findings": [
+        {
+          "id": "approval-options-unstated",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "approval is asked with AskUserQuestion and no options or recommendation are named, so each session invents its own",
+          "evidence": {
+            "file": "skills/task/SKILL.md",
+            "line": "2. Ask for approval with `AskUserQuestion`. A plan with a non-empty `## Open questions` is not presented — those questions are the round that has not been asked yet."
+          },
+          "fixedWhen": {
+            "file": "skills/task/SKILL.md",
+            "section": "## Step 8 — approval",
+            "present": "\\*\\*approve\\*\\* \\*\\(Recommended\\)\\*"
+          }
+        },
+        {
+          "id": "route-init-no-language",
+          "rubric": "R9",
+          "severity": "major",
+          "owner": "chat-language",
+          "says": "the task opens with no record of the language the developer spoke, so the session the handoff names, /hodos:run <slug> after /clear, answers in English whatever they wrote in (map D4)",
+          "evidence": {
+            "file": "skills/task/references/route.md",
+            "line": "2. `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs init <slug> --path <path> --type <type>`, plus `--shape <inert|mechanical>` when the confirmed verdict carries one, and `--campaign <campaign>/<node>` when the argument was a node."
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/route.md",
+            "section": "## 6. Open the task",
+            "present": "--chat <xx>"
+          }
+        }
+      ]
+    },
+    {
+      "id": "task-question",
+      "journey": "start",
+      "touchpoint": "the answer to a question-type task",
+      "trigger": "the router types the request question",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/SKILL.md",
+        "section": "## Step 4 — question"
+      },
+      "findings": [
+        {
+          "id": "question-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the answer ends on its sources, with no line saying what the developer can run with it",
+          "evidence": {
+            "file": "skills/task/SKILL.md",
+            "line": "Type `question` answers in chat and writes no plan: the answer, then the sources it rests on — `path:line` for the repository, a URL with its version for a library. Close with `ledger.mjs add \"Finish: report delivered\"`. A question that turns out to need code is re-routed, not answered: say so and start again with the work as the description."
+          },
+          "fixedWhen": {
+            "file": "skills/task/SKILL.md",
+            "section": "## Step 4 — question",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "task-reproduce-observable",
+      "journey": "start",
+      "touchpoint": "the observable a bug needs",
+      "trigger": "a bug's description lacks what is seen, where, or what was expected",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/references/reproduce.md",
+        "section": "## 1. The symptom as an observable"
+      },
+      "findings": []
+    },
+    {
+      "id": "task-not-reproducible",
+      "journey": "start",
+      "touchpoint": "a bug that would not go red",
+      "trigger": "three reproduce attempts found nothing red",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/references/reproduce.md",
+        "section": "## 5. Exit B — not reproducible here"
+      },
+      "findings": [
+        {
+          "id": "not-reproducible-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the two ways forward — get what is missing, or re-route as a question or a spike — are offered in words with no command for either",
+          "evidence": {
+            "file": "skills/task/references/reproduce.md",
+            "line": "2. Say it to the developer with the three attempts and their output, and offer the two ways forward: **get what is missing** (a dump, an account, a failing pipeline to point `ci.failedRun` at) and come back, or **re-route** — a symptom that cannot be contradicted is not a `bug` the red loop can carry, and the honest types are `question` (find out what is happening) or `spike` (what would it take to observe this at all)."
+          },
+          "fixedWhen": {
+            "file": "skills/task/references/reproduce.md",
+            "section": "## 5. Exit B — not reproducible here",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "task-inert-finish",
+      "journey": "start",
+      "touchpoint": "an inert task's finish, in the session that routed it",
+      "trigger": "an inert task passes its one review",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/references/inert.md",
+        "section": "## 6. Finish"
+      },
+      "findings": []
+    },
+    {
+      "id": "task-inert-red-tree",
+      "journey": "start",
+      "touchpoint": "an inert task on a tree that was already red",
+      "trigger": "an inert task's command is red with the edit stashed too",
+      "channel": "screen",
+      "where": {
+        "file": "skills/task/references/inert.md",
+        "section": "## 4. The commands, then the commit"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-resume-plan",
+      "journey": "continue",
+      "touchpoint": "/hodos:run on a task that is not approved",
+      "trigger": "the developer runs /hodos:run on a task at phase plan",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Resume"
+      },
+      "findings": [
+        {
+          "id": "resume-plan-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the stop names the missing S1 step and not the command that supplies it",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "| `plan` | say which S1 step is missing — the plan is not approved — and stop |"
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Resume",
+            "present": "^\\| `plan` \\|.*Next:"
+          }
+        },
+        {
+          "id": "resume-plan-s1",
+          "rubric": "R3",
+          "severity": "minor",
+          "owner": "plain-words",
+          "says": "\"S1\" is the engine's name for the /hodos:task session, said to a developer who only typed commands",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "| `plan` | the plan is not approved: print `Next: <next>` with the `next` of `ledger.mjs next <slug>`, which names `/hodos:task <slug>` to continue S1 where it stopped, and stop |"
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Resume",
+            "absent": "\\bS1\\b"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-resume-done",
+      "journey": "continue",
+      "touchpoint": "/hodos:run on a finished task",
+      "trigger": "the developer runs /hodos:run on a task at phase done",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Resume"
+      },
+      "findings": [
+        {
+          "id": "resume-done-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the stop says the task is finished and nothing about what comes after it — the next node of its campaign, or a new task",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "| `done` | say the task is finished, and stop |"
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Resume",
+            "present": "^\\| `done` \\|.*Next:"
+          }
+        },
+        {
+          "id": "resume-done-prints-landing",
+          "rubric": "R8",
+          "severity": "major",
+          "owner": "land-on-yes",
+          "says": "/hodos:run on a finished task prints the landing command and stops, so a branch not yet landed is handed off again instead of asked about (map D7)",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "| `done` | the task is finished: print `Next: <next>` with the `next` of `ledger.mjs next <slug>`, the map for a campaign node or what lands the branch otherwise, and stop |"
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Resume",
+            "present": "^\\| `done` \\|.*references/land\\.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-unknown-slug",
+      "journey": "continue",
+      "touchpoint": "/hodos:run on a slug with no task",
+      "trigger": "the developer runs /hodos:run with a slug nothing opened",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Step 0 — config and state"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-gap",
+      "journey": "continue",
+      "touchpoint": "a fork the plan did not settle",
+      "trigger": "execute meets a decision the plan left open",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Gates"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-simplify",
+      "journey": "continue",
+      "touchpoint": "the simplify pass's lines",
+      "trigger": "the last task is done and the diff is walked",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/defaults.md",
+        "section": "## What the pass writes"
+      },
+      "findings": [
+        {
+          "id": "simplify-tags",
+          "rubric": "R3",
+          "severity": "minor",
+          "owner": "plain-words",
+          "says": "each cut prints as L<line>: <tag> with tags such as yagni and shrink, shorthand the developer decodes to follow what was removed",
+          "evidence": {
+            "file": "skills/run/references/defaults.md",
+            "line": "`<tag>` is one of `delete`, `stdlib`, `native`, `yagni`, `shrink`. Prefix the line with the file when the diff spans more than one. Close the pass with:"
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/defaults.md",
+            "section": "## What the pass writes",
+            "absent": "^L<line>:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-finish-report",
+      "journey": "continue",
+      "touchpoint": "the finish report",
+      "trigger": "a run session delivers its report",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 6. The report"
+      },
+      "findings": [
+        {
+          "id": "finish-no-next",
+          "rubric": "R2",
+          "severity": "blocker",
+          "owner": "next-line",
+          "says": "the report ends without the command that continues — for a campaign node, the next node — so the developer leaves hodos at the moment the work is done",
+          "evidence": {
+            "file": "skills/run/references/finish.md",
+            "line": "Proposals: <rule or convention proposals with both counts, hook proposals, observations — or none>"
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/finish.md",
+            "section": "## 6. The report",
+            "present": "^Next: "
+          }
+        },
+        {
+          "id": "finish-engine-words",
+          "rubric": "R3",
+          "severity": "major",
+          "owner": "plain-words",
+          "says": "Simplify, markers, Rulings, Gaps, Claim feedback and Re-pointed are engine words in the deliverable the developer reads first",
+          "evidence": {
+            "file": "skills/run/references/finish.md",
+            "line": "Simplify: net -<n> lines · markers: <hodos: lines, or none>"
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/finish.md",
+            "section": "## 6. The report",
+            "absent": "^(Simplify: net|Gaps \\(|Rulings \\(|Re-pointed:|Claim feedback:)"
+          }
+        },
+        {
+          "id": "finish-verdict-seventh",
+          "rubric": "R4",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "whether the work passed review and verify is the seventh of fifteen lines",
+          "evidence": {
+            "file": "skills/run/references/finish.md",
+            "line": "Review: <verdict> after <n> fix passes · Verify: <verdict>, <n> claims, <s> skipped"
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/finish.md",
+            "section": "## 6. The report",
+            "present": "^<slug> — <n> tasks, <n> commits, branch <name>\\nReview: <verdict>"
+          }
+        },
+        {
+          "id": "run-landing-handed-off",
+          "rubric": "R8",
+          "severity": "major",
+          "owner": "land-on-yes",
+          "says": "the run hands push, merge and rebase to the developer as a printed command, where DESIGN.md §4.4 makes them a stop that asks, so the mandatory question is never asked and the developer types what hodos could have run (map D7)",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "- One commit per task, in `config.conventions.commit`. Push, merge, and rebase are the developer's; the branch stays."
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Invariants",
+            "present": "Push, merge and rebase are asked"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-finish-pins",
+      "journey": "continue",
+      "touchpoint": "the pin question",
+      "trigger": "the verifier marked a proved browser claim worth keeping",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 3a. The pins"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-finish-tracker",
+      "journey": "continue",
+      "touchpoint": "the tracker link",
+      "trigger": "a tracker adapter is configured and the branch names an issue",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 5a. The tracker link"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-finish-repoint",
+      "journey": "continue",
+      "touchpoint": "the re-point question",
+      "trigger": "this branch moved a line a rule anchors on",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 5b. Anchors this branch moved"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-finish-offer",
+      "journey": "continue",
+      "touchpoint": "finish's one offer",
+      "trigger": "the digest computes an offer at the phase boundary",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 5c. The one offer"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-land",
+      "journey": "continue",
+      "touchpoint": "the landing question",
+      "trigger": "the finish report is delivered, or /hodos:run meets a finished task whose branch has not landed",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/land.md",
+        "section": "## 2. The question"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-finish-directory",
+      "journey": "continue",
+      "touchpoint": "the task directory question",
+      "trigger": "the report is delivered",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/land.md",
+        "section": "## 4. The task directory"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-finish-spike",
+      "journey": "continue",
+      "touchpoint": "a spike ends",
+      "trigger": "a spike reaches its answer or its timebox",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 8a. A spike ends here, and merges nothing"
+      },
+      "findings": [
+        {
+          "id": "spike-branch-no-command",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the branch is named and the command that deletes it is left to the developer to recall",
+          "evidence": {
+            "file": "skills/run/references/finish.md",
+            "line": "3. **The branch.** Deleting it is the developer's, like every other git action here: name it, say the answer is recorded in the ruling and in `## Outcome`, and leave the command to them."
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/finish.md",
+            "section": "## 8a. A spike ends here, and merges nothing",
+            "present": "Next:"
+          }
+        },
+        {
+          "id": "spike-branch-handed-off",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "land-on-yes",
+          "says": "the spike's branch is deleted by a command printed for the developer to type, where it is an outward git action hodos asks about and runs (map D7)",
+          "evidence": {
+            "file": "skills/run/references/finish.md",
+            "line": "3. **The branch.** Deleting it is the developer's, like every other git action here: name it, say the answer is recorded in the ruling and in `## Outcome`, and leave the command to them as the report's last line. That is `Next: git switch <default> && git branch -D <branch>` where the exit deleted it, or `Next: /hodos:task <the follow-up>` where it opened one."
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/finish.md",
+            "section": "## 8a. A spike ends here, and merges nothing",
+            "present": "land\\.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-verify-access",
+      "journey": "continue",
+      "touchpoint": "the access question for a layer",
+      "trigger": "env.mjs up reports a layer blocked on a grant",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/verify-loop.md",
+        "section": "## 3. The environment"
+      },
+      "findings": []
+    },
+    {
+      "id": "reviewer-review-file",
+      "journey": "continue",
+      "touchpoint": "the reviewer's file",
+      "trigger": "hodos-reviewer runs",
+      "channel": "context",
+      "where": {
+        "file": "agents/hodos-reviewer.md",
+        "section": "## Output — `review.md`"
+      },
+      "findings": [
+        {
+          "id": "reviewer-file-last",
+          "rubric": "R6",
+          "severity": "major",
+          "owner": "recover-at-bounds",
+          "says": "review.md is written at the last step, so a reviewer that reaches its 40-turn bound returns nothing — the stop of run-review-bound",
+          "evidence": {
+            "file": "agents/hodos-reviewer.md",
+            "line": "**7. Coverage, then write.** Name what you did not review. Write `review.md` beside the package. Return the verdict line and nothing else."
+          },
+          "fixedWhen": {
+            "file": "agents/hodos-reviewer.md",
+            "section": "## Procedure",
+            "present": "review\\.partial\\.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "verifier-verify-file",
+      "journey": "continue",
+      "touchpoint": "the verifier's file",
+      "trigger": "hodos-verifier runs",
+      "channel": "context",
+      "where": {
+        "file": "agents/hodos-verifier.md",
+        "section": "## Output — `verify.md`"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-resume-manual",
+      "journey": "recover",
+      "touchpoint": "/hodos:run on a task in manual mode",
+      "trigger": "the developer runs /hodos:run after choosing continue manually at a breaker",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Resume"
+      },
+      "findings": [
+        {
+          "id": "resume-manual-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the stop says the task is in manual mode and not how it comes back into hodos",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "| `manual` | say the task is in manual mode after a breaker, and stop |"
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Resume",
+            "present": "^\\| `manual` \\|.*Next:"
+          }
+        },
+        {
+          "id": "resume-manual-words",
+          "rubric": "R3",
+          "severity": "minor",
+          "owner": "plain-words",
+          "says": "\"manual mode\" and \"breaker\" are the engine's names for a choice the developer made in other words",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "| `manual` | the task is in manual mode after a breaker: print `Next: <next>` with the `next` of `ledger.mjs next <slug>`, a review of the branch the developer finishes by hand, and stop |"
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Resume",
+            "absent": "manual mode"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-stopped-early",
+      "journey": "recover",
+      "touchpoint": "a run that stops before finish",
+      "trigger": "a run stops at a breaker's manual or at an exhausted bound",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Completion"
+      },
+      "findings": [
+        {
+          "id": "stopped-early-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the stop says which phase it stopped before and leaves the ledger as the record, with no command to resume from it",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "`Finish: report delivered` in the ledger, the report in chat, `## Outcome` in `plan.md`, and this session's pointers removed by that same line. A run that stops earlier — at a breaker's `manual`, at an exhausted bound — says which phase it stopped before and leaves the ledger as the record of where to resume."
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Completion",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-red-check-stop",
+      "journey": "recover",
+      "touchpoint": "the third red check",
+      "trigger": "a check stays red after three attempts",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/execute.md",
+        "section": "## 4. The three attempts"
+      },
+      "findings": [
+        {
+          "id": "red-check-no-next",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "next-line",
+          "says": "the stop ends on the question that would unblock it, and not on what to run once it is answered",
+          "evidence": {
+            "file": "skills/run/references/execute.md",
+            "line": "The third failure ends the phase. Say in chat: what the check asserts, what the code does instead, the two hypotheses already ruled out and the evidence that ruled them out, and the one question whose answer would unblock it. No fourth attempt under another name — a widened assertion, a skipped case, or a check swapped for an easier one is the failure this bound exists to catch."
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/execute.md",
+            "section": "## 4. The three attempts",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-review-bound",
+      "journey": "recover",
+      "touchpoint": "a reviewer that reached its turn bound",
+      "trigger": "hodos-reviewer returns with no verdict line",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/review-loop.md",
+        "section": "## 4. The verdict"
+      },
+      "findings": [
+        {
+          "id": "review-bound-dead-end",
+          "rubric": "R2",
+          "severity": "blocker",
+          "owner": "next-line",
+          "says": "the session says so, names the bound and stops, and nothing tells the developer what would move the task on",
+          "evidence": {
+            "file": "skills/run/references/review-loop.md",
+            "line": "A reviewer that reached its turn bound comes back with **no** verdict line and no `review.md`. Say so, name the bound, and stop — there is nothing to record, and a resumed agent is a second opinion from a context this session cannot audit (decision 0044)."
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/review-loop.md",
+            "section": "## 4. The verdict",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-review-breaker",
+      "journey": "recover",
+      "touchpoint": "the review breaker",
+      "trigger": "review iteration 2 does not ACCEPT",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/review-loop.md",
+        "section": "## 7. The breaker"
+      },
+      "findings": [
+        {
+          "id": "review-breaker-unmarked",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "three options and none marked recommended, where every grilling question carries one",
+          "evidence": {
+            "file": "skills/run/references/review-loop.md",
+            "line": "`AskUserQuestion` with the open findings named, and exactly three options:"
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/review-loop.md",
+            "section": "## 7. The breaker",
+            "present": "exactly three options, one of them marked \\*\\(Recommended\\)\\*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-verify-bound",
+      "journey": "recover",
+      "touchpoint": "a verifier that reached its turn bound",
+      "trigger": "hodos-verifier returns with no verdict line",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/verify-loop.md",
+        "section": "## 6. The verdict"
+      },
+      "findings": [
+        {
+          "id": "verify-bound-dead-end",
+          "rubric": "R2",
+          "severity": "blocker",
+          "owner": "next-line",
+          "says": "the session names the bound and stops; raising it or running the claims by hand is written for the reader of this file, not said",
+          "evidence": {
+            "file": "skills/run/references/verify-loop.md",
+            "line": "**A verifier that reached its turn bound** comes back with no verdict line. It may still have left a `verify.md` on disk, because it writes the table before the attacks (decision **0112**): name the file in the stop where it exists, so the developer reads what did run. Nothing reaches the ledger either way — no verdict came back, and a partial table is not one (decision 0044). Say that the bound was reached, name it, stop what §3 raised, and stop. The developer raises the bound in the definition or runs the claims by hand; a resumed agent is a second opinion from a context this session cannot audit (decision 0044)."
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/verify-loop.md",
+            "section": "## 6. The verdict",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-verify-breaker",
+      "journey": "recover",
+      "touchpoint": "the verify breaker",
+      "trigger": "verify iteration 2 fails",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/verify-loop.md",
+        "section": "## 9. The breaker"
+      },
+      "findings": [
+        {
+          "id": "verify-breaker-unmarked",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "the counts by severity are named and none of the three options is marked recommended",
+          "evidence": {
+            "file": "skills/run/references/verify-loop.md",
+            "line": "`AskUserQuestion` with the failing rows named **and the counts by severity** — `2 blockers · 1 major · 0 minors`, and the `flaky` and `pre-existing` counts beside them — because the counts are what the choice is about (decisions **0097**, **0108**). Then exactly three options:"
+          },
+          "fixedWhen": {
+            "file": "skills/run/references/verify-loop.md",
+            "section": "## 9. The breaker",
+            "present": "exactly three options, one of them marked \\*\\(Recommended\\)\\*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "preparer-env-file",
+      "journey": "recover",
+      "touchpoint": "the preparer's diagnosis",
+      "trigger": "a layer is still red at its own timeout",
+      "channel": "both",
+      "where": {
+        "file": "agents/hodos-preparer.md",
+        "section": "## Output — `env.md`"
+      },
+      "findings": []
+    },
+    {
+      "id": "hook-git-guard",
+      "journey": "recover",
+      "touchpoint": "git-guard's denial",
+      "trigger": "a Bash git call meets an opted-in gate",
+      "channel": "unverified",
+      "where": {
+        "file": "scripts/git-guard.mjs"
+      },
+      "findings": [
+        {
+          "id": "fix-commit-denied",
+          "rubric": "R6",
+          "severity": "blocker",
+          "owner": "recover-at-bounds",
+          "says": "with gates.blockCommitOnFailedReview on, every commit is denied while the phase is fix, and the fix pass's own commit (review-loop.md §5) is made in fix — the reason names no point at which that commit is allowed",
+          "evidence": {
+            "file": "scripts/git-guard.mjs",
+            "line": "return 'git commit is denied while the task is in fix: the review found blockers, and the fix commit comes after they are addressed (gates.blockCommitOnFailedReview).';"
+          },
+          "fixedWhen": {
+            "file": "scripts/git-guard.mjs",
+            "present": "Fix \\$\\{\\w+\\}: green"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook-stop-gate",
+      "journey": "recover",
+      "touchpoint": "the Stop gate's block",
+      "trigger": "a session tries to stop with a task in flight and the gate on",
+      "channel": "unverified",
+      "where": {
+        "file": "scripts/stop-gate.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "script-ledger-refusal",
+      "journey": "recover",
+      "touchpoint": "ledger.mjs's refusal",
+      "trigger": "a ledger line does not match the grammar",
+      "channel": "context",
+      "where": {
+        "file": "scripts/ledger.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "digest-session-start",
+      "journey": "orient",
+      "touchpoint": "the SessionStart digest",
+      "trigger": "a session starts, resumes or clears in a project with a hodos layer",
+      "channel": "unverified",
+      "where": {
+        "file": "scripts/state-digest.mjs"
+      },
+      "findings": [
+        {
+          "id": "digest-campaign-no-command",
+          "rubric": "R2",
+          "severity": "major",
+          "owner": "state-at-a-glance",
+          "says": "the campaign row counts the frontier and names no command, where each task row ends with resume with /hodos:run <slug>",
+          "evidence": {
+            "file": "scripts/state-digest.mjs",
+            "line": "? `- campaigns: ${maps.map((m) => `${m.slug} — frontier ${shortCounts(m.f)}`).join(' · ')}`"
+          },
+          "fixedWhen": {
+            "file": "scripts/state-digest.mjs",
+            "present": "`- campaign \\$\\{(\\w+\\.)?slug\\} — frontier \\$\\{[^\\n]*\\} — advance with /hodos:campaign \\$\\{(\\w+\\.)?slug\\}`"
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-row",
+      "journey": "orient",
+      "touchpoint": "the state band above the prompt",
+      "trigger": "an interactive session starts or a turn ends with work open",
+      "channel": "screen",
+      "where": {
+        "file": "hooks/state-row.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "status-digest",
+      "journey": "orient",
+      "touchpoint": "status's full digest",
+      "trigger": "the developer runs /hodos:status",
+      "channel": "screen",
+      "where": {
+        "file": "skills/status/SKILL.md",
+        "section": "## 1. The digest"
+      },
+      "findings": [
+        {
+          "id": "status-no-single-next",
+          "rubric": "R1",
+          "severity": "major",
+          "owner": "state-at-a-glance",
+          "says": "status opens on the uncapped digest and one block per map, and no line says which one thing to do next",
+          "evidence": {
+            "file": "skills/status/SKILL.md",
+            "line": "node ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs --full --fetch"
+          },
+          "fixedWhen": {
+            "file": "skills/status/SKILL.md",
+            "section": "## 1. The digest",
+            "present": "`Next:`[^\\n]*decision \\*\\*0198\\*\\*[^\\n]*close the report with it"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status-stale",
+      "journey": "orient",
+      "touchpoint": "the stale-task question",
+      "trigger": "a task has not moved for staleDays",
+      "channel": "screen",
+      "where": {
+        "file": "skills/status/SKILL.md",
+        "section": "## 4. Stale tasks"
+      },
+      "findings": []
+    },
+    {
+      "id": "status-sessions",
+      "journey": "orient",
+      "touchpoint": "the session pointers section",
+      "trigger": "/hodos:status lists the session pointers",
+      "channel": "screen",
+      "where": {
+        "file": "skills/status/SKILL.md",
+        "section": "## 5. Session pointers"
+      },
+      "findings": [
+        {
+          "id": "status-pointers-internal",
+          "rubric": "R3",
+          "severity": "minor",
+          "owner": "plain-words",
+          "says": "session pointers are the engine's bookkeeping, shown as one line per file under .claude/hodos/sessions/",
+          "evidence": {
+            "file": "skills/status/SKILL.md",
+            "line": "One line per `.claude/hodos/sessions/<id>`, with the task it names and a reason when it is dead — it names no task, its task directory is gone, or the session's transcript is. Nothing dead → say so and move on. Something dead → offer `ledger.mjs sessions --gc`, which removes exactly those, and run it on confirmation."
+          },
+          "fixedWhen": {
+            "file": "skills/status/SKILL.md",
+            "section": "## 5. Session pointers",
+            "absent": "One line per .\\.claude/hodos/sessions"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status-debt",
+      "journey": "orient",
+      "touchpoint": "the debt list",
+      "trigger": "the developer runs /hodos:status --debt",
+      "channel": "screen",
+      "where": {
+        "file": "skills/status/SKILL.md",
+        "section": "## 7. `--debt` — the `hodos:` markers"
+      },
+      "findings": [
+        {
+          "id": "debt-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the run closes on its count and proposes nothing, not even how a marker is acted on",
+          "evidence": {
+            "file": "skills/status/SKILL.md",
+            "line": "A marker with no `upgrade when` half is tagged `no-trigger` at the end of its row — a ceiling nobody can act on is the half of the form that decays. Close with `<N> markers, <M> with no trigger.` — or, when there are none, with `No hodos: debt.` and that line alone; the two closers are alternatives, and printing both says the same nothing twice. Then stop: this run proposes nothing and writes nothing."
+          },
+          "fixedWhen": {
+            "file": "skills/status/SKILL.md",
+            "section": "## 7. `--debt` — the `hodos:` markers",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status-cost",
+      "journey": "orient",
+      "touchpoint": "the cost table",
+      "trigger": "the developer runs /hodos:status --cost",
+      "channel": "screen",
+      "where": {
+        "file": "skills/status/SKILL.md",
+        "section": "## 8. `--cost` — what the tasks cost"
+      },
+      "findings": [
+        {
+          "id": "cost-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the table and its totals end the run with no next step",
+          "evidence": {
+            "file": "skills/status/SKILL.md",
+            "line": "Token counts only. hodos prints no dollar figure — the price of a token is not in the transcript — and the multiplier, hodos ÷ bare on the same task, needs a bare run of that task, which this file does not hold (`DESIGN.md §11`). Say that rather than dividing by anything else."
+          },
+          "fixedWhen": {
+            "file": "skills/status/SKILL.md",
+            "section": "## 8. `--cost` — what the tasks cost",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status-prune",
+      "journey": "orient",
+      "touchpoint": "the per-rule prune question",
+      "trigger": "the developer runs /hodos:status --prune and a precedent has rotted",
+      "channel": "screen",
+      "where": {
+        "file": "skills/status/references/prune.md",
+        "section": "## 3. The three answers"
+      },
+      "findings": []
+    },
+    {
+      "id": "campaign-frontier",
+      "journey": "orient",
+      "touchpoint": "the frontier lines",
+      "trigger": "status or the campaign skill prints a map's frontier",
+      "channel": "both",
+      "where": {
+        "file": "scripts/campaigns.mjs"
+      },
+      "findings": [
+        {
+          "id": "frontier-engine-states",
+          "rubric": "R3",
+          "severity": "major",
+          "owner": "plain-words",
+          "says": "held, claimed and fog are the map's internal states; \"held\" means a node marked ready whose dependency is open, which no reader guesses",
+          "evidence": {
+            "file": "scripts/campaigns.mjs",
+            "line": "lines.push(`held: ${gist(node)} · by: ${named}`);"
+          },
+          "fixedWhen": {
+            "file": "scripts/campaigns.mjs",
+            "absent": "held: \\$\\{gist"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook-lint",
+      "journey": "orient",
+      "touchpoint": "the lint hook's findings",
+      "trigger": "a Write or Edit touches a file hodos owns",
+      "channel": "unverified",
+      "where": {
+        "file": "scripts/lint.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "script-citations",
+      "journey": "orient",
+      "touchpoint": "the citation check",
+      "trigger": "init, research or finish checks file:line citations",
+      "channel": "context",
+      "where": {
+        "file": "scripts/verify-citations.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "handoff-no-task",
+      "journey": "hand-over",
+      "touchpoint": "a handoff with nothing to hand",
+      "trigger": "/hodos:handoff runs with no argument and no task, or on a finished task",
+      "channel": "screen",
+      "where": {
+        "file": "skills/handoff/SKILL.md",
+        "section": "## 1. The task"
+      },
+      "findings": [
+        {
+          "id": "handoff-no-task-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the stop lists the tasks that exist and not the command that hands one over",
+          "evidence": {
+            "file": "skills/handoff/SKILL.md",
+            "line": "The argument, or the session's own task when there is none (`ledger.mjs sessions` names it, and the digest above already printed it). No task and no argument → say which tasks exist, and stop."
+          },
+          "fixedWhen": {
+            "file": "skills/handoff/SKILL.md",
+            "section": "## 1. The task",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "handoff-written",
+      "journey": "hand-over",
+      "touchpoint": "the handoff file written",
+      "trigger": "/hodos:handoff writes the file",
+      "channel": "screen",
+      "where": {
+        "file": "skills/handoff/SKILL.md",
+        "section": "## 3. What the developer does with it"
+      },
+      "findings": [
+        {
+          "id": "handoff-commit-handed-off",
+          "rubric": "R8",
+          "severity": "major",
+          "owner": "land-on-yes",
+          "says": "the handoff tells the developer which commit carries the file and leaves both the commit and the push to them, so the file the other machine needs travels only if they remember both (map D7)",
+          "evidence": {
+            "file": "skills/handoff/SKILL.md",
+            "line": "Say it in three lines: the path written, that it is **tracked and uncommitted**, and the commit that carries it — hodos does not commit for the developer here any more than anywhere else. Then name the two things the other person needs: the branch (pushed, or the handoff is a file about work nobody else has) and `/hodos:run <slug>`, which finds the file and offers the pickup."
+          },
+          "fixedWhen": {
+            "file": "skills/handoff/SKILL.md",
+            "section": "## 3. What the developer does with it",
+            "present": "ledger\\.mjs next .*--handoff"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-pickup",
+      "journey": "hand-over",
+      "touchpoint": "the pickup question",
+      "trigger": "/hodos:run finds a handoff file and no task directory",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/SKILL.md",
+        "section": "## Pickup"
+      },
+      "findings": [
+        {
+          "id": "pickup-no-language",
+          "rubric": "R9",
+          "severity": "major",
+          "owner": "chat-language",
+          "says": "a picked-up task records no language either, so every session after the pickup answers in English whatever the developer who took it speaks (map D4)",
+          "evidence": {
+            "file": "skills/run/SKILL.md",
+            "line": "2. **From the default branch, before checking the work out**: `ledger.mjs init <slug> --path <path> --type <type>`, write `plan.md` from the file's `## Plan` verbatim, then `ledger.mjs add \"Plan: approved\" --tasks <n> --branch <branch> --handoff`. The order is what makes `base` the fork point rather than the branch tip; a base recorded on the branch would hide every commit the handoff carried from the review that follows. `--handoff` stores no session, because this session approves a plan it did not write and must still claim it (decision **0190**)."
+          },
+          "fixedWhen": {
+            "file": "skills/run/SKILL.md",
+            "section": "## Pickup",
+            "present": "--chat <xx>"
+          }
+        }
+      ]
+    },
+    {
+      "id": "review-report",
+      "journey": "review",
+      "touchpoint": "/hodos:review's printed verdict",
+      "trigger": "the reviewer returns on a diff hodos did not write",
+      "channel": "screen",
+      "where": {
+        "file": "skills/review/SKILL.md",
+        "section": "## 3. What is reported"
+      },
+      "findings": [
+        {
+          "id": "review-report-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the report ends on the path to review.md; that fixes are a /hodos:task is said further down, as a rule for the session",
+          "evidence": {
+            "file": "skills/review/SKILL.md",
+            "line": "4. The path to `review.md`, so it can be kept, pasted into a merge request, or thrown away with the temporary directory."
+          },
+          "fixedWhen": {
+            "file": "skills/review/SKILL.md",
+            "section": "## 3. What is reported",
+            "present": "Next:"
+          }
+        },
+        {
+          "id": "review-report-bound-silent",
+          "rubric": "R6",
+          "severity": "major",
+          "owner": "recover-at-bounds",
+          "says": "a reviewer that reaches its turn bound returns no verdict line, and this step only says to read review.md and print it — the session has no file to read and no step to name",
+          "evidence": {
+            "file": "skills/review/SKILL.md",
+            "line": "Read `review.md` and print, in the chat:"
+          },
+          "fixedWhen": {
+            "file": "skills/review/SKILL.md",
+            "section": "## 3. What is reported",
+            "present": "review\\.partial\\.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "review-target-refused",
+      "journey": "review",
+      "touchpoint": "review-package's refusal of a target",
+      "trigger": "/hodos:review names a task's branch, the default branch, or nothing that changed",
+      "channel": "context",
+      "where": {
+        "file": "scripts/review-package.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "campaign-mode",
+      "journey": "campaign",
+      "touchpoint": "an argument that may name a map",
+      "trigger": "/hodos:campaign gets an argument that matches no map and reads like a slug",
+      "channel": "screen",
+      "where": {
+        "file": "skills/campaign/SKILL.md",
+        "section": "## Step 1 — mode"
+      },
+      "findings": []
+    },
+    {
+      "id": "campaign-created",
+      "journey": "campaign",
+      "touchpoint": "a map created with no node started",
+      "trigger": "the developer leaves the first node for later",
+      "channel": "screen",
+      "where": {
+        "file": "skills/campaign/SKILL.md",
+        "section": "## Completion"
+      },
+      "findings": [
+        {
+          "id": "campaign-created-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "a map left for later ends without the command that advances it",
+          "evidence": {
+            "file": "skills/campaign/SKILL.md",
+            "line": "*Create*: the map is on disk with a done-metric measured now for every metric, at least three nodes, at least one fog item, and the first node either claimed and handed to `task`, or explicitly left for later at the developer's word."
+          },
+          "fixedWhen": {
+            "file": "skills/campaign/SKILL.md",
+            "section": "## Completion",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "campaign-map-approval",
+      "journey": "campaign",
+      "touchpoint": "the map approval",
+      "trigger": "campaign grilling has all six parts",
+      "channel": "screen",
+      "where": {
+        "file": "skills/campaign/references/map.md",
+        "section": "## 2. Grilling"
+      },
+      "findings": []
+    },
+    {
+      "id": "campaign-node-proposal",
+      "journey": "campaign",
+      "touchpoint": "the node proposal",
+      "trigger": "the frontier has ready nodes",
+      "channel": "screen",
+      "where": {
+        "file": "skills/campaign/references/map.md",
+        "section": "## 5. Proposing one node"
+      },
+      "findings": []
+    },
+    {
+      "id": "campaign-empty-frontier",
+      "journey": "campaign",
+      "touchpoint": "the empty-frontier question",
+      "trigger": "an advance finds nothing ready",
+      "channel": "screen",
+      "where": {
+        "file": "skills/campaign/references/map.md",
+        "section": "## 7. Advance"
+      },
+      "findings": [
+        {
+          "id": "empty-frontier-unmarked",
+          "rubric": "R8",
+          "severity": "minor",
+          "owner": "answer-first",
+          "says": "nudge, pull from the fog and out of scope are put with none recommended",
+          "evidence": {
+            "file": "skills/campaign/references/map.md",
+            "line": "**Frontier empty** → name the wait: which node is blocked, on what, from whom, and since when, taken from the blocked nodes' `by:` and the `## Waits` lines. Then put exactly three options with `AskUserQuestion`:"
+          },
+          "fixedWhen": {
+            "file": "skills/campaign/references/map.md",
+            "section": "## 7. Advance",
+            "present": "exactly three options with `AskUserQuestion`, one of them marked \\*\\(Recommended\\)\\*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "campaign-close",
+      "journey": "campaign",
+      "touchpoint": "a campaign closed",
+      "trigger": "every node is done or dropped and the metrics are met",
+      "channel": "screen",
+      "where": {
+        "file": "skills/campaign/references/map.md",
+        "section": "## 9. Closing"
+      },
+      "findings": [
+        {
+          "id": "campaign-close-no-next",
+          "rubric": "R2",
+          "severity": "minor",
+          "owner": "next-line",
+          "says": "the close sets Status: done and commits, and says nothing about what comes next",
+          "evidence": {
+            "file": "skills/campaign/references/map.md",
+            "line": "Every node `done` or `dropped`, every metric at its target, and the developer confirms → set `Status: done` in the header and commit. The file stays for the team; deleting it is the developer's own action, never this skill's."
+          },
+          "fixedWhen": {
+            "file": "skills/campaign/references/map.md",
+            "section": "## 9. Closing",
+            "present": "Next:"
+          }
+        }
+      ]
+    },
+    {
+      "id": "campaign-claim-refused",
+      "journey": "campaign",
+      "touchpoint": "a claim another branch holds",
+      "trigger": "campaigns.mjs claim finds the node claimed elsewhere",
+      "channel": "context",
+      "where": {
+        "file": "scripts/campaigns.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "run-finish-campaign-node",
+      "journey": "campaign",
+      "touchpoint": "a campaign node finishes",
+      "trigger": "a run's finish closes the node on its map",
+      "channel": "screen",
+      "where": {
+        "file": "skills/run/references/finish.md",
+        "section": "## 4. The campaign node"
+      },
+      "findings": []
+    },
+    {
+      "id": "wait-what-repitch",
+      "journey": "lost-thread",
+      "touchpoint": "the wait-what re-pitch",
+      "trigger": "the developer runs /hodos:wait-what",
+      "channel": "screen",
+      "where": {
+        "file": "skills/wait-what/SKILL.md",
+        "section": "# wait-what"
+      },
+      "findings": [
+        {
+          "id": "wait-what-no-next",
+          "rubric": "R2",
+          "severity": "blocker",
+          "owner": "next-line",
+          "says": "the re-pitch closes with what the agent needs, not with the command or the words that continue, so the next reply leaves hodos",
+          "evidence": {
+            "file": "skills/wait-what/SKILL.md",
+            "line": "Wait, I lost you. Re-pitch where you are: one sentence of context, then what you are doing and why — plain technical English, this project's own terms, none of this session's shorthand. Close with what you need from me. Ten lines at most, and no apology."
+          },
+          "fixedWhen": {
+            "file": "skills/wait-what/SKILL.md",
+            "section": "# wait-what",
+            "present": "Next:"
+          }
+        },
+        {
+          "id": "wait-what-english",
+          "rubric": "R3",
+          "severity": "major",
+          "owner": "chat-language",
+          "says": "the re-pitch is asked for in plain technical English, whatever language the developer reads (map D4)",
+          "evidence": {
+            "file": "skills/wait-what/SKILL.md",
+            "line": "Wait, I lost you. Re-pitch where you are: open with the hodos task you are on, its phase and the step after it, as the digest above lists them, or say that no hodos task is open; then one sentence of context, then what you are doing and why — plain technical English, this project's own terms, none of this session's shorthand. Close with what you need from me, then end on one `Next:` line naming the one step you propose: the command with its arguments filled in, which for work not yet started is `/hodos:task <the change>` because work enters hodos through that command, or the words when no command takes it. Any other way forward goes above that line. Ten lines at most, and no apology."
+          },
+          "fixedWhen": {
+            "file": "skills/wait-what/SKILL.md",
+            "section": "# wait-what",
+            "absent": "technical English"
+          }
+        },
+        {
+          "id": "wait-what-no-state",
+          "rubric": "R1",
+          "severity": "major",
+          "owner": "state-at-a-glance",
+          "says": "the re-pitch asks for context and what is being done, and not for where the work is in the hodos flow — the task, its phase, the step after",
+          "evidence": {
+            "file": "skills/wait-what/SKILL.md",
+            "line": "Wait, I lost you. Re-pitch where you are: one sentence of context, then what you are doing and why — plain technical English, this project's own terms, none of this session's shorthand. Close with what you need from me, then end on one `Next:` line naming the one step you propose: the command with its arguments filled in, which for work not yet started is `/hodos:task <the change>` because work enters hodos through that command, or the words when no command takes it. Any other way forward goes above that line. Ten lines at most, and no apology."
+          },
+          "fixedWhen": {
+            "file": "skills/wait-what/SKILL.md",
+            "section": "# wait-what",
+            "present": "^!`node \\$\\{CLAUDE_PLUGIN_ROOT\\}/scripts/state-digest\\.mjs`\\n[^\\n]*open with the hodos task[^\\n]*its phase[^\\n]*the step after it"
+          }
+        }
+      ]
+    },
+    {
+      "id": "wait-what-continuation",
+      "journey": "lost-thread",
+      "touchpoint": "a go-ahead after the re-pitch",
+      "trigger": "the developer answers a re-pitch that proposed a task with \"продолжаем\"",
+      "channel": "screen",
+      "where": {
+        "file": "skills/wait-what/SKILL.md",
+        "section": "# wait-what"
+      },
+      "findings": []
+    },
+    {
+      "id": "digest-resume-go-ahead",
+      "journey": "lost-thread",
+      "touchpoint": "a go-ahead to the digest's resume line",
+      "trigger": "the developer answers the digest's \"resume with /hodos:run <slug>\" in words",
+      "channel": "unverified",
+      "where": {
+        "file": "scripts/state-digest.mjs"
+      },
+      "findings": []
+    },
+    {
+      "id": "digest-compact",
+      "journey": "lost-thread",
+      "touchpoint": "the compact line",
+      "trigger": "a session is compacted mid-task",
+      "channel": "unverified",
+      "where": {
+        "file": "hooks/hooks.json"
+      },
+      "findings": []
+    }
+  ]
+}

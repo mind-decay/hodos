@@ -24,8 +24,8 @@ function tree(files) {
 }
 
 const kernel = (body = 'Body.\n') => `---
-name: run
-description: Execute an approved hodos task.
+name: init
+description: Learn a project and write its hodos layer.
 disable-model-invocation: true
 argument-hint: "<slug>"
 allowed-tools: Bash(node \${CLAUDE_PLUGIN_ROOT}/scripts/*)
@@ -66,8 +66,8 @@ test('an empty tree is clean', () => {
 
 test('a valid kernel, reference and agent are clean', () => {
   const root = tree({
-    'skills/run/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
-    'skills/run/references/execute.md': '# Execute\n\nProcedure.\n',
+    'skills/init/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
+    'skills/init/references/execute.md': '# Execute\n\nProcedure.\n',
     'agents/hodos-reviewer.md': agent(),
     'adapters/browser/chrome-devtools.md': adapter('navigate: mcp__chrome-devtools__navigate_page {url}\n'),
     'sources/react.md': '# react\n',
@@ -81,7 +81,7 @@ test('a valid kernel, reference and agent are clean', () => {
 });
 
 test('an over-cap kernel is flagged at the first line past the cap', () => {
-  const root = tree({ 'skills/run/SKILL.md': kernel('x\n'.repeat(143)) });
+  const root = tree({ 'skills/init/SKILL.md': kernel('x\n'.repeat(143)) });
   try {
     const { findings } = lint([], root);
     const [cap] = errors(findings);
@@ -102,7 +102,7 @@ disable-model-invocation: true
 ${'x\n'.repeat(6)}`,
     'adapters/browser/chrome-devtools.md': pad(adapter('navigate: mcp__chrome-devtools__navigate_page {url}\n'), 31),
     'sources/react.md': 'x\n'.repeat(61),
-    'skills/run/references/execute.md': 'x\n'.repeat(201),
+    'skills/init/references/execute.md': 'x\n'.repeat(201),
   });
   try {
     const messages = errors(lint([], root).findings).map((f) => f.message);
@@ -118,8 +118,8 @@ ${'x\n'.repeat(6)}`,
 
 test('a description over 500 characters is an error', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
+    'skills/init/SKILL.md': `---
+name: init
 description: ${'d'.repeat(501)}
 disable-model-invocation: true
 ---
@@ -137,9 +137,9 @@ Body.
 
 test('": " inside a plain scalar is an error, quoted is not', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
-description: Execute a task: implement, review, verify.
+    'skills/status/SKILL.md': `---
+name: status
+description: Report on a task: phase, ledger, next step.
 disable-model-invocation: true
 ---
 
@@ -157,7 +157,7 @@ Body.
   try {
     const found = errors(lint([], root).findings);
     assert.equal(found.length, 1);
-    assert.equal(found[0].file, 'skills/run/SKILL.md');
+    assert.equal(found[0].file, 'skills/status/SKILL.md');
     assert.match(found[0].message, /": " inside a plain scalar/);
     assert.equal(found[0].line, 3);
   } finally {
@@ -175,11 +175,11 @@ test('an agent name without the hodos- prefix is an error', () => {
   }
 });
 
-test('disable-model-invocation is required outside the three call targets', () => {
+test('disable-model-invocation is required outside the four call targets', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
-description: Execute an approved hodos task.
+    'skills/init/SKILL.md': `---
+name: init
+description: Learn a project and write its hodos layer.
 ---
 
 Body.
@@ -195,7 +195,7 @@ Body.
   try {
     const found = errors(lint([], root).findings);
     assert.equal(found.length, 1);
-    assert.equal(found[0].file, 'skills/run/SKILL.md');
+    assert.equal(found[0].file, 'skills/init/SKILL.md');
     assert.match(found[0].message, /disable-model-invocation: true is required/);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -215,17 +215,38 @@ Body.
   });
   try {
     const [finding] = errors(lint([], root).findings);
-    assert.match(finding.message, /call target \(decision 0016\) and must omit disable-model-invocation/);
+    assert.match(finding.message, /call target \(decisions 0016, 0190\) and must omit disable-model-invocation/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('a key outside the subset warns and keeps the exit code at 0', () => {
-  const root = tree({
-    'skills/run/SKILL.md': `---
+test('run is a call target: carrying the gate is an error, and omitting it is clean (decision 0190)', () => {
+  const skill = (gate) => `---
 name: run
 description: Execute an approved hodos task.
+${gate}---
+
+Body.
+`;
+  const gated = tree({ 'skills/run/SKILL.md': skill('disable-model-invocation: true\n') });
+  const open = tree({ 'skills/run/SKILL.md': skill('') });
+  try {
+    const found = errors(lint([], gated).findings);
+    assert.equal(found.length, 1);
+    assert.match(found[0].message, /^run is a call target \(decisions 0016, 0190\) and must omit disable-model-invocation$/);
+    assert.deepEqual(errors(lint([], open).findings), []);
+  } finally {
+    rmSync(gated, { recursive: true, force: true });
+    rmSync(open, { recursive: true, force: true });
+  }
+});
+
+test('a key outside the subset warns and keeps the exit code at 0', () => {
+  const root = tree({
+    'skills/init/SKILL.md': `---
+name: init
+description: Learn a project and write its hodos layer.
 disable-model-invocation: true
 model: opus
 ---
@@ -245,9 +266,9 @@ Body.
 
 test('frontmatter out of the §8 order warns', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-description: Execute an approved hodos task.
-name: run
+    'skills/init/SKILL.md': `---
+description: Learn a project and write its hodos layer.
+name: init
 disable-model-invocation: true
 ---
 
@@ -267,7 +288,7 @@ test('a skill whose name differs from its directory is an error', () => {
   const root = tree({ 'skills/status/SKILL.md': kernel() });
   try {
     const messages = errors(lint([], root).findings).map((f) => f.message);
-    assert.ok(messages.some((m) => /name is "run"; the directory is "status"/.test(m)));
+    assert.ok(messages.some((m) => /name is "init"; the directory is "status"/.test(m)));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -285,7 +306,7 @@ test('a file matching no cap pattern is an unknown artifact', () => {
 });
 
 test('missing frontmatter on a SKILL.md is an error', () => {
-  const root = tree({ 'skills/run/SKILL.md': '# run\n\nBody.\n' });
+  const root = tree({ 'skills/init/SKILL.md': '# init\n\nBody.\n' });
   try {
     const [finding] = errors(lint([], root).findings);
     assert.equal(finding.message, 'no frontmatter');
@@ -300,10 +321,10 @@ test('--help exits 0 and prints the usage', () => {
 });
 
 test('the CLI exits 1 on an error and 0 on a clean tree', () => {
-  const clean = tree({ 'skills/run/SKILL.md': kernel() });
+  const clean = tree({ 'skills/init/SKILL.md': kernel() });
   const dirty = tree({ 'agents/reviewer.md': agent('reviewer') });
   try {
-    const ok = execFileSync(process.execPath, [LINT, join(clean, 'skills/run/SKILL.md')], {
+    const ok = execFileSync(process.execPath, [LINT, join(clean, 'skills/init/SKILL.md')], {
       encoding: 'utf8',
       cwd: clean,
     });
@@ -338,9 +359,9 @@ test('an unknown option exits 2', () => {
 
 test('quoted values are read without their quotes', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: "run"
-description: 'Execute an approved hodos task.'
+    'skills/init/SKILL.md': `---
+name: "init"
+description: 'Learn a project and write its hodos layer.'
 disable-model-invocation: true
 argument-hint: "<slug>"
 ---
@@ -399,9 +420,9 @@ disable-model-invocation: true
 
 test('a duplicate key is an error', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
-description: Execute an approved hodos task.
+    'skills/init/SKILL.md': `---
+name: init
+description: Learn a project and write its hodos layer.
 description: Execute it again.
 disable-model-invocation: true
 ---
@@ -420,9 +441,9 @@ Body.
 
 test('frontmatter that never closes is an error', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
-description: Execute an approved hodos task.
+    'skills/init/SKILL.md': `---
+name: init
+description: Learn a project and write its hodos layer.
 
 Body.
 `,
@@ -438,10 +459,10 @@ Body.
 
 test('a list item before any key is an error', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
+    'skills/init/SKILL.md': `---
   - "src/**/*.ts"
-name: run
-description: Execute an approved hodos task.
+name: init
+description: Learn a project and write its hodos layer.
 disable-model-invocation: true
 ---
 
@@ -459,9 +480,9 @@ Body.
 
 test('a quoted gate is an error — "true" is a string, not the boolean', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
-description: Execute an approved hodos task.
+    'skills/init/SKILL.md': `---
+name: init
+description: Learn a project and write its hodos layer.
 disable-model-invocation: "true"
 ---
 
@@ -498,8 +519,8 @@ Body.
 
 test('an escaped quote inside a quoted scalar stays one scalar', () => {
   const root = tree({
-    'skills/run/SKILL.md': `---
-name: run
+    'skills/init/SKILL.md': `---
+name: init
 description: "Execute the project's \\"approved\\" task."
 disable-model-invocation: true
 ---
@@ -518,13 +539,13 @@ Body.
 
 test('a reference two levels deep is an error', () => {
   const root = tree({
-    'skills/run/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
-    'skills/run/references/execute.md': '# Execute\n',
-    'skills/run/references/phases/verify.md': '# Verify\n',
+    'skills/init/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
+    'skills/init/references/execute.md': '# Execute\n',
+    'skills/init/references/phases/verify.md': '# Verify\n',
   });
   try {
     const [deep] = errors(lint([], root).findings);
-    assert.equal(deep.file, 'skills/run/references/phases/verify.md');
+    assert.equal(deep.file, 'skills/init/references/phases/verify.md');
     assert.match(deep.message, /one level deep/);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -533,14 +554,14 @@ test('a reference two levels deep is an error', () => {
 
 test('a reference no kernel names is an error', () => {
   const root = tree({
-    'skills/run/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
-    'skills/run/references/execute.md': '# Execute\n',
-    'skills/run/references/orphan.md': '# Orphan\n',
+    'skills/init/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
+    'skills/init/references/execute.md': '# Execute\n',
+    'skills/init/references/orphan.md': '# Orphan\n',
   });
   try {
     const found = errors(lint([], root).findings);
     assert.equal(found.length, 1);
-    assert.equal(found[0].file, 'skills/run/references/orphan.md');
+    assert.equal(found[0].file, 'skills/init/references/orphan.md');
     assert.match(found[0].message, /does not name references\/orphan\.md/);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -549,8 +570,8 @@ test('a reference no kernel names is an error', () => {
 
 test('a dead file:line citation is an error and a live one is not', () => {
   const root = tree({
-    'skills/run/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
-    'skills/run/references/execute.md': '# Execute\n\nPrecedent: sources/react.md:1 and sources/react.md:40.\n',
+    'skills/init/SKILL.md': kernel('Execute runs from references/execute.md.\n'),
+    'skills/init/references/execute.md': '# Execute\n\nPrecedent: sources/react.md:1 and sources/react.md:40.\n',
     'sources/react.md': '# react\n',
   });
   try {
@@ -802,8 +823,8 @@ Body.
 const xref = (body) => ({
   'docs/DESIGN.md': '# Design\n\n## 7. Quality of code\n\n### 7.4 Verify contract\n\nText.\n',
   'docs/AUTHORING.md': '# Authoring\n\n## 7. Size caps\n\nText.\n',
-  'skills/run/SKILL.md': kernel(`${body}\n\nreferences/execute.md is the phase.\n`),
-  'skills/run/references/execute.md': '# execute\n\n## 3. The red phase\n\nText.\n',
+  'skills/init/SKILL.md': kernel(`${body}\n\nreferences/execute.md is the phase.\n`),
+  'skills/init/references/execute.md': '# execute\n\n## 3. The red phase\n\nText.\n',
 });
 
 test('a section reference that resolves is not a finding', () => {
@@ -822,7 +843,7 @@ test('a renumbered section reference is an error at its line', () => {
     const { findings } = lint([], root);
     const dead = findings.filter((f) => /DESIGN\.md §99/.test(f.message));
     assert.equal(dead.length, 1, JSON.stringify(findings));
-    assert.equal(dead[0].file, 'skills/run/SKILL.md');
+    assert.equal(dead[0].file, 'skills/init/SKILL.md');
     assert.equal(dead[0].severity, 'error');
     assert.equal(dead[0].line, 11, 'the line the reference sits on');
   } finally {

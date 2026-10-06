@@ -12,7 +12,7 @@ import { tempDir } from './temp-dir.mjs';
 
 const GUARD = fileURLToPath(new URL('./git-guard.mjs', import.meta.url));
 
-function project({ gates = { denyDangerousGit: true }, phase = null } = {}) {
+function project({ gates = { denyDangerousGit: true }, phase = null, state = {} } = {}) {
   const root = tempDir('hodos-guard-');
   mkdirSync(join(root, '.git'), { recursive: true });
   mkdirSync(join(root, '.claude', 'hodos', 'tasks'), { recursive: true });
@@ -21,7 +21,7 @@ function project({ gates = { denyDangerousGit: true }, phase = null } = {}) {
     const taskDir = join(root, '.claude', 'hodos', 'tasks', 'orders-summary');
     mkdirSync(taskDir, { recursive: true });
     writeFileSync(join(root, '.claude', 'hodos', 'active'), 'orders-summary\n');
-    writeFileSync(join(taskDir, 'state.json'), JSON.stringify({ slug: 'orders-summary', phase }));
+    writeFileSync(join(taskDir, 'state.json'), JSON.stringify({ slug: 'orders-summary', phase, ...state }));
   }
   return root;
 }
@@ -67,6 +67,19 @@ test('denyDangerousGit allows what only looks dangerous', () => {
   allowed(root, 'npm run build && git status');
 });
 
+test('denyDangerousGit allows every command a land option runs (decision 0197)', () => {
+  // Allowed today because no rule names them; this pins that a new rule must
+  // not catch the landing the developer just approved.
+  const root = project();
+
+  allowed(root, 'git switch main');
+  allowed(root, 'git merge --ff-only task/orders-summary');
+  allowed(root, 'git rebase main');
+  allowed(root, 'git rebase --abort');
+  allowed(root, 'git branch -D task/orders-summary');
+  allowed(root, 'git push -u origin task/orders-summary');
+});
+
 test('an rm -rf that names one path outside the task directory is denied', () => {
   const root = project();
   const inside = join(root, '.claude/hodos/tasks/x');
@@ -87,9 +100,34 @@ test('blockCommitOnFailedReview denies a commit only in phase fix', () => {
   const inExecute = project({ gates: { blockCommitOnFailedReview: true }, phase: 'execute' });
 
   denied(inFix, 'git commit -m x');
-  assert.match(decide(inFix, 'git commit -m x').reason, /while the task is in fix/);
+  assert.match(decide(inFix, 'git commit -m x').reason, /denied in fix until the pass's checks are green/);
   allowed(inExecute, 'git commit -m x');
   allowed(inFix, 'git push --force', 'the other gate is off');
+});
+
+// --- decision 0195: the fix pass commits once it has recorded its green checks.
+
+test('blockCommitOnFailedReview allows the commit in fix once the pass recorded Fix <k>: green', () => {
+  const green = project({ gates: { blockCommitOnFailedReview: true }, phase: 'fix', state: { fixGreen: 1, review: { iteration: 1 } } });
+
+  allowed(green, 'git commit -m x');
+});
+
+test('without the green line the commit in fix is denied, and the reason names the line to record', () => {
+  const root = project({ gates: { blockCommitOnFailedReview: true }, phase: 'fix', state: { fixGreen: null, review: { iteration: 1 } } });
+
+  denied(root, 'git commit -m x');
+  assert.match(decide(root, 'git commit -m x').reason, /ledger\.mjs add "Fix 1: green", then commit/);
+});
+
+test('in a verify fix pass the reason names that pass, not the review counter', () => {
+  const root = project({
+    gates: { blockCommitOnFailedReview: true },
+    phase: 'fix',
+    state: { fixGreen: null, review: { iteration: 1 }, verify: { iteration: 2 } },
+  });
+
+  assert.match(decide(root, 'git commit -m x').reason, /"Fix 2: green"/);
 });
 
 test('with both gates off everything is allowed', () => {

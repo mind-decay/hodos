@@ -16,3 +16,4 @@ bench/holdout/runs/*/copies/
 .claude/hodos/sessions/
 .claude/hodos/env/
 .claude/settings.local.json
+.claude-plugin/types/

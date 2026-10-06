@@ -56,9 +56,9 @@ A `target` judgement needs a reason that is not the model's taste: the stack's o
 
 ## The report (step 4)
 
-One row per candidate, the rejected ones included. The `Q1` cell names the kind, and the `Judgement` cell is `keep` or `target` with what carries it — the source URL, the developer's sentence, or the correcting commit:
+One row per candidate, the rejected ones included. The `Evidence` cell names the kind, and the `Judgement` cell is `keep` or `target` with what carries it — the source URL, the developer's sentence, or the correcting commit:
 
-| Rule | `paths` | Precedents | Source | Q1 (kind) · Q2 · Q3 | Judgement | Form |
+| Rule | `paths` | Precedents | Source | Evidence · Needed because · Checkable | Judgement | Form |
 |---|---|---|---|---|---|---|
 | Network calls go through the wrapper | `src/features/**` | 6, cited in the file | — | descriptive · developer named it · no lint covers it | keep | prose |
 | A catch that swallows the error | `src/features/**` | 9 of the old shape, 1 of the target | the stack's own page, URL in the row | prescriptive · developer settled it · a lint could | target — the source says so and the developer agreed | prose + a lint proposal, old shape counted in `## Migration` |

@@ -21,12 +21,14 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The directories this repository keeps tests in. `tools/` is in the build
- * repository and not in the published one (decision 0102), so an **absent**
- * root is skipped and one that exists with no test file is an error: the same
- * npm script serves both trees without going quiet in either.
+ * The directories this repository keeps tests in. `hooks/` holds the state
+ * row's module, the one file that runs outside Node, with its test beside it
+ * (decision 0202). `tools/` is in the build repository and not in the
+ * published one (decision 0102), so an **absent** root is skipped and one that
+ * exists with no test file is an error: the same npm script serves both trees
+ * without going quiet in either.
  */
-export const ROOTS = ['scripts', 'bench', 'tools'];
+export const ROOTS = ['scripts', 'hooks', 'bench', 'tools'];
 
 /**
  * Every `*.test.mjs` below `root`, sorted, `node_modules` skipped.

@@ -17,7 +17,8 @@ import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { claimsOnRefs, findMaps, formatFrontier, frontier, parseMap, refsOf, shortCounts } from './campaigns.mjs';
-import { activeTask, findConfig } from './config.mjs';
+import { activeTask, findConfig, readState } from './config.mjs';
+import { nextFacts, nextStep } from './ledger.mjs';
 import { anchors, barePaths, citations, verifyAnchors, verifyFile } from './verify-citations.mjs';
 
 const TOKEN_CAP = 300; // AUTHORING.md §7
@@ -26,14 +27,18 @@ const CHAR_CAP = TOKEN_CAP * CHARS_PER_TOKEN;
 const DEFAULT_STALE_DAYS = 14;
 const FETCH_TIMEOUT_MS = 5000; // decision 0138
 
-const USAGE = `Usage: node scripts/state-digest.mjs [--full|--compact]
+const USAGE = `Usage: node scripts/state-digest.mjs [--full|--compact|--row]
 
 Prints the hodos state of the current project as context (FORMATS.md §12).
 
   (bare)      the SessionStart digest, capped at ${TOKEN_CAP} tokens.
-  --full      the same content with no cap, for /hodos:status.
-  --compact   the active task's ledger path and the resume line, for
-              SessionStart(compact).
+  --full      the same content with no cap, for /hodos:status, ending on
+              the one Next: line that continues this project.
+  --compact   the active task's ledger path and the resume line, and its
+              chat line, for SessionStart(compact).
+  --row       one line, where the work is and the command that continues
+              it, drawn by the band above the prompt; nothing when no task
+              or campaign is open. Never fetches (decision 0203).
   --fetch     before reading the maps, git fetch --no-tags --quiet in each
               repository one lives in, so a claim made on another branch is
               seen. Refs only, ${FETCH_TIMEOUT_MS / 1000} seconds, failing
@@ -76,13 +81,6 @@ function tasks(projectRoot) {
 
 
 /**
- * One entry per campaign map: its frontier, or the reason this version will not
- * read it. Called in-process rather than as a subprocess — this runs on the
- * SessionStart latency budget, and a second Node start costs more than the line
- * is worth. A map that cannot be parsed drops out silently: the digest is
- * context, and a broken file in it must not cost the session its state.
- */
-/**
  * The one network call the engine makes (decisions 0080, 0138). It runs in the
  * repository each map lives in, updates remote-tracking refs and nothing else,
  * is bounded by `FETCH_TIMEOUT_MS`, and its failure is a line rather than an
@@ -117,6 +115,13 @@ export function fetchRepos(roots) {
   return failed;
 }
 
+/**
+ * One entry per campaign map: its frontier, or the reason this version will not
+ * read it. Called in-process rather than as a subprocess — this runs on the
+ * SessionStart latency budget, and a second Node start costs more than the line
+ * is worth. A map that cannot be parsed drops out silently: the digest is
+ * context, and a broken file in it must not cost the session its state.
+ */
 function campaigns(projectRoot, config, { fetch = false } = {}) {
   const out = [];
   // One ref list per repository, however many maps it holds: the digest runs on
@@ -136,6 +141,7 @@ function campaigns(projectRoot, config, { fetch = false } = {}) {
       const claims = claimsOnRefs(entry.path, { root: entry.root, refs: refs.get(entry.root) });
       out.push({
         slug: entry.slug,
+        status: map.header.Status ?? 'active',
         f: frontier(map, { claims }),
         names: new Set(map.nodes.map((n) => n.name)),
       });
@@ -323,16 +329,115 @@ function decayRow(projectRoot, config) {
   return `- decay: ${paths} renamed or deleted since the scan (${sha.slice(0, 7)}) — /hodos:init --refresh`;
 }
 
-export function digest(found, { full = false, fetch = false } = {}) {
-  if (found.notFound) return '';
+/**
+ * The command that continues a listed task, from the one table that answers it
+ * (decision 0192). No git: the digest lists no finished task, and only a
+ * finished task's answer reads it. A ledger this cannot read leaves the phase
+ * alone to answer, because a hook does not fail the session it starts.
+ */
+function resumeOf(t) {
+  let facts = {};
+  try {
+    facts = nextFacts(t.taskDir, t.state, { git: false });
+  } catch {
+    // unreadable ledger: the phase answers without the files and lines
+  }
+  return nextStep(t.state, facts).next;
+}
+
+/**
+ * The task the next step ranks first (decision 0198): the session's own task
+ * not at done, else the open task updated last, else null. The chat line reads
+ * the same one (decision 0200), so the language printed is that task's.
+ */
+function currentTask({ session, active, stale }) {
+  const own = [...active, ...stale].find((t) => t.slug === session && t.state.phase !== 'done');
+  if (own) return own;
+  if (active.length === 0) return null;
+  // `latestTask`'s order (ledger.mjs): the highest updatedAt, the first on a tie.
+  return active.reduce((a, b) => ((b.state.updatedAt ?? '') > (a.state.updatedAt ?? '') ? b : a));
+}
+
+/**
+ * The language the developer is speaking, as state (decision 0200), or null
+ * where the engine's own English needs no line.
+ * States: chat null | 'en' | another two-letter code — not a type; enumerated by hand.
+ */
+function chatLine(task, config) {
+  const chat = task?.state?.chat;
+  if (!chat || chat === 'en') return null;
+  return `- chat: the developer reads ${chat} — commands, slugs and paths are English, files are written in ${config.language ?? 'en'}`;
+}
+
+/**
+ * The one step that continues this project (decision 0198). Pure: the facts
+ * are the ones digest() already holds, so the ranking is testable on objects.
+ * First match wins:
+ * `session | active | ready-map | stale | open-map | none`. A map with no ready
+ * node ranks below a stale task and is still named: advancing it names the
+ * wait or closes the campaign, and a stall has to be said. `subject` is what
+ * the step continues, as the band prints it, and null on tier none: the band
+ * reads nothing else, and a second copy of the tiers would drift (decisions
+ * 0202, 0203).
+ */
+export function nextOverall({ session, active, stale, maps }) {
+  const t = currentTask({ session, active, stale });
+  if (t) {
+    const why = t.slug === session ? "is this session's task" : 'is the open task updated last';
+    return { next: t.resume, why: `${t.slug} ${why}, at ${t.state.phase}`, subject: taskSubject(t) };
+  }
+  const live = maps.filter((m) => m.status !== 'done');
+  const ready = live.find((m) => m.f.ready.length > 0);
+  if (ready) {
+    const n = ready.f.ready.length;
+    return {
+      next: `/hodos:campaign ${ready.slug}`,
+      why: `${ready.slug} has ${n} ready node${n === 1 ? '' : 's'}`,
+      subject: ready.slug,
+    };
+  }
+  const old = stale.find((t) => t.state.phase !== 'done');
+  if (old) return { next: old.resume, why: `${old.slug} has been open ${old.ageDays} days`, subject: taskSubject(old) };
+  if (live.length > 0) {
+    return {
+      next: `/hodos:campaign ${live[0].slug}`,
+      why: `${live[0].slug} has no ready node — advancing it names the wait`,
+      subject: live[0].slug,
+    };
+  }
+  return { next: nextStep(null).next, why: 'no open task and no open campaign', subject: null };
+}
+
+/** A task as the band names it: the slug and the phase as stored. */
+const taskSubject = (t) => `${t.slug} ${t.state.phase}`;
+
+/**
+ * The facts every printed form reads, gathered once per run. The digest adds
+ * its offer and decay rows on top; the row reads none of them.
+ */
+function gather(found, { fetch = false } = {}) {
   const { config, projectRoot } = found;
   const staleDays = config.tasks?.staleDays ?? DEFAULT_STALE_DAYS;
 
   const all = tasks(projectRoot);
   const stale = all.filter((t) => t.ageDays >= staleDays);
-  const active = all.filter((t) => !stale.includes(t) && t.state.phase !== 'done');
+  const active = all
+    .filter((t) => !stale.includes(t) && t.state.phase !== 'done')
+    .map((t) => ({ ...t, resume: resumeOf(t) }));
 
   const { maps, failed } = campaigns(projectRoot, config, { fetch });
+  return { config, projectRoot, all, stale, active, maps, failed, session: activeTask(projectRoot) };
+}
+
+/** nextOverall over gathered facts, a stale task ranked with its own resume. */
+function rank({ session, active, stale, maps }) {
+  return nextOverall({ session, active, stale: stale.map((t) => ({ ...t, resume: resumeOf(t) })), maps });
+}
+
+export function digest(found, { full = false, fetch = false } = {}) {
+  if (found.notFound) return '';
+  const facts = gather(found, { fetch });
+  const { config, projectRoot, all, stale, active, maps, failed, session } = facts;
   const counts = [
     `${active.length} active task${active.length === 1 ? '' : 's'}`,
     stale.length > 0 ? `${stale.length} stale task${stale.length === 1 ? '' : 's'}` : null,
@@ -340,17 +445,19 @@ export function digest(found, { full = false, fetch = false } = {}) {
   ].filter(Boolean);
   const verified = config.verifiedAt ? `config verified ${config.verifiedAt}` : 'config found';
   const header = `hodos: ${[verified, ...counts].join(' · ')}`;
+  // Under the header and outside the row budget, as the header is: a row the
+  // cap drops must not take the language with it.
+  const chat = chatLine(currentTask({ session, active, stale }), config);
+  const top = chat ? [header, chat] : [header];
 
   const rows = [
-    ...active.map(
-      (t) => `- ${t.slug} [${t.state.phase}] last: "${t.state.lastEvent ?? '—'}" — resume with /hodos:run ${t.slug}`,
-    ),
+    ...active.map((t) => `- ${t.slug} [${t.state.phase}] last: "${t.state.lastEvent ?? '—'}" — resume with ${t.resume}`),
     ...stale.map((t) => `- stale: ${t.slug} (${t.ageDays} days) — /hodos:status to fold or delete`),
-    // Before the campaign row, because it is what says how fresh that row is.
+    // Before the campaign rows, because it is what says how fresh they are.
     ...failed.map((name) => `- fetch failed — the map is as of your last pull (${name})`),
-    maps.length > 0
-      ? `- campaigns: ${maps.map((m) => `${m.slug} — frontier ${shortCounts(m.f)}`).join(' · ')}`
-      : null,
+    // One row per map, ending on its command as a task row ends on its resume,
+    // so the cap drops one map at a time (decision 0198).
+    ...maps.map((m) => `- campaign ${m.slug} — frontier ${shortCounts(m.f)} — advance with /hodos:campaign ${m.slug}`),
     decayRow(projectRoot, config),
     // Last, so the cap drops it before it drops a row of state (FORMATS.md §12).
     offer(projectRoot, all, stale),
@@ -360,11 +467,13 @@ export function digest(found, { full = false, fetch = false } = {}) {
     // The rows are a list and stay one per line; each map's frontier is a block
     // of its own, so `status` can read them apart at a glance.
     const blocks = maps.map((m) => formatFrontier(m.slug, m.f, { byName: m.names }));
-    return [[header, ...rows].join('\n'), ...blocks].join('\n\n');
+    // Last, after the blocks: status holds it and closes its report with it.
+    const { next, why } = rank(facts);
+    return [[...top, ...rows].join('\n'), ...blocks, `Next: ${next} — ${why}`].join('\n\n');
   }
 
   const kept = [];
-  let size = header.length;
+  let size = top.join('\n').length;
   for (const row of rows) {
     // The last line must still fit the "and n more" pointer, so measure it first.
     const dropped = rows.length - kept.length;
@@ -376,7 +485,7 @@ export function digest(found, { full = false, fetch = false } = {}) {
     kept.push(row);
     size += row.length + 1;
   }
-  return [header, ...kept].join('\n');
+  return [...top, ...kept].join('\n');
 }
 
 // The session's task, not the project's: `activeTask` reads
@@ -392,7 +501,25 @@ export function compactLine(found) {
   // `/` on every platform: the line is quoted in COMPONENTS.md §4, in the
   // kernels and in the tests, and a reader types it into a shell.
   const ledger = `.claude/hodos/tasks/${slug}/ledger.md`;
-  return `hodos: ${slug} — ledger ${ledger} — continue from the first open line`;
+  const line = `hodos: ${slug} — ledger ${ledger} — continue from the first open line`;
+  // A compacted session has no digest otherwise (decision 0200).
+  const chat = chatLine({ state: readState(found.projectRoot, slug) }, found.config);
+  return chat ? `${line}\n${chat}` : line;
+}
+
+/**
+ * The line the band above the prompt draws (decisions 0202, 0203): what the
+ * work is and the command `--full` ends on, from the same ranking, so the band
+ * and `/hodos:status` cannot disagree. Plain text: the band adds its own glyph
+ * and colour, and a program reads this form. Empty on tier none, where a band
+ * would sit in every session that has no hodos work. It never fetches: it runs
+ * after every main-thread turn, and the network is `/hodos:status`'s alone
+ * (decision 0080).
+ */
+export function rowLine(found) {
+  if (found.notFound) return '';
+  const { next, subject } = rank(gather(found));
+  return subject === null ? '' : `${subject} → ${next}`;
 }
 
 function main(argv) {
@@ -403,7 +530,7 @@ function main(argv) {
       process.stdout.write(`${USAGE}\n`);
       return 0;
     }
-    if (arg === '--full' || arg === '--compact') mode = arg.slice(2);
+    if (arg === '--full' || arg === '--compact' || arg === '--row') mode = arg.slice(2);
     else if (arg === '--fetch') fetch = true;
     else {
       process.stderr.write(`state-digest: unknown option: ${arg}\n${USAGE}\n`);
@@ -412,7 +539,10 @@ function main(argv) {
   }
 
   const found = findConfig(process.cwd());
-  const text = mode === 'compact' ? compactLine(found) : digest(found, { full: mode === 'full', fetch });
+  const text =
+    mode === 'compact' ? compactLine(found)
+      : mode === 'row' ? rowLine(found)
+        : digest(found, { full: mode === 'full', fetch });
   if (text !== '') process.stdout.write(`${text}\n`);
   return 0;
 }

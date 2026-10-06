@@ -1,5 +1,6 @@
 {
   "description": "hodos: state digest on session start, ledger on compact, lint on writes, opt-in git and stop gates",
+  "modules": ["./state-row.mjs"],
   "hooks": {
     "SessionStart": [
       {

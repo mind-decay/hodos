@@ -18,7 +18,7 @@ Everything else is an answer copied down. These four are derived, and each is wr
 | Key | Value |
 |---|---|
 | `version` | `1` |
-| `language` | the interview language, two letters |
+| `language` | the language of the files hodos writes (rules, plans, reports), two letters; the chat follows each developer's own (decision **0200**) |
 | `stack[]` | the scan's stack tokens, lowercase |
 | `commands` | `test` · `typecheck` · `lint` · `build`: a string or `null`; `dev`: `{ cmd, url, ready }` |
 | `verify.recipes[]` | `{ name, kind, when, … }`; `kind` is `command` · `browser` · `http` · `a11y` · `viewport`; `when` is `always` · `ui` · `api` · `perf` · a glob. `viewport` carries `widths[]` in CSS pixels. A recipe whose command **cannot run in a session** — one gated behind a corpus download, a device, a paid account — is written with `unrun: true` on the approval that says so, and `check` warns about it by name (decision **0148**). That is the only route: a command recorded unrun and unmarked is the anti-pattern below |
@@ -27,6 +27,7 @@ Everything else is an answer copied down. These four are derived, and each is wr
 | `verify.detectors.allow[]` | `"<detector>:<route glob>"` entries silencing an intended presentation defect — `overflow` · `clipped` · `overlap` · `focus` · `axe`, or `*` for all five (decision **0107**). Omit it: a route earns an entry when a hit on it turns out to be the design |
 | `conventions.commit` | `conventional` · `ticket-prefix` · `custom:<pattern>` |
 | `conventions.branch` | the project's pattern, `{slug}` for the task's slug |
+| `conventions.land` | `branch` · `default`, written in the root config for either answer wherever the inventory lists a remote, and nowhere else (decision **0201**). Step 5 recommends the one question 4's answer names, `branch` when it names neither. Absent then means the question was never asked |
 | `models.*` | `review` · `planReview` · `verify` · `preparer` · `research` · `initScan`; a model name each. No key for plan or execute, which run in the session |
 | `autonomy` | `ask` (default) · `rulings` |
 | `gates.*` | `denyDangerousGit` · `blockCommitOnFailedReview` · `stopHookLedger`, booleans, `false` unless the developer asked |

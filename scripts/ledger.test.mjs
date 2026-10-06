@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { append, deriveState, normalizeSlug, eventOf } from './ledger.mjs';
+import { append, deriveState, normalizeSlug, eventOf, latestTask, nextFacts, nextStep } from './ledger.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const LEDGER = fileURLToPath(new URL('./ledger.mjs', import.meta.url));
@@ -142,6 +142,44 @@ test('init records a campaign node', () => {
   assert.equal(readState(root, 'state-migration-step-1').campaign, 'state-migration/n2');
 });
 
+test('init --chat records the developer’s language, and a later add keeps it (decision 0200)', () => {
+  const root = project();
+  assert.equal(run(root, 'init', 't', '--path', 'quick', '--type', 'feature', '--chat', 'ru').status, 0);
+  assert.equal(readState(root, 't').chat, 'ru');
+
+  assert.equal(run(root, 'add', 'Ruling: a — b — c').status, 0);
+  assert.equal(readState(root, 't').chat, 'ru');
+});
+
+test('init without --chat records chat null', () => {
+  const root = project();
+  run(root, 'init', 't', '--path', 'quick', '--type', 'feature');
+
+  assert.equal(readState(root, 't').chat, null);
+});
+
+test('--chat takes two lowercase letters: anything else exits 1 and creates nothing', () => {
+  for (const chat of ['RU', 'rus', '']) {
+    const root = project();
+    const out = run(root, 'init', 't', '--path', 'quick', '--type', 'feature', '--chat', chat);
+
+    assert.equal(out.status, 1, `--chat ${JSON.stringify(chat)}`);
+    assert.match(out.stderr, /ledger: --chat must be two lowercase letters, as config\.language is/);
+    assert.equal(existsSync(join(root, '.claude/hodos/tasks/t')), false);
+    assert.equal(existsSync(join(root, '.claude/hodos/active')), false);
+  }
+});
+
+test('a state.json written before decision 0200 seeds chat null', () => {
+  const root = started();
+  const file = join(root, '.claude/hodos/tasks/orders-summary/state.json');
+  const { chat, ...before } = readState(root, 'orders-summary');
+  writeFileSync(file, JSON.stringify(before));
+
+  assert.equal(run(root, 'add', 'Ruling: a — b — c').status, 0);
+  assert.equal(readState(root, 'orders-summary').chat, null);
+});
+
 test('normalizeSlug is kebab ASCII, capped at 40 characters', () => {
   assert.equal(normalizeSlug('Orders Summary!'), 'orders-summary');
   assert.equal(normalizeSlug('  --Fix: the CACHE bug  '), 'fix-the-cache-bug');
@@ -171,6 +209,7 @@ test('every CLI form of FORMATS.md §6 is accepted and stored in its stored form
     [['Upgrade: standard→deep — the schema changes after all'], null],
     [['Simplify: done', '--sha', sha, '--net', '12'], `Simplify: done (${sha}, net -12)`],
     [['Review 1: NEEDS_WORK 0/2/1'], 'Review 1: NEEDS_WORK (0/2/1)'],
+    [['Fix 1: green'], 'Fix 1: green'],
     [['Fix 1: done', '--sha', sha], `Fix 1: done (${sha})`],
     [['Review 2: ACCEPT 0/0/1'], 'Review 2: ACCEPT (0/0/1)'],
     [['Verify 1: PASS 4 claims, 1 skipped'], 'Verify 1: PASS 4 claims, 1 skipped'],
@@ -307,6 +346,77 @@ test('the bound is in the grammar: a fourth red-check attempt is rejected', () =
   ).redCheckAttempts, 3);
 });
 
+// --- decision 0193: the third red check blocks the task on its question.
+
+const ledgerText = (root) => readFileSync(join(root, '.claude/hodos/tasks/orders-summary/ledger.md'), 'utf8');
+
+test('a third red check lets the task be blocked on its question', () => {
+  const root = started();
+  run(root, 'add', 'Task 1: started');
+  for (const k of [1, 2, 3]) run(root, 'add', `Task 1: red-check attempt ${k}/3 — still red`);
+  const out = run(root, 'add', 'Task 1: blocked — which fixture holds the empty cart?');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout.trim(), 'Task 1: blocked — which fixture holds the empty cart?');
+  const state = readState(root, 'orders-summary');
+  assert.equal(state.phase, 'blocked');
+  assert.equal(state.blockedOn, 'which fixture holds the empty cart?');
+  assert.equal(state.redCheckAttempts, 3, 'the spent bound stays visible while the task waits');
+});
+
+test('blocked before the third red check is refused and writes nothing', () => {
+  const root = started();
+  run(root, 'add', 'Task 1: started');
+  for (const k of [1, 2]) run(root, 'add', `Task 1: red-check attempt ${k}/3 — still red`);
+  const before = ledgerText(root);
+  const out = run(root, 'add', 'Task 1: blocked — which fixture holds the empty cart?');
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stderr.trim(), 'ledger: "Task 1: blocked" needs "Task 1: red-check attempt 3/3" before it (decision 0193)');
+  assert.equal(ledgerText(root), before, 'ledger.md is byte-identical');
+});
+
+test('the third red check counts for its own task, since that task last started', () => {
+  const root = started();
+  run(root, 'add', 'Task 1: started');
+  for (const k of [1, 2, 3]) run(root, 'add', `Task 1: red-check attempt ${k}/3 — still red`);
+  run(root, 'add', 'Task 1: test red');
+  run(root, 'add', 'Task 1: done', '--sha', 'aaaaaaa');
+  run(root, 'add', 'Task 2: started');
+  const other = run(root, 'add', 'Task 2: blocked — q');
+  assert.equal(other.status, 1, 'task 1’s attempts are not task 2’s');
+  assert.match(other.stderr, /"Task 2: red-check attempt 3\/3"/);
+
+  // A restarted task is on a fresh bound, so it earns its stop again.
+  const root2 = started();
+  run(root2, 'add', 'Task 1: started');
+  for (const k of [1, 2, 3]) run(root2, 'add', `Task 1: red-check attempt ${k}/3 — still red`);
+  assert.equal(run(root2, 'add', 'Task 1: blocked — q').status, 0);
+  run(root2, 'add', 'Gap: q — a (developer)');
+  run(root2, 'add', 'Task 1: started');
+  assert.equal(run(root2, 'add', 'Task 1: blocked — q').status, 1, 'the attempts before the restart are spent');
+});
+
+test('the answer and a new start take the task out of blocked on a fresh bound', () => {
+  const state = derive(
+    'Task 1: started',
+    'Task 1: red-check attempt 1/3 — red',
+    'Task 1: red-check attempt 2/3 — red',
+    'Task 1: red-check attempt 3/3 — red',
+    'Task 1: blocked — q',
+    'Gap: q — a (developer)',
+    'Task 1: started',
+  );
+  assert.equal(state.phase, 'execute');
+  assert.equal(state.redCheckAttempts, 0);
+  assert.equal(state.blockedOn, null);
+});
+
+test('a ledger with no blocked line derives blockedOn null', () => {
+  // No `started` either: that line clears the field, and would hide a seed without it.
+  assert.equal(derive('Init: standard feature', 'Plan: approved (a1b2c3d, 2 tasks, feature/x)').blockedOn, null);
+});
+
 test('a malformed line exits 1 and prints the grammar', () => {
   const root = started();
   const out = run(root, 'add', 'Task one is finished');
@@ -398,6 +508,73 @@ test('an unknown command exits 2', () => {
   assert.equal(out.status, 2);
 });
 
+// --- decision 0195: a fix pass records its green checks before its commit.
+
+/** A started task whose ledger already holds these stored events. */
+function withEvents(...events) {
+  const root = started();
+  const file = join(root, '.claude/hodos/tasks/orders-summary/ledger.md');
+  for (const event of events) appendFileSync(file, `${new Date().toISOString()} ${event}\n`);
+  return root;
+}
+
+const TO_REVIEW = ['Plan: approved (a1b2c3d, 1 tasks, task/x)', 'Task 1: started', 'Task 1: test red', 'Task 1: done (aaaaaaa)', 'Simplify: done (aaaaaaa, net -0)'];
+
+test('Fix k: green in phase fix is stored, sets fixGreen, and leaves the phase in fix', () => {
+  const root = withEvents(...TO_REVIEW, 'Review 1: NEEDS_WORK (0/2/0)');
+  const out = run(root, 'add', 'Fix 1: green');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout.trim(), 'Fix 1: green');
+  const state = readState(root, 'orders-summary');
+  assert.equal(state.fixGreen, 1);
+  assert.equal(state.phase, 'fix');
+});
+
+test('Fix k: green outside phase fix exits 1, names the phase and 0195, and writes nothing', () => {
+  for (const [events, phase] of [
+    [[...TO_REVIEW], 'review'],
+    [['Plan: approved (a1b2c3d, 1 tasks, task/x)', 'Task 1: started'], 'execute'],
+  ]) {
+    const root = withEvents(...events);
+    const before = ledgerText(root);
+    const out = run(root, 'add', 'Fix 1: green');
+
+    assert.equal(out.status, 1, phase);
+    assert.equal(
+      out.stderr.trim(),
+      `ledger: "Fix 1: green" is recorded in phase fix, once the pass's checks pass, and this task is in ${phase} (decision 0195)`,
+    );
+    assert.equal(ledgerText(root), before, `${phase}: ledger.md is byte-identical`);
+  }
+});
+
+test('Fix k: done after its green line clears fixGreen and leaves for the loop that failed', () => {
+  const afterReview = withEvents(...TO_REVIEW, 'Review 1: NEEDS_WORK (0/2/0)', 'Fix 1: green');
+  assert.equal(run(afterReview, 'add', 'Fix 1: done', '--sha', 'bbbbbbb').status, 0);
+  assert.equal(readState(afterReview, 'orders-summary').fixGreen, null);
+  assert.equal(readState(afterReview, 'orders-summary').phase, 'review');
+
+  const afterVerify = withEvents(...TO_REVIEW, 'Review 1: ACCEPT (0/0/0)', 'Verify 1: FAIL 3 claims, 0 skipped', 'Fix 1: green');
+  assert.equal(run(afterVerify, 'add', 'Fix 1: done', '--sha', 'bbbbbbb').status, 0);
+  assert.equal(readState(afterVerify, 'orders-summary').fixGreen, null);
+  assert.equal(readState(afterVerify, 'orders-summary').phase, 'verify');
+});
+
+test('Fix k: done with no green line is still accepted: the line is read by the gate only (D7)', () => {
+  const root = withEvents(...TO_REVIEW, 'Review 1: NEEDS_WORK (0/2/0)');
+  const out = run(root, 'add', 'Fix 1: done', '--sha', 'bbbbbbb');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(readState(root, 'orders-summary').phase, 'review');
+});
+
+test('fixGreen is null in every phase but fix, and a ledger with no green line derives null', () => {
+  assert.equal(derive('Review 1: NEEDS_WORK (0/2/0)').fixGreen, null);
+  assert.equal(derive('Review 1: NEEDS_WORK (0/2/0)', 'Fix 1: green', 'Gap: a — b').fixGreen, 1, 'a Gap: in the pass keeps it');
+  assert.equal(derive('Review 1: NEEDS_WORK (0/2/0)', 'Fix 1: green', 'Breaker: review — manual').fixGreen, null);
+});
+
 // --- state.json derivation: one case per row of the FORMATS.md §6 phase column ---
 
 const SEED = { slug: 'orders-summary', path: 'standard', type: 'feature', campaign: null };
@@ -414,6 +591,7 @@ test('phase after each row of the §6 table', () => {
     [[...base, 'Task 1: mutation (3 tests)'], 'execute'],
     [[...base, 'Task 1: done (d4e5f6a)'], 'execute'],
     [[...base, 'Task 1: red-check attempt 2/3 — still red'], 'execute'],
+    [[...base, 'Task 1: red-check attempt 3/3 — still red', 'Task 1: blocked — q'], 'blocked'],
     [[...base, 'Task 1: started', 'Ruling: a — b — c'], 'execute'],
     [[...base, 'Task 1: started', 'Gap: a — b'], 'execute'],
     [[...base, 'Task 1: started', 'Upgrade: standard→deep — schema'], 'execute'],
@@ -594,6 +772,166 @@ test('claim with no config exits 0 and says nothing was claimed', () => {
   const out = runAs(root, 'sess-b', 'claim', 'orders-summary');
 
   assert.equal(out.status, 0);
+});
+
+// --- decision 0190: S2 never starts in the session that approved the plan.
+
+const headOf = (root) => execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+
+/** A task planned and approved in session `sess-x`, as S1 leaves it. */
+function plannedIn(session = 'sess-x') {
+  const root = project();
+  assert.equal(runAs(root, session, 'init', 'orders-summary', '--path', 'deep', '--type', 'feature').status, 0);
+  const approved = runAs(root, session, 'add', 'Plan: approved', '--tasks', '2', '--branch', 'b');
+  assert.equal(approved.status, 0, approved.stderr);
+  return root;
+}
+
+/** Every file under `.claude/hodos/sessions/`, with its content. */
+const sessionsSnapshot = (root) => {
+  const dir = join(root, '.claude/hodos/sessions');
+  if (!existsSync(dir)) return null;
+  return readdirSync(dir).sort().map((name) => [name, readFileSync(join(dir, name), 'utf8')]);
+};
+
+test('Plan: approved under a session id stores the session, and the branch stays the branch', () => {
+  const root = plannedIn('sess-x');
+
+  assert.match(ledgerLines(root, 'orders-summary').at(-1), /, session sess-x\)$/);
+  const state = readState(root, 'orders-summary');
+  assert.equal(state.planSession, 'sess-x');
+  assert.equal(state.branch, 'b');
+  assert.equal(state.tasks.total, 2);
+  assert.equal(state.base, headOf(root));
+});
+
+test('Plan: approved with no session id is stored as before, and planSession is null', () => {
+  const root = started();
+  const out = run(root, 'add', 'Plan: approved', '--tasks', '2', '--branch', 'b');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(eventOf(ledgerLines(root, 'orders-summary').at(-1)), `Plan: approved (${headOf(root)}, 2 tasks, b)`);
+  const state = readState(root, 'orders-summary');
+  assert.equal(state.planSession, null);
+  assert.equal(state.branch, 'b');
+});
+
+test('Plan: approved --handoff stores no session, so the session picking the work up can claim it', () => {
+  const root = project();
+  assert.equal(runAs(root, 'sess-x', 'init', 'orders-summary', '--path', 'deep', '--type', 'feature').status, 0);
+  const out = runAs(root, 'sess-x', 'add', 'Plan: approved', '--tasks', '2', '--branch', 'b', '--handoff');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(eventOf(ledgerLines(root, 'orders-summary').at(-1)), `Plan: approved (${headOf(root)}, 2 tasks, b)`);
+  assert.equal(readState(root, 'orders-summary').planSession, null);
+});
+
+test('a ledger approved before decision 0190 replays to planSession null and its branch unchanged', () => {
+  const old = derive('Init: deep feature', 'Plan: approved (a1b2c3d, 2 tasks, feature/x)');
+  assert.equal(old.planSession, null);
+  assert.equal(old.branch, 'feature/x');
+
+  // A later approval wins, as it does for base.
+  const again = derive(
+    'Init: deep feature',
+    'Plan: approved (a1b2c3d, 2 tasks, feature/x, session sess-x)',
+    'Plan: approved (b2c3d4e, 2 tasks, feature/x)',
+  );
+  assert.equal(again.planSession, null);
+  assert.equal(again.base, 'b2c3d4e');
+});
+
+test('claim in the session that approved the plan exits 1, names /clear, and writes no pointer', () => {
+  const root = plannedIn('sess-x');
+  const before = sessionsSnapshot(root);
+
+  const out = runAs(root, 'sess-x', 'claim', 'orders-summary');
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout, '');
+  assert.equal(out.stderr, 'ledger: orders-summary was planned in this session — /clear, then /hodos:run orders-summary\n');
+  assert.deepEqual(sessionsSnapshot(root), before);
+});
+
+test('claim in another session than the one that approved the plan writes its pointer', () => {
+  const root = plannedIn('sess-x');
+
+  const out = runAs(root, 'sess-y', 'claim', 'orders-summary');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(readFileSync(pointer(root, 'sess-y'), 'utf8').trim(), 'orders-summary');
+});
+
+test('claim with no session id is allowed on a plan approved in a session (D6: nothing to compare)', () => {
+  const root = plannedIn('sess-x');
+
+  const out = run(root, 'claim', 'orders-summary');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(readFileSync(join(root, '.claude/hodos/active'), 'utf8').trim(), 'orders-summary');
+});
+
+test('--handoff on any line but Plan: approved exits 1 and appends nothing', () => {
+  const root = started();
+  const before = ledgerLines(root, 'orders-summary');
+
+  const out = run(root, 'add', 'Task 1: started', '--handoff');
+
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /--handoff belongs to "Plan: approved" only/);
+  assert.deepEqual(ledgerLines(root, 'orders-summary'), before);
+});
+
+test('claim on a task whose ledger cannot be read refuses with the reader’s message and writes no pointer', { skip: process.platform === 'win32' && 'chmod 0o222 does not make a file unreadable on Windows' }, () => {
+  const root = plannedIn('sess-x');
+  const file = join(root, '.claude/hodos/tasks/orders-summary/ledger.md');
+  chmodSync(file, 0o222);
+
+  const out = runAs(root, 'sess-y', 'claim', 'orders-summary');
+
+  chmodSync(file, 0o644);
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /^ledger: cannot read /);
+  assert.equal(existsSync(pointer(root, 'sess-y')), false);
+});
+
+test('claim refuses the planning session at a later phase too: a resumed S1 still holds its context', () => {
+  const root = plannedIn('sess-x');
+  assert.equal(runAs(root, 'sess-x', 'add', 'Task 1: started').status, 0);
+  assert.equal(readState(root, 'orders-summary').phase, 'execute');
+  const before = sessionsSnapshot(root);
+
+  const out = runAs(root, 'sess-x', 'claim', 'orders-summary');
+
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /was planned in this session — \/clear/);
+  assert.deepEqual(sessionsSnapshot(root), before);
+});
+
+test('claim on a ledger approved before decision 0190 behaves as before, in any session', () => {
+  const root = project();
+  assert.equal(runAs(root, 'sess-x', 'init', 'orders-summary', '--path', 'deep', '--type', 'feature').status, 0);
+  // The stored form every approval had before the session part existed.
+  appendFileSync(
+    join(root, '.claude/hodos/tasks/orders-summary/ledger.md'),
+    `${new Date().toISOString()} Plan: approved (${headOf(root)}, 2 tasks, b)\n`,
+  );
+
+  const out = runAs(root, 'sess-x', 'claim', 'orders-summary');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(readFileSync(pointer(root, 'sess-x'), 'utf8').trim(), 'orders-summary');
+});
+
+test('claim after an approval made with --handoff is allowed in the session that made it', () => {
+  const root = project();
+  assert.equal(runAs(root, 'sess-x', 'init', 'orders-summary', '--path', 'deep', '--type', 'feature').status, 0);
+  assert.equal(runAs(root, 'sess-x', 'add', 'Plan: approved', '--tasks', '2', '--branch', 'b', '--handoff').status, 0);
+
+  const out = runAs(root, 'sess-x', 'claim', 'orders-summary');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(readFileSync(pointer(root, 'sess-x'), 'utf8').trim(), 'orders-summary');
 });
 
 test('add resolves the session pointer over active', () => {
@@ -1228,4 +1566,645 @@ test('the upgrade out of inert returns the task to plan, so run stops at the mis
   // Any other upgrade leaves the phase where it was.
   const wider = derive('Init: quick feature', 'Review 1: NEEDS_WORK (0/1/0)', 'Upgrade: quick→standard — wider');
   assert.equal(wider.phase, 'fix');
+});
+
+// --- decision 0192: `next` names the step and the command that continue a task.
+
+const st = (over) => ({ slug: 'orders-summary', path: 'standard', type: 'feature', shape: null, phase: 'plan', campaign: null, branch: 'task/orders-summary', ...over });
+const FULL = {
+  brief: true, research: true, plan: true, openQuestions: false, rerouted: false, upgradedFromInert: false,
+  remote: null, remotes: 0, defaultBranch: null, done: false,
+  repo: false, branchExists: false, head: null, dirty: [], ffable: false, merged: false, pushed: false,
+  defaultAhead: 0, land: null, mapLocal: false, mapRepo: null, pluginRoot: '/plugin',
+};
+const facts = (over) => ({ ...FULL, ...over });
+
+test('nextStep answers every row of the decider table', () => {
+  const rows = [
+    // done is the landing table's, below (decision 0197)
+    [st({ phase: 'manual' }), facts(), 'manual', '/hodos:review task/orders-summary'],
+    [st({ phase: 'blocked' }), facts(), 'blocked', '/hodos:run orders-summary'],
+    ...['approved', 'execute', 'review', 'fix', 'verify', 'finish'].map((phase) => [st({ phase }), facts(), 'run', '/hodos:run orders-summary']),
+    [st(), facts({ rerouted: true }), 'reroute', '/hodos:task <the symptom, as a question or a spike>'],
+    [st(), facts({ brief: false, research: false, plan: false }), 'route', '/hodos:task orders-summary'],
+    [st({ path: 'quick', shape: 'inert' }), facts({ research: false, plan: false }), 'inert', '/hodos:task orders-summary'],
+    [st({ path: 'quick' }), facts({ research: false, upgradedFromInert: true }), 'plan', '/hodos:task orders-summary'],
+    [st({ path: 'deep' }), facts({ research: false, plan: false }), 'research', '/hodos:task orders-summary'],
+    [st(), facts({ research: false, plan: false }), 'plan', '/hodos:task orders-summary'],
+    [st(), facts({ research: false, openQuestions: true }), 'plan', '/hodos:task orders-summary'],
+    [st({ path: 'deep' }), facts(), 'approve', '/hodos:task orders-summary'],
+    [null, undefined, 'none', '/hodos:task <description>'],
+  ];
+  for (const [state, f, step, next] of rows) {
+    assert.deepEqual(nextStep(state, f), { step, next }, `${state?.phase ?? 'no task'} → ${step}`);
+  }
+});
+
+// --- decision 0197: the done answer carries the landing, built from git facts only.
+
+const B = 'task/orders-summary';
+const AFTER = '/hodos:task <description>';
+const TO_MAP = '/hodos:campaign demo';
+const WORDS = `merge ${B} into the branch it came from`;
+const NODE_DONE = `node "${join('/plugin', 'scripts', 'campaigns.mjs')}" node-done demo first --sha HEAD~1`;
+const node = { campaign: 'demo/first' };
+const origin = { remote: 'origin', remotes: 1 };
+/** A clean task branch one commit ahead of `main`, HEAD on it, no remote. */
+const repo = (over) => facts({ done: true, repo: true, branchExists: true, head: B, defaultBranch: 'main', ffable: true, ...over });
+const opt = (label, run, next = AFTER) => ({ label, run, next });
+const joined = (o) => o.run.join(' && ');
+const leave = (next) => opt('leave it', [], next);
+const asked = (options, note = null) => ({ next: joined(options[0]), land: { options: [...options, leave(joined(options[0]))], note } });
+const blocked = (next, note) => ({ next, land: { options: [leave(next)], note } });
+const toMap = (o) => ({ ...o, next: TO_MAP });
+
+const PUSH = opt(`push ${B} to origin`, [`git push -u origin ${B}`]);
+const MERGE = opt('merge into main', ['git switch main', `git merge --ff-only ${B}`]);
+const LAND = opt('land on main and push it', ['git switch main', `git merge --ff-only ${B}`, 'git push origin main']);
+const REBASE = opt('rebase onto main and merge', ['git rebase main', 'git switch main', `git merge --ff-only ${B}`]);
+const REBASE_LAND = opt('rebase onto main, land and push it', ['git rebase main', 'git switch main', `git merge --ff-only ${B}`, 'git push origin main']);
+const NODE_REBASE = opt(
+  'rebase onto main, land and push it',
+  ['git rebase main', NODE_DONE, 'git add .claude/hodos/campaigns/demo.md', 'git commit -m "{subject}"', 'git switch main', `git merge --ff-only ${B}`, 'git push origin main'],
+  TO_MAP,
+);
+const ELSEWHERE = `main moved past ${B} and the map lives in home — rebase by hand, then node-done`;
+
+const LANDING = [
+  ['a question lands nothing', st({ type: 'question', branch: null }), repo(origin), { next: AFTER, land: null }],
+  ['a question that kept a branch lands nothing either', st({ type: 'question' }), repo(origin), { next: AFTER, land: null }],
+  ['no branch', st({ branch: null }), repo(origin), { next: AFTER, land: null }],
+  ['no repository', st(), facts({ done: true }), { next: WORDS, land: null }],
+  ['no repository, a node', st(node), facts({ done: true }), { next: WORDS, land: null }],
+  ['a branch git no longer has', st(), repo({ ...origin, branchExists: false, head: 'main' }), { next: AFTER, land: null }],
+  ['a node whose branch is gone goes back to its map', st(node), repo({ branchExists: false, head: 'main' }), { next: TO_MAP, land: null }],
+  ['a spike deletes its branch', st({ type: 'spike' }), repo(origin), { next: AFTER, land: { options: [opt(`delete ${B}`, ['git switch main', `git branch -D ${B}`]), leave(AFTER)], note: null } }],
+  ['a spike with no default', st({ type: 'spike' }), repo({ defaultBranch: null }), { next: AFTER, land: { options: [leave(AFTER)], note: 'no default branch found' } }],
+  ['a spike outside a repository', st({ type: 'spike' }), facts({ done: true }), { next: AFTER, land: null }],
+  ['a spike whose branch is gone', st({ type: 'spike' }), repo({ branchExists: false, head: 'main' }), { next: AFTER, land: null }],
+  ['merged, the remote default behind', st(), repo({ ...origin, merged: true, defaultAhead: 1 }), asked([opt('push main to origin', ['git push origin main'])])],
+  ['merged, nothing to push', st(), repo({ ...origin, merged: true, defaultAhead: 0 }), { next: AFTER, land: null }],
+  ['merged, no remote', st(), repo({ merged: true, defaultAhead: 1 }), { next: AFTER, land: null }],
+  ['a merged node goes back to its map', st(node), repo({ merged: true }), { next: TO_MAP, land: null }],
+  ['HEAD on another branch', st(), repo({ ...origin, head: 'main' }), blocked(`git switch ${B}, then /hodos:run orders-summary`, `HEAD is main, not ${B}`)],
+  ['HEAD detached', st(), repo({ head: null }), blocked(`git switch ${B}, then /hodos:run orders-summary`, `HEAD is detached, not ${B}`)],
+  ['remotes, and none git pushes to', st(), repo({ remotes: 2 }), blocked(`push ${B} to its remote`, 'no remote git would push to — set remote.pushDefault')],
+  ['no remote, clean, ffable', st(), repo(), asked([MERGE])],
+  ['the same by phase, with no --done', st({ phase: 'done' }), repo({ done: false }), asked([MERGE])],
+  ['a remote, the convention unset', st(), repo(origin), asked([PUSH, LAND])],
+  ['a remote, the convention branch', st(), repo({ ...origin, land: 'branch' }), asked([PUSH, LAND])],
+  ['a remote, the convention default', st(), repo({ ...origin, land: 'default' }), asked([LAND, PUSH])],
+  ['no remote, the convention default', st(), repo({ land: 'default' }), asked([MERGE])],
+  ['the branch already pushed', st(), repo({ ...origin, pushed: true }), asked([LAND])],
+  ['the default moved, a remote', st(), repo({ ...origin, ffable: false }), asked([PUSH, REBASE_LAND])],
+  ['the default moved, no remote', st(), repo({ ffable: false }), asked([REBASE])],
+  ['a node lands, its map commit riding the fast-forward', st(node), repo({ ...origin, mapLocal: true }), asked([toMap(PUSH), toMap(LAND)])],
+  ['a node rebases and re-points its map', st(node), repo({ ...origin, land: 'default', ffable: false, mapLocal: true }), asked([NODE_REBASE, toMap(PUSH)])],
+  ['a node whose map is elsewhere does not rebase', st(node), repo({ ...origin, ffable: false, mapRepo: 'home' }), asked([toMap(PUSH)], ELSEWHERE)],
+  ['the same with the push made', st(node), repo({ ...origin, pushed: true, ffable: false, mapRepo: 'home' }), blocked(`rebase ${B} onto main by hand, then node-done in home`, ELSEWHERE)],
+  ['a node whose map is elsewhere still fast-forwards', st(node), repo({ mapRepo: 'home' }), asked([toMap(MERGE)])],
+  ['a dirty tree keeps the push', st(), repo({ ...origin, dirty: ['src/a.js'] }), asked([PUSH], 'uncommitted changes in src/a.js — merging needs a clean tree')],
+  [
+    'a dirty tree with no remote',
+    st(),
+    repo({ dirty: ['src/a.js', 'src/b.js'] }),
+    blocked('commit or stash src/a.js, src/b.js, then /hodos:run orders-summary', 'uncommitted changes in src/a.js, src/b.js — merging needs a clean tree'),
+  ],
+  [
+    'seven dirty paths are five and a count',
+    st(),
+    repo({ dirty: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }),
+    blocked('commit or stash a, b, c, d, e +2, then /hodos:run orders-summary', 'uncommitted changes in a, b, c, d, e +2 — merging needs a clean tree'),
+  ],
+  ['no default, a remote', st(), repo({ ...origin, defaultBranch: null, ffable: false }), asked([PUSH], 'no default branch found')],
+  ['no default, no remote', st(), repo({ defaultBranch: null, ffable: false }), blocked(WORDS, 'no default branch found')],
+  ['no default and dirty: both notes', st(), repo({ ...origin, defaultBranch: null, ffable: false, dirty: ['x'] }), asked([PUSH], 'uncommitted changes in x — merging needs a clean tree; no default branch found')],
+  [
+    'the remote names develop',
+    st(),
+    repo({ ...origin, defaultBranch: 'develop' }),
+    asked([PUSH, opt('land on develop and push it', ['git switch develop', `git merge --ff-only ${B}`, 'git push origin develop'])]),
+  ],
+];
+
+test('nextStep answers every row of the landing table (decision 0197)', () => {
+  for (const [name, state, f, want] of LANDING) {
+    assert.deepEqual(nextStep(state, f), { step: 'done', ...want }, name);
+  }
+});
+
+test('every landing holds the invariants: no forced or substituted command, leave last, the recommendation first', () => {
+  for (const [name, state, f] of LANDING) {
+    const { next, land } = nextStep(state, f);
+    assert.notEqual(land, undefined, `${name}: a done answer carries land`);
+    if (land === null) continue;
+    const after = state.campaign ? TO_MAP : AFTER;
+    const last = land.options.at(-1);
+    assert.deepEqual([last.label, last.run], ['leave it', []], name);
+    assert.equal(last.next, next, `${name}: leave ends on the top-level next`);
+    for (const o of land.options.slice(0, -1)) {
+      assert.equal(o.next, after, `${name}: ${o.label}`);
+      assert.ok(o.run.length >= 1 && o.run.length <= 7, `${name}: ${o.label} runs 1–7 commands`);
+      for (const line of o.run) {
+        assert.doesNotMatch(line, /--force|\s-f\b|reset|\$\(/, `${name}: ${line}`);
+        assert.match(line, /^(git |node "[^"]+campaigns\.mjs" node-done )/, `${name}: ${line}`);
+      }
+    }
+    if (land.options.length > 1) {
+      assert.notEqual(land.options[0].label, 'leave it', name);
+      if (state.type !== 'spike') assert.equal(next, joined(land.options[0]), name);
+    }
+  }
+});
+
+/** A task directory at phase plan with the S1 files given, for nextFacts to read. */
+function planned({ init = ['--path', 'standard', '--type', 'feature'], lines = [], files = {} } = {}) {
+  const root = project();
+  assert.equal(run(root, 'init', 'orders-summary', ...init).status, 0);
+  for (const line of lines) assert.equal(run(root, 'add', line).status, 0, line);
+  const dir = join(root, '.claude/hodos/tasks/orders-summary');
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
+  return root;
+}
+
+const PLAN = (open = '') => `# Plan — orders-summary\n\n## Goal\n\nx\n\n## Tasks\n\n### T1. x\n\n## Open questions\n${open}`;
+const nextOf = (root, ...args) => {
+  const out = run(root, 'next', ...args);
+  assert.equal(out.status, 0, out.stderr);
+  return JSON.parse(out.stdout);
+};
+
+test('the plan rows read the ledger and plan.md: an upgrade out of inert and an open question both mean plan', () => {
+  const inert = { init: ['--path', 'quick', '--type', 'feature', '--shape', 'inert'], files: { 'brief.md': 'b', 'plan.md': PLAN() } };
+  assert.equal(nextOf(planned(inert), 'orders-summary').step, 'approve', 'control: the same files with no upgrade');
+  const upgraded = planned({ ...inert, lines: ['Upgrade: inert→quick — the fix reads a line a program compares'] });
+  assert.equal(nextOf(upgraded, 'orders-summary').step, 'plan');
+
+  const files = { 'brief.md': 'b', 'plan.md': PLAN() };
+  assert.equal(nextOf(planned({ files }), 'orders-summary').step, 'approve', 'control: an empty section');
+  const open = planned({ files: { ...files, 'plan.md': PLAN('\n- Which fixture holds the empty cart?\n') } });
+  assert.equal(nextOf(open, 'orders-summary').step, 'plan');
+});
+
+test('the inert plan as its template writes it reads as approvable', () => {
+  const reference = readFileSync(new URL('../skills/task/references/inert.md', import.meta.url), 'utf8');
+  const template = /```markdown\n(# Plan — <slug>\n[\s\S]*?)```/.exec(reference)[1];
+  const init = ['--path', 'quick', '--type', 'feature', '--shape', 'inert'];
+  const root = planned({ init, files: { 'brief.md': 'b', 'plan.md': template } });
+  assert.equal(nextOf(root, 'orders-summary').step, 'approve');
+});
+
+const snapshot = (root) => {
+  const dir = join(root, '.claude/hodos');
+  const sessions = existsSync(join(dir, 'sessions'))
+    ? readdirSync(join(dir, 'sessions')).sort().map((n) => [n, readFileSync(join(dir, 'sessions', n), 'utf8')])
+    : null;
+  return JSON.stringify({
+    ledger: readFileSync(join(dir, 'tasks/orders-summary/ledger.md'), 'utf8'),
+    state: readFileSync(join(dir, 'tasks/orders-summary/state.json'), 'utf8'),
+    sessions,
+    active: existsSync(join(dir, 'active')),
+  });
+};
+
+test('next <slug> prints one JSON line and writes nothing', () => {
+  const root = project();
+  runAs(root, 'sess-a', 'init', 'orders-summary', '--path', 'standard', '--type', 'feature');
+  runAs(root, 'sess-a', 'add', 'Plan: approved', '--tasks', '1', '--branch', 'task/orders-summary', '--handoff');
+  const before = snapshot(root);
+  const out = runAs(root, 'sess-b', 'next', 'orders-summary');
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout.split('\n').filter((l) => l !== '').length, 1, 'one line');
+  assert.deepEqual(JSON.parse(out.stdout), { slug: 'orders-summary', step: 'run', next: '/hodos:run orders-summary' });
+  assert.equal(snapshot(root), before, 'ledger.md, state.json and sessions/ are byte-identical');
+});
+
+test('next on a slug with no task exits 1 and prints nothing on stdout', () => {
+  const out = run(project(), 'next', 'nosuch');
+  assert.equal(out.status, 1);
+  assert.equal(out.stderr.trim(), 'ledger: no task nosuch');
+  assert.equal(out.stdout, '');
+});
+
+test('next with no slug names the most recently touched task neither done nor manual', () => {
+  const root = project();
+  run(root, 'init', 'older', '--path', 'standard', '--type', 'feature');
+  run(root, 'init', 'newer', '--path', 'standard', '--type', 'feature');
+  assert.equal(nextOf(root).slug, 'newer', 'both in flight: the most recently touched');
+  run(root, 'add', 'Review 2: REJECT 1/0/0', '--slug', 'newer');
+  run(root, 'add', 'Breaker: review — manual', '--slug', 'newer');
+  assert.deepEqual(nextOf(root), { slug: 'older', step: 'route', next: '/hodos:task older' });
+
+  run(root, 'add', 'Finish: report delivered', '--slug', 'older');
+  assert.deepEqual(nextOf(root), { slug: null, step: 'none', next: '/hodos:task <description>' });
+});
+
+const CAMPAIGNS = fileURLToPath(new URL('./campaigns.mjs', import.meta.url));
+const PLUGIN_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const MAP_PATH = '.claude/hodos/campaigns/demo.md';
+const MAP_TEXT = `# Demo
+Status: active · Owners: @you
+
+## Nodes
+- [active] first — the first node · deps: — · owner: @you · branch: ${B} · ref: task:orders-summary · metric: —
+`;
+
+/**
+ * A git project whose config the developer's own cannot reach (fact 68), with
+ * HEAD on the task branch one commit ahead of `branch`. `bare` adds `origin` as
+ * a bare repository holding that default, and `map` commits `MAP_PATH` at the
+ * base. The identity is in the environment, so a command the test runs as a
+ * land option shows it commits as the kernel's would.
+ */
+function gitProject({
+  at = tempDir('hodos-next-'),
+  branch = 'main',
+  remotes = [],
+  pushDefault = null,
+  defaultBranch = null,
+  bare = false,
+  campaign = null,
+  map = false,
+  config = { version: 1 },
+} = {}) {
+  const root = at;
+  mkdirSync(join(root, '.claude', 'hodos'), { recursive: true });
+  writeFileSync(join(root, '.claude', 'hodos', 'config.json'), JSON.stringify(config));
+  const env = {
+    ...withoutSession(),
+    GIT_CONFIG_GLOBAL: join(tempDir('hodos-noconfig-'), 'none'),
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 't',
+    GIT_AUTHOR_EMAIL: 't@example.com',
+    GIT_COMMITTER_NAME: 't',
+    GIT_COMMITTER_EMAIL: 't@example.com',
+  };
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '-q', '-b', branch);
+  if (map) {
+    mkdirSync(join(root, '.claude', 'hodos', 'campaigns'), { recursive: true });
+    writeFileSync(join(root, MAP_PATH), MAP_TEXT);
+    git('add', MAP_PATH);
+  }
+  git('commit', '--allow-empty', '-q', '-m', 'base');
+  for (const name of remotes) git('remote', 'add', name, `../${name}.git`);
+  if (bare) {
+    const dir = join(tempDir('hodos-bare-'), 'origin.git');
+    git('init', '-q', '--bare', dir);
+    git('remote', 'add', 'origin', dir);
+    git('push', '-q', 'origin', branch);
+  }
+  if (pushDefault) git('config', 'remote.pushDefault', pushDefault);
+  if (defaultBranch) git('config', 'init.defaultBranch', defaultBranch);
+  git('switch', '-q', '-c', B);
+  writeFileSync(join(root, 'work.txt'), 'the work\n');
+  git('add', 'work.txt');
+  git('commit', '-q', '-m', 'feat: the work');
+  const cli = (...args) => spawnSync(process.execPath, [LEDGER, ...args], { cwd: root, encoding: 'utf8', env });
+  const init = ['init', 'orders-summary', '--path', 'standard', '--type', 'feature', ...(campaign ? ['--campaign', campaign] : [])];
+  assert.equal(cli(...init).status, 0);
+  for (const line of ['Plan: approved', 'Review 1: ACCEPT 0/0/0', 'Verify 1: PASS 3 claims, 0 skipped']) {
+    const extra = line === 'Plan: approved' ? ['--tasks', '1', '--branch', B] : [];
+    assert.equal(cli('add', line, ...extra).status, 0, line);
+  }
+  const done = () => {
+    const out = cli('next', 'orders-summary', '--done');
+    assert.equal(out.status, 0, out.stderr);
+    return JSON.parse(out.stdout);
+  };
+  return { root, git, env, done };
+}
+
+/** `main` moved by a commit the task branch does not have, HEAD back on the branch. */
+function moveMain(p) {
+  p.git('switch', '-q', 'main');
+  writeFileSync(join(p.root, 'other.txt'), 'a parallel session\n');
+  p.git('add', 'other.txt');
+  p.git('commit', '-q', '-m', 'feat: elsewhere');
+  p.git('switch', '-q', B);
+}
+
+/** The options of a done answer, asserting first that it carries them. */
+const optionsOf = (answer) => {
+  assert.ok(answer.land?.options, `a landing to ask: ${JSON.stringify(answer)}`);
+  return answer.land.options;
+};
+const labels = (answer) => optionsOf(answer).map((o) => o.label);
+const DEFAULT = { version: 1, conventions: { land: 'default' } };
+
+test('next --done names what continues a finished task: the landing, the map after it, or the words', () => {
+  const node = gitProject({ campaign: 'demo/first' });
+  assert.equal(readState(node.root, 'orders-summary').phase, 'finish');
+  assert.deepEqual(node.done(), {
+    slug: 'orders-summary',
+    step: 'done',
+    next: joined(MERGE),
+    land: { options: [toMap(MERGE), leave(joined(MERGE))], note: null },
+  });
+
+  assert.equal(gitProject({ remotes: ['origin'] }).done().next, `git push -u origin ${B}`);
+  assert.equal(gitProject().done().next, `git switch main && git merge --ff-only ${B}`);
+  assert.equal(gitProject({ branch: 'master' }).done().next, `git switch master && git merge --ff-only ${B}`);
+  assert.equal(
+    gitProject({ branch: 'trunk', defaultBranch: 'trunk' }).done().next,
+    `git switch trunk && git merge --ff-only ${B}`,
+    'init.defaultBranch, when that branch exists',
+  );
+  assert.equal(gitProject({ branch: 'trunk' }).done().next, WORDS);
+
+  const outside = gitProject();
+  rmSync(join(outside.root, '.git'), { recursive: true, force: true });
+  assert.deepEqual(outside.done(), { slug: 'orders-summary', step: 'done', next: WORDS, land: null });
+});
+
+test('next --done pushes where git pushes a new branch: remote.pushDefault, then origin, then the only remote', () => {
+  // git remote sorts the names, so backup comes first (fact 68).
+  assert.equal(gitProject({ remotes: ['origin', 'backup'] }).done().next, `git push -u origin ${B}`);
+  assert.equal(gitProject({ remotes: ['origin', 'backup'], pushDefault: 'backup' }).done().next, `git push -u backup ${B}`);
+  assert.equal(gitProject({ remotes: ['fork'] }).done().next, `git push -u fork ${B}`);
+  const none = gitProject({ remotes: ['fork', 'backup'] }).done();
+  assert.equal(none.next, `push ${B} to its remote`, 'remotes, and none git would push to: the words, never a merge');
+  assert.deepEqual(none.land, { options: [leave(`push ${B} to its remote`)], note: 'no remote git would push to — set remote.pushDefault' });
+});
+
+test('next --done over a bare remote puts the push first, and conventions.land default puts the landing first', () => {
+  const unset = gitProject({ bare: true }).done();
+  assert.deepEqual(labels(unset), [`push ${B} to origin`, 'land on main and push it', 'leave it']);
+  assert.deepEqual(optionsOf(unset)[1].run, ['git switch main', `git merge --ff-only ${B}`, 'git push origin main']);
+  assert.equal(unset.next, `git push -u origin ${B}`);
+
+  const first = gitProject({ bare: true, config: DEFAULT }).done();
+  assert.deepEqual(labels(first), ['land on main and push it', `push ${B} to origin`, 'leave it']);
+  assert.equal(first.next, `git switch main && git merge --ff-only ${B} && git push origin main`);
+});
+
+test('next --done does not offer a push already made, nor a landing already made', () => {
+  const p = gitProject({ bare: true });
+  p.git('push', '-q', '-u', 'origin', B);
+  assert.deepEqual(labels(p.done()), ['land on main and push it', 'leave it']);
+
+  p.git('switch', '-q', 'main');
+  p.git('merge', '-q', '--ff-only', B);
+  assert.deepEqual(
+    optionsOf(p.done()).map((o) => [o.label, o.run]),
+    [['push main to origin', ['git push origin main']], ['leave it', []]],
+    'landed here, the remote default behind',
+  );
+  p.git('push', '-q', 'origin', 'main');
+  assert.deepEqual(p.done(), { slug: 'orders-summary', step: 'done', next: AFTER, land: null });
+
+  const unpushed = gitProject({ remotes: ['origin'] });
+  unpushed.git('switch', '-q', 'main');
+  unpushed.git('merge', '-q', '--ff-only', B);
+  assert.deepEqual(labels(unpushed.done()), ['push main to origin', 'leave it'], 'a remote that has no main yet is behind it');
+});
+
+test('next --done with a tracked change keeps the push and names the file', () => {
+  const p = gitProject({ bare: true });
+  writeFileSync(join(p.root, 'work.txt'), 'changed\n');
+  const dirty = p.done();
+  assert.deepEqual(labels(dirty), [`push ${B} to origin`, 'leave it']);
+  assert.equal(dirty.land.note, 'uncommitted changes in work.txt — merging needs a clean tree');
+
+  const renamed = gitProject();
+  renamed.git('mv', 'work.txt', 'moved.txt');
+  assert.equal(renamed.done().land.note, 'uncommitted changes in moved.txt — merging needs a clean tree', 'a rename names its new path (fact 72)');
+});
+
+test('next --done with HEAD on another branch asks nothing, and a branch that is gone lands nothing', () => {
+  const p = gitProject();
+  p.git('switch', '-q', 'main');
+  assert.deepEqual(p.done().land, { options: [leave(`git switch ${B}, then /hodos:run orders-summary`)], note: `HEAD is main, not ${B}` });
+  p.git('branch', '-q', '-D', B);
+  assert.deepEqual(p.done(), { slug: 'orders-summary', step: 'done', next: AFTER, land: null });
+});
+
+test("next --done lands on the remote's default when a local branch carries it (D8)", () => {
+  const p = gitProject({ bare: true });
+  p.git('branch', 'develop', 'main');
+  p.git('push', '-q', 'origin', 'develop');
+  assert.equal(optionsOf(p.done())[1].run[0], 'git switch main', 'control: no origin/HEAD, so the chain names main');
+  p.git('remote', 'set-head', 'origin', 'develop');
+  assert.deepEqual(optionsOf(p.done())[1].run, ['git switch develop', `git merge --ff-only ${B}`, 'git push origin develop']);
+  p.git('branch', '-q', '-D', 'develop');
+  assert.equal(optionsOf(p.done())[1].run[0], 'git switch main', 'origin/HEAD names no local branch: the chain decides');
+});
+
+test('next --done on a node whose default moved re-points the map, and the option runs as shown (D7, D14)', () => {
+  const p = gitProject({ bare: true, campaign: 'demo/first', map: true, config: DEFAULT });
+  // finish's close: node-done at the last task commit, and the map committed on the branch
+  const close = spawnSync(process.execPath, [CAMPAIGNS, 'node-done', 'demo', 'first', '--sha', 'HEAD'], { cwd: p.root, encoding: 'utf8', env: p.env });
+  assert.equal(close.status, 0, close.stderr);
+  p.git('add', MAP_PATH);
+  p.git('commit', '-q', '-m', 'chore: first done in campaign demo');
+  moveMain(p);
+
+  const [first] = optionsOf(p.done());
+  assert.equal(first.label, 'rebase onto main, land and push it');
+  assert.deepEqual(first.run, [
+    'git rebase main',
+    `node "${join(PLUGIN_ROOT, 'scripts', 'campaigns.mjs')}" node-done demo first --sha HEAD~1`,
+    `git add ${MAP_PATH}`,
+    'git commit -m "{subject}"',
+    'git switch main',
+    `git merge --ff-only ${B}`,
+    'git push origin main',
+  ]);
+  assert.equal(first.next, TO_MAP);
+
+  // The kernel fills {subject} per conventions.commit, then runs each line verbatim.
+  for (const line of first.run.map((l) => l.replace('{subject}', 'chore: first re-pointed in campaign demo'))) {
+    const ran = spawnSync(line, { cwd: p.root, encoding: 'utf8', env: p.env, shell: true });
+    assert.equal(ran.status, 0, `${line}\n${ran.stderr}`);
+  }
+  const work = p.git('rev-parse', '--short', 'main~2').trim();
+  assert.match(readFileSync(join(p.root, MAP_PATH), 'utf8'), new RegExp(`· ref: sha:${work} ·`), 'the map names the rebased commit');
+  assert.equal(p.git('rev-parse', 'main'), p.git('rev-parse', 'origin/main'), 'main landed and pushed');
+  assert.deepEqual(p.done(), { slug: 'orders-summary', step: 'done', next: TO_MAP, land: null });
+});
+
+test('next --done on a node whose map is in another repository offers no rebase, and names that repository', () => {
+  const ws = tempDir('hodos-ws-');
+  const home = join(ws, 'home');
+  mkdirSync(join(home, '.git'), { recursive: true });
+  mkdirSync(join(home, '.claude', 'hodos', 'campaigns'), { recursive: true });
+  writeFileSync(join(home, MAP_PATH), MAP_TEXT);
+  const p = gitProject({
+    at: join(ws, 'away'),
+    bare: true,
+    campaign: 'demo/first',
+    config: { version: 1, campaigns: { external: ['../home/.claude/hodos/campaigns'] } },
+  });
+  moveMain(p);
+  const answer = p.done();
+  assert.deepEqual(labels(answer), [`push ${B} to origin`, 'leave it']);
+  assert.equal(answer.land.note, `main moved past ${B} and the map lives in home — rebase by hand, then node-done`);
+});
+
+test('next --done makes at most 10 git reads, the worst default lookup included', () => {
+  // origin/HEAD names a branch with no local copy, init.defaultBranch is unset
+  // and main is absent, so every link of the default's chain is tried.
+  const p = gitProject({ branch: 'master', bare: true });
+  p.git('branch', 'develop', 'master');
+  p.git('push', '-q', 'origin', 'develop');
+  p.git('remote', 'set-head', 'origin', 'develop');
+  p.git('branch', '-q', '-D', 'develop');
+  const reads = [];
+  const gitRead = (cwd, args) => {
+    reads.push(args.join(' '));
+    try {
+      return execFileSync('git', args, { cwd, encoding: 'utf8', env: p.env, stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      return null;
+    }
+  };
+  const dir = join(p.root, '.claude/hodos/tasks/orders-summary');
+  const got = nextFacts(dir, readState(p.root, 'orders-summary'), { done: true }, { gitRead });
+  assert.equal(got.defaultBranch, 'master');
+  assert.ok(reads.length <= 10, `${reads.length} reads:\n${reads.join('\n')}`);
+});
+
+test('next --done writes nothing', () => {
+  const p = gitProject({ bare: true });
+  const before = snapshot(p.root);
+  p.done();
+  assert.equal(snapshot(p.root), before);
+});
+
+test('next --done with no slug is a bad invocation', () => {
+  assert.equal(run(started(), 'next', '--done').status, 2);
+});
+
+test('nextFacts reads every non-zero git exit as null', () => {
+  const { root } = gitProject();
+  rmSync(join(root, '.git'), { recursive: true, force: true });
+  const dir = join(root, '.claude/hodos/tasks/orders-summary');
+  const state = readState(root, 'orders-summary');
+  const got = nextFacts(dir, state, { done: true });
+  const git = ['remote', 'remotes', 'defaultBranch', 'repo', 'branchExists', 'head', 'dirty', 'ffable', 'merged', 'pushed', 'defaultAhead'];
+  assert.deepEqual(
+    Object.fromEntries(git.map((k) => [k, got[k]])),
+    { remote: null, remotes: 0, defaultBranch: null, repo: false, branchExists: false, head: null, dirty: [], ffable: false, merged: false, pushed: false, defaultAhead: 0 },
+  );
+  assert.equal(got.done, true);
+  assert.deepEqual(
+    [got.brief, got.research, got.plan, got.openQuestions, got.rerouted, got.upgradedFromInert],
+    [false, false, false, false, false, false],
+  );
+});
+
+// --- decision 0197: /hodos:handoff asks the same way, through next --handoff <file>.
+
+const HANDOFF = '.claude/hodos/handoffs/orders-summary.md';
+const ON_THE_OTHER = '/hodos:run orders-summary on the other machine';
+const COMMIT_RUN = [`git add ${HANDOFF}`, `git commit -m "{subject}" -- ${HANDOFF}`];
+const handing = (over) => repo({ done: false, handoff: HANDOFF, ...over });
+const handed = (options, note = null) => ({ step: 'handoff', next: ON_THE_OTHER, land: { options: [...options, leave(joined(options[0]))], note } });
+
+test('nextStep answers every row of the handoff table (decision 0197)', () => {
+  const rows = [
+    [
+      'a remote: commit and push, commit, leave',
+      handing(origin),
+      handed([
+        opt('commit and push', [...COMMIT_RUN, `git push -u origin ${B}`], ON_THE_OTHER),
+        opt('commit', COMMIT_RUN, `git push -u origin ${B}, then ${ON_THE_OTHER}`),
+      ]),
+    ],
+    ['no remote: commit, leave', handing(), handed([opt('commit', COMMIT_RUN, `push ${B}, then ${ON_THE_OTHER}`)])],
+    [
+      'remotes, and none git pushes to',
+      handing({ remotes: 2 }),
+      handed([opt('commit', COMMIT_RUN, `push ${B} to its remote, then ${ON_THE_OTHER}`)], 'no remote git would push to — set remote.pushDefault'),
+    ],
+    [
+      'HEAD on another branch',
+      handing({ ...origin, head: 'main' }),
+      { step: 'handoff', next: `git switch ${B}, then /hodos:handoff orders-summary`, land: { options: [leave(`git switch ${B}, then /hodos:handoff orders-summary`)], note: `HEAD is main, not ${B}` } },
+    ],
+    ['outside a repository', facts({ handoff: HANDOFF }), { step: 'handoff', next: ON_THE_OTHER, land: null }],
+  ];
+  for (const [name, f, want] of rows) {
+    const got = nextStep(st({ phase: 'execute' }), f);
+    assert.deepEqual(got, want, name);
+    for (const o of got.land?.options ?? []) {
+      for (const line of o.run) assert.doesNotMatch(line, /--force|\s-f\b|reset|\$\(/, `${name}: ${line}`);
+    }
+  }
+});
+
+/** A project mid-task, one commit on its branch, with the handoff file written and not committed. */
+function handingProject(options) {
+  const p = gitProject(options);
+  mkdirSync(join(p.root, '.claude', 'hodos', 'handoffs'), { recursive: true });
+  writeFileSync(join(p.root, HANDOFF), '# Handoff — orders-summary\n');
+  const handoff = (...args) =>
+    spawnSync(process.execPath, [LEDGER, 'next', ...args], { cwd: p.root, encoding: 'utf8', env: p.env });
+  return { ...p, handoff };
+}
+
+test('next --handoff over a bare remote offers commit and push, commit, and leave, in that order', () => {
+  const p = handingProject({ bare: true });
+  const out = p.handoff('orders-summary', '--handoff', HANDOFF);
+  assert.equal(out.status, 0, out.stderr);
+  const answer = JSON.parse(out.stdout);
+  assert.equal(answer.step, 'handoff');
+  assert.equal(answer.next, ON_THE_OTHER);
+  assert.deepEqual(labels(answer), ['commit and push', 'commit', 'leave it']);
+  assert.deepEqual(answer.land.options[0].run, [...COMMIT_RUN, `git push -u origin ${B}`]);
+});
+
+test('next --handoff with no remote offers commit and leave, and with HEAD elsewhere only the note', () => {
+  const p = handingProject();
+  const answer = JSON.parse(p.handoff('orders-summary', '--handoff', HANDOFF).stdout);
+  assert.deepEqual(labels(answer), ['commit', 'leave it']);
+  assert.equal(answer.land.options[0].next, `push ${B}, then ${ON_THE_OTHER}`);
+
+  p.git('switch', '-q', 'main');
+  const elsewhere = JSON.parse(p.handoff('orders-summary', '--handoff', HANDOFF).stdout);
+  assert.deepEqual(elsewhere.land, {
+    options: [leave(`git switch ${B}, then /hodos:handoff orders-summary`)],
+    note: `HEAD is main, not ${B}`,
+  });
+});
+
+test('the handoff commit, run as shown, commits the file alone and leaves staged work staged (fact 74)', () => {
+  const p = handingProject();
+  writeFileSync(join(p.root, 'work.txt'), 'half done\n');
+  p.git('add', 'work.txt');
+  const [commit] = optionsOf(JSON.parse(p.handoff('orders-summary', '--handoff', HANDOFF).stdout));
+  for (const line of commit.run.map((l) => l.replace('{subject}', 'chore: hand off orders-summary'))) {
+    const ran = spawnSync(line, { cwd: p.root, encoding: 'utf8', env: p.env, shell: true });
+    assert.equal(ran.status, 0, `${line}\n${ran.stderr}`);
+  }
+  const shown = p.git('show', '--name-only', '--format=%s', 'HEAD').split('\n').filter((l) => l !== '');
+  assert.deepEqual(shown, ['chore: hand off orders-summary', HANDOFF], 'the commit holds the handoff alone');
+  assert.match(p.git('status', '--porcelain'), /^M {2}work\.txt$/m, 'the staged work is still staged');
+});
+
+test('next takes --done or --handoff, and --handoff needs a slug and a file', () => {
+  const p = handingProject();
+  assert.equal(p.handoff('orders-summary', '--done', '--handoff', HANDOFF).status, 2);
+  assert.equal(p.handoff('--handoff', HANDOFF).status, 2);
+  assert.equal(p.handoff('orders-summary', '--handoff').status, 2);
+});
+
+test('nextFacts spawns no git with git: false, and reads it for a done answer', () => {
+  const { root } = gitProject();
+  const dir = join(root, '.claude/hodos/tasks/orders-summary');
+  const state = readState(root, 'orders-summary');
+  const calls = [];
+  const gitRead = (cwd, args) => {
+    calls.push(args.join(' '));
+    return null;
+  };
+  nextFacts(dir, state, { done: true, git: false }, { gitRead });
+  assert.deepEqual(calls, []);
+  nextFacts(dir, state, { done: true }, { gitRead });
+  assert.deepEqual(calls, ['remote'], 'control: a done answer reads git, and stops at the first read that says no repository');
+});
+
+test('latestTask is null with no task in flight', () => {
+  assert.equal(latestTask(project()), null);
 });

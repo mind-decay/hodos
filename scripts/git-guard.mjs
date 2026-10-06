@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { declinedLine, findConfig, readState, resolveTask, sessionOf } from './config.mjs';
+import { declinedLine, findConfig, fixPass, readState, resolveTask, sessionOf } from './config.mjs';
 
 const USAGE = `Usage: node scripts/git-guard.mjs
 
@@ -28,7 +28,8 @@ permissionDecision (PLATFORM-NOTES.md fact 5).
 With config.gates.denyDangerousGit: denies git push --force, git commit
 --no-verify, git reset --hard, and rm -rf outside .claude/hodos/tasks/.
 With config.gates.blockCommitOnFailedReview: denies git commit while the
-active task's phase is fix.
+active task's phase is fix, until the fix pass has recorded its checks green
+with ledger.mjs add "Fix <k>: green" (decision 0195).
 
 Exit codes: 0 — always, decision on stdout when there is one.`;
 
@@ -124,14 +125,18 @@ function subcommandOf(rest) {
 /**
  * The reason to deny `tokens`, or null. `tokens` start at the command name.
  * `underTasks` decides whether an rm path is inside the task directory.
+ * `green` is whether the fix pass recorded its checks green, and `pass` its k.
  */
-export function denyReason(tokens, { dangerous, blockCommit, phase, underTasks }) {
+export function denyReason(tokens, { dangerous, blockCommit, phase, green, pass, underTasks }) {
   const [command, ...rest] = tokens;
 
   if (command === 'git') {
     const subcommand = subcommandOf(rest);
-    if (blockCommit && subcommand === 'commit' && phase === 'fix') {
-      return 'git commit is denied while the task is in fix: the review found blockers, and the fix commit comes after they are addressed (gates.blockCommitOnFailedReview).';
+    // The fix pass commits while the phase is still fix, so the gate waits for
+    // the line that says its checks ran green, not for the phase to move
+    // (decision 0195).
+    if (blockCommit && subcommand === 'commit' && phase === 'fix' && !green) {
+      return `git commit is denied in fix until the pass's checks are green: run them, record ledger.mjs add "Fix ${pass}: green", then commit (gates.blockCommitOnFailedReview, decision 0195).`;
     }
     if (!dangerous) return null;
     // Exact tokens, not a prefix: --force-with-lease is the form git provides
@@ -173,15 +178,17 @@ function readStdin() {
 }
 
 /**
- * `{ phase, others }`: the phase of the task this session is on — the
- * session's, not the project's, because `blockCommitOnFailedReview` used to
+ * `{ phase, green, pass, others }`: the phase of the task this session is on —
+ * the session's, not the project's, because `blockCommitOnFailedReview` used to
  * deny a commit on whatever task `active` happened to name (decision 0047) —
- * and how many other sessions hold a task, which is what the line saying why
- * the gate stayed open counts (decision 0171).
+ * whether its fix pass recorded `Fix <k>: green`, that pass's `k`, and how many
+ * other sessions hold a task, which is what the line saying why the gate stayed
+ * open counts (decision 0171).
  */
 function activePhase(projectRoot, payload) {
   const { slug, others } = resolveTask(projectRoot, sessionOf(payload));
-  return { phase: slug ? (readState(projectRoot, slug)?.phase ?? null) : null, others };
+  const state = slug ? readState(projectRoot, slug) : null;
+  return { phase: state?.phase ?? null, green: state?.fixGreen != null, pass: state ? fixPass(state).iteration : 1, others };
 }
 
 function main() {
@@ -209,12 +216,12 @@ function main() {
     const rel = relative(tasksDir, abs).split(sep).join('/');
     return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
   };
-  const { phase, others } = blockCommit ? activePhase(found.projectRoot, payload) : { phase: null, others: 0 };
+  const { phase, green, pass, others } = blockCommit ? activePhase(found.projectRoot, payload) : { phase: null, others: 0 };
 
   for (const segment of segments(command)) {
     const tokens = stripAssignments(words(segment));
     if (tokens.length === 0) continue;
-    const reason = denyReason(tokens, { dangerous, blockCommit, phase, underTasks });
+    const reason = denyReason(tokens, { dangerous, blockCommit, phase, green, pass, underTasks });
     if (reason) {
       process.stdout.write(
         `${JSON.stringify({

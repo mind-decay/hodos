@@ -61,8 +61,11 @@ Read `review.md` and print, in the chat:
 2. Every blocker and major, one line each: `<severity> · <file>:<line> — <finding> → <fix>`.
 3. The reviewer's Coverage line verbatim, including what it did not read. A package of a mechanical change or a generated file leaves things out by design, and the developer needs to know which.
 4. The path to `review.md`, so it can be kept, pasted into a merge request, or thrown away with the temporary directory.
+5. One `Next:` line: `/hodos:task <the first blocker or major, as its description>` where there is one, and otherwise `attach <the review.md path> to the merge request` (decision **0191**).
 
 Minors go in a count, not a list, unless the developer asks for them.
+
+A reviewer that reached its turn bound returns no verdict line. Say so, and print `review.partial.md`'s PARTIAL line, its blockers and majors so far, and its Coverage line where the file exists, then `Next: /hodos:review <the same target>` — a fresh reviewer, and `maxTurns` in `agents/hodos-reviewer.md` raised first if the diff is large (decision **0196**).
 
 ## 4. What this run does not do
 
@@ -72,7 +75,7 @@ No ledger line is written, no `history.jsonl` entry, and no rate this reports fe
 
 ## Completion
 
-A verdict printed with its blockers and majors, the Coverage line, and the path to `review.md`. `git status` is what it was before the run, and `.claude/hodos/tasks/` holds exactly the directories it held.
+A verdict printed with its blockers and majors, the Coverage line, and the path to `review.md` — or, at the reviewer's turn bound, the stop with what its partial holds. `git status` is what it was before the run, and `.claude/hodos/tasks/` holds exactly the directories it held.
 
 ## Anti-pattern
 

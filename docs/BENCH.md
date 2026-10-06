@@ -29,6 +29,7 @@ node bench/router/run.mjs --check-labels
 node bench/review/run.mjs --check-key
 node bench/holdout/run.mjs --check-key
 node bench/noop/run.mjs   --check-scenarios
+node bench/ux/run.mjs     # the UX audit: an inventory, not a bench (below)
 
 # the scored runs — these call the model
 node bench/router/invoke.mjs --out <dir> --concurrency 5
@@ -355,6 +356,34 @@ and a measurement may not take its own sample from the treatment (decision
 the header states. `node --test bench/scripts/assert-audit.test.mjs` is its
 nineteen cases; twenty mutants die against them, and the two that survive are
 argued equivalent in `docs/stages/12c1-report.md` rather than fitted with a test.
+
+## The UX audit — `bench/ux/`
+
+**Question.** Where does a developer meet hodos, and which of those places are
+broken?
+
+Not a bench: it calls no model and runs no engine script, so it has no arms to
+compare, no `report.json`, and neither gate nor measurement. Like the instrument
+above it scores nothing. What it reads is the engine's own text.
+`bench/ux/scenarios.json` inventories every touchpoint, which is a journey
+crossed with an exit, a gate, a printed message or a proposal. Its findings
+are scored against a ten-item rubric drawn from four cited sources (decision
+**0188**).
+
+```
+node bench/ux/run.mjs            # every scenario resolves — runs in npm test
+node bench/ux/run.mjs --report   # the findings by owner node, worst first
+node bench/ux/run.mjs --count    # the broken scenarios, one number
+```
+
+A finding is open, fixed or judged. Its `fixedWhen` regex reads one section of
+an engine file and states a property a binding row of the `hodos-ux` map
+already states. A finding no regex can settle is judged and never counted, so
+`--count` falls only when the engine changes. That number is the campaign's
+third done-metric. An open or judged finding's evidence line must occur exactly
+once, so an engine edit that moves it fails `npm test`. Every skill, agent,
+hook file and script is a scenario's or is exempt with a reason. The format and
+the rubric's sources are `bench/ux/README.md`.
 
 ## What every run here is exposed to
 

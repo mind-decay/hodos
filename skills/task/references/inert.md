@@ -37,7 +37,6 @@ Files: <every file the edit touches>
 Acceptance: `commands.test` and `commands.lint` green; <what the text says afterwards>
 
 ## Open questions
-(empty)
 ```
 
 The plan has no `## Decisions`, no `## Design` and no `## Verify plan`, because the shape leaves them nothing to hold. There is one task per commit, and an inert change is nearly always one task.
@@ -76,7 +75,7 @@ A review `major` on the shape, meaning an edited line that a program reads, goes
 
 ## 6. Finish
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/run/references/finish.md` and run it. The shape has no `verify.md`. The Outcome's `Verify:` line and the report's `Verify:` field both read `— inert: commands.test and commands.lint green, evidence/<files>`, and there is no claim feedback and no pin. `Finish: report delivered` writes the history line with its `shape`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/run/references/finish.md` and run it, then `${CLAUDE_PLUGIN_ROOT}/skills/run/references/land.md`, which asks the landing and prints `Next:`. The shape has no `verify.md`. The Outcome's `Verify:` line and the report's `Verify:` field both read `— inert: commands.test and commands.lint green, evidence/<files>`, and there is no claim feedback and no pin. `Finish: report delivered` writes the history line with its `shape`.
 
 ## 7. The ratchet
 

@@ -64,7 +64,7 @@ node bench/review/invoke.mjs --out <dir>                   # calls the model
 
 `docs/BENCH.md` says what each number is, which of them are gates and which are measurements, and what none of them prove. Read it before quoting one.
 
-Every script is zero-dependency Node `.mjs` with `node:test` tests beside it, and the test is written **before** the implementation: the failing run is part of what a change is judged on. There is no bash and no Python in the engine.
+Every script is zero-dependency Node `.mjs` with `node:test` tests beside it, and the test is written **before** the implementation: the failing run is part of what a change is judged on. There is no bash and no Python in the engine. The one file that runs outside Node is `hooks/state-row.mjs`, which Claude Code loads with no Node: it imports nothing and spawns a tested script (decision 0202).
 
 ## When it is a decision, not a change
 

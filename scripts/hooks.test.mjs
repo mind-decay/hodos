@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './temp-dir.mjs';
+import { collectRoots, ROOTS } from './run-tests.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MANIFEST = JSON.parse(readFileSync(join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
@@ -60,6 +61,18 @@ test('every script a hook names exists', () => {
     const rel = hook.args[0].replace('${CLAUDE_PLUGIN_ROOT}/', '');
     assert.ok(existsSync(join(ROOT, rel)), rel);
   }
+});
+
+// The one hooks module, beside the six entries rather than among them: the
+// engine loads it with no Node (decision 0202).
+test('the manifest lists one module, the state row, and the file exists', () => {
+  assert.deepEqual(MANIFEST.modules, ['./state-row.mjs']);
+  assert.ok(existsSync(join(ROOT, 'hooks', 'state-row.mjs')));
+});
+
+test("npm test runs the module's test: hooks is a root, and the collector lists the file", () => {
+  assert.ok(ROOTS.includes('hooks'), ROOTS.join(', '));
+  assert.ok(collectRoots(ROOT, ROOTS).includes(join(ROOT, 'hooks', 'state-row.test.mjs')));
 });
 
 test('in a project with no config every hook is silent, exits 0, and is quick', () => {

@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { declinedLine, findConfig, hodosDir, readState, resolveTask, sessionOf } from './config.mjs';
+import { declinedLine, findConfig, fixPass, hodosDir, readState, resolveTask, sessionOf } from './config.mjs';
 
 const BLOCK_LIMIT = 6; // Claude Code overrides at 8 (PLATFORM-NOTES.md fact 6)
 const OPEN_PHASES = ['execute', 'review', 'fix', 'verify'];
@@ -43,11 +43,8 @@ export function openItem(state) {
       return `Review ${(state.review?.iteration ?? 0) + 1}`;
     case 'verify':
       return `Verify ${(state.verify?.iteration ?? 0) + 1}`;
-    case 'fix': {
-      const kind = String(state.lastEvent ?? '').startsWith('Verify') ? 'verify' : 'review';
-      const iteration = kind === 'verify' ? state.verify?.iteration : state.review?.iteration;
-      return `Fix ${iteration ?? 1}`;
-    }
+    case 'fix':
+      return `Fix ${fixPass(state).iteration}`;
     default:
       return null;
   }

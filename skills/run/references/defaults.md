@@ -57,16 +57,16 @@ Four sentences that mean the walk is being talked out of a cut. Each is answered
 One line per cut, to the transcript:
 
 ```
-L<line>: <tag> <what>. <replacement>.
+line <n>: <printed form> <what>. <replacement>.
 ```
 
-`<tag>` is one of `delete`, `stdlib`, `native`, `yagni`, `shrink`. Prefix the line with the file when the diff spans more than one. Close the pass with:
+The tag is the rung the pass names to itself, and the line prints its plain form: `delete` removed · `stdlib` standard library instead · `native` built-in instead · `yagni` not needed yet · `shrink` shortened (decision **0199**). Prefix the line with the file when the diff spans more than one. Close the pass with:
 
 ```
-net: -<N> lines
+<N> lines shorter
 ```
 
-or with `Lean already.` when the walk cut nothing. The count is descriptive: hodos values a readable diff, not a short one, and no threshold reads this number.
+or with `Nothing to simplify.` when the walk cut nothing. The count is descriptive: hodos values a readable diff, not a short one, and no threshold reads this number.
 
 A cut declined because the simpler form is correct but bounded is recorded in the code, on its own comment line, in the project's comment syntax:
 
@@ -88,7 +88,7 @@ A row is nominated for **retirement** when no finding cites it across a task set
 
 ## Completion
 
-Every hunk of the diff has been down the ladder once, and the pass has emitted either its cut lines and a `net:` line or `Lean already.`
+Every hunk of the diff has been down the ladder once, and the pass has emitted either its cut lines and a `lines shorter` line or `Nothing to simplify.`
 
 ## Anti-pattern
 

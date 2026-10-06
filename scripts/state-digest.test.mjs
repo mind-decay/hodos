@@ -7,7 +7,7 @@ import { basename, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { digest, compactLine } from './state-digest.mjs';
+import { digest, compactLine, nextOverall } from './state-digest.mjs';
 import { tempDir } from './temp-dir.mjs';
 import { findConfig } from './config.mjs';
 
@@ -64,8 +64,39 @@ test('one active task prints the two lines of FORMATS.md §12, under the cap', (
     lines[1],
     '- orders-summary [execute] last: "Task 1: done (d4e5f6a)" — resume with /hodos:run orders-summary',
   );
-  assert.equal(lines.length, 2, 'no campaign line before campaigns.mjs exists (Stage 9)');
+  assert.equal(lines.length, 2, 'no campaign row in a project with no map');
   assert.ok(out.stdout.length <= CAP_CHARS, `${out.stdout.length} chars`);
+});
+
+// Decision 0192: the command after `resume with` is the one `ledger.mjs next` names.
+
+test('a task at plan resumes with /hodos:task, which continues S1', () => {
+  const root = project();
+  task(root, 'users-export', { phase: 'plan', lastEvent: 'Init: standard feature' });
+
+  assert.match(run(root).stdout, /^- users-export \[plan\] last: "Init: standard feature" — resume with \/hodos:task users-export$/m);
+});
+
+test('a bug ruled not reproducible resumes with a re-route, read from its ledger', () => {
+  const root = project();
+  const ruling = 'Ruling: not reproducible here — three commands stayed green — a re-route if wrong';
+  task(root, 'users-export', { phase: 'plan', type: 'bug', lastEvent: ruling });
+
+  assert.match(run(root).stdout, /— resume with \/hodos:task <the symptom, as a question or a spike>$/m);
+});
+
+test('a task at manual resumes with a review of its branch', () => {
+  const root = project();
+  task(root, 'users-export', { phase: 'manual', branch: 'task/users-export', lastEvent: 'Breaker: review — manual' });
+
+  assert.match(run(root).stdout, /^- users-export \[manual\] last: "Breaker: review — manual" — resume with \/hodos:review task\/users-export$/m);
+});
+
+test('a blocked task resumes with /hodos:run, which asks its question', () => {
+  const root = project();
+  task(root, 'users-export', { phase: 'blocked', lastEvent: 'Task 1: blocked — q' });
+
+  assert.match(run(root).stdout, /^- users-export \[blocked\] last: "Task 1: blocked — q" — resume with \/hodos:run users-export$/m);
 });
 
 test('a task older than staleDays is counted and named as stale', () => {
@@ -104,7 +135,7 @@ test('the bare digest stays under the cap and points at status for the rest', ()
   assert.ok(bare.length <= CAP_CHARS, `${bare.length} chars`);
   assert.match(bare, /- … and \d+ more — \/hodos:status$/m);
   assert.ok(full.length > CAP_CHARS, 'the full digest is uncapped');
-  assert.equal(full.trimEnd().split('\n').length, 31);
+  assert.equal(full.trimEnd().split('\n\n')[0].split('\n').length, 31);
 });
 
 test('--compact prints the active task ledger path and the resume instruction', () => {
@@ -125,6 +156,77 @@ test('--compact with no active task prints nothing', () => {
   assert.equal(compactLine(findConfig(root)), '');
 });
 
+// ── The chat line (decision 0200) ──────────────────────────────────────────
+// The language the developer is speaking, from the task the next step ranks
+// first, under the header and outside the row budget.
+
+const chatOf = (lang, files) =>
+  `- chat: the developer reads ${lang} — commands, slugs and paths are English, files are written in ${files}`;
+
+test('the session\'s task with chat ru puts the chat line second, naming config.language', () => {
+  const root = project({ language: 'en' });
+  task(root, 'orders-summary', { chat: 'ru' });
+  setActive(root, 'orders-summary');
+
+  assert.equal(run(root).stdout.split('\n')[1], chatOf('ru', 'en'));
+});
+
+test('the files clause is config.language, and en when the config has none', () => {
+  const ru = project({ language: 'ru' });
+  task(ru, 'orders-summary', { chat: 'ru' });
+  setActive(ru, 'orders-summary');
+  assert.equal(run(ru).stdout.split('\n')[1], chatOf('ru', 'ru'));
+
+  const none = project();
+  task(none, 'orders-summary', { chat: 'ru' });
+  setActive(none, 'orders-summary');
+  assert.equal(run(none).stdout.split('\n')[1], chatOf('ru', 'en'));
+});
+
+test('no chat line for chat en, chat null, no task, or a task at done', () => {
+  for (const [name, state] of [['en', { chat: 'en' }], ['null', { chat: null }], ['done', { chat: 'ru', phase: 'done' }]]) {
+    const root = project();
+    task(root, 'orders-summary', state);
+    setActive(root, 'orders-summary');
+    assert.doesNotMatch(run(root).stdout, /^- chat:/m, name);
+  }
+  assert.doesNotMatch(run(project()).stdout, /^- chat:/m, 'no task');
+});
+
+test('with no session task, the chat line follows the open task updated last', () => {
+  const root = project();
+  task(root, 'a-older', { chat: 'ru', updatedAt: '2026-10-05T09:00:00.000Z' });
+  task(root, 'b-newer', { chat: 'de', updatedAt: '2026-10-05T11:00:00.000Z' });
+
+  assert.equal(run(root).stdout.split('\n')[1], chatOf('de', 'en'));
+});
+
+test('the chat line survives a cap that drops rows, and the digest stays under it', () => {
+  const root = project();
+  // Rows shorter than the chat line leave less room under the cap than the
+  // line takes, so a budget that does not count the line overflows it.
+  for (let i = 0; i < 30; i += 1) task(root, `task-${i}`, {});
+  task(root, 'orders-summary', { chat: 'ru' });
+  setActive(root, 'orders-summary');
+  const bare = run(root).stdout;
+
+  assert.equal(bare.split('\n')[1], chatOf('ru', 'en'));
+  assert.match(bare, /- … and \d+ more — \/hodos:status$/m);
+  assert.ok(bare.length <= CAP_CHARS, `${bare.length} chars`);
+});
+
+test('--full carries the chat line under the header, and --compact after the ledger line', () => {
+  const root = project();
+  task(root, 'orders-summary', { chat: 'ru' });
+  setActive(root, 'orders-summary');
+
+  assert.equal(run(root, '--full').stdout.split('\n')[1], chatOf('ru', 'en'));
+  assert.equal(
+    compactLine(findConfig(root)),
+    `hodos: orders-summary — ledger .claude/hodos/tasks/orders-summary/ledger.md — continue from the first open line\n${chatOf('ru', 'en')}`,
+  );
+});
+
 test('digest of a notFound config is empty', () => {
   assert.equal(digest({ notFound: true }), '');
 });
@@ -137,7 +239,7 @@ test('--help exits 0, an unknown option exits 2', () => {
 // --- campaigns (FORMATS.md §12, Stage 9a)
 
 /** A map with one ready node, one blocked, one fog — the digest's example shape. */
-function campaign(root, slug, { ready = 1, blocked = 1, fog = 1 } = {}) {
+function campaign(root, slug, { ready = 1, blocked = 1, fog = 1, done = 0 } = {}) {
   const dir = join(root, '.claude', 'hodos', 'campaigns');
   mkdirSync(dir, { recursive: true });
   const node = (status, n) => `- [${status}] ${status}-${n} — ${status} node ${n} · deps: — · owner: — · branch: — · ref: — · metric: —`;
@@ -145,6 +247,7 @@ function campaign(root, slug, { ready = 1, blocked = 1, fog = 1 } = {}) {
     ...Array.from({ length: ready }, (_, i) => node('ready', i)),
     ...Array.from({ length: blocked }, (_, i) => node('blocked', i)),
     ...Array.from({ length: fog }, (_, i) => node('fog', i)),
+    ...Array.from({ length: done }, (_, i) => node('done', i)),
   ];
   writeFileSync(join(dir, `${slug}.md`), `# ${slug}\nStatus: active · Owners: @you\n\n## Nodes\n${nodes.join('\n')}\n\n## Waits\n- the backend — @them, asked 2026-08-27\n`);
 }
@@ -155,10 +258,46 @@ test('the digest counts the campaigns and prints their frontiers (FORMATS.md §1
   campaign(root, 'mui-cleanup', { ready: 2, blocked: 0, fog: 0 });
   const text = digest(findConfig(root));
   assert.match(text, /· 2 campaigns/);
-  assert.match(text, /^- campaigns: mui-cleanup — frontier 2 ready · state-migration — frontier 1 ready \/ 1 blocked \/ 1 fog$/m);
+  // One row per map, in slug order, each ending on its own command: the task
+  // rows' shape, and the cap drops one map at a time (decision 0198).
+  assert.deepEqual(text.split('\n').filter((line) => line.startsWith('- campaign')), [
+    '- campaign mui-cleanup — frontier 2 ready — advance with /hodos:campaign mui-cleanup',
+    '- campaign state-migration — frontier 1 ready / 1 blocked / 1 fog — advance with /hodos:campaign state-migration',
+  ]);
 });
 
-test('a project with no maps has no campaign line', () => {
+test('one map is one row that ends on the command that advances it', () => {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready: 2, blocked: 0, fog: 1 });
+
+  assert.match(
+    digest(findConfig(root)),
+    /^- campaign badge-rollout — frontier 2 ready \/ 1 fog — advance with \/hodos:campaign badge-rollout$/m,
+  );
+});
+
+test('a map with nothing open still names the command that advances it', () => {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready: 0, blocked: 0, fog: 0, done: 2 });
+
+  assert.match(
+    digest(findConfig(root)),
+    /^- campaign badge-rollout — frontier nothing open — advance with \/hodos:campaign badge-rollout$/m,
+  );
+});
+
+test('a ready node whose dependency is open counts as waiting in the row (decision 0199)', () => {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready: 2, blocked: 0, fog: 0 });
+  const path = join(root, '.claude', 'hodos', 'campaigns', 'badge-rollout.md');
+  writeFileSync(path, readFileSync(path, 'utf8').replace('ready node 1 · deps: —', 'ready node 1 · deps: ready-0'));
+
+  const text = digest(findConfig(root));
+  assert.match(text, /^- campaign badge-rollout — frontier 1 ready \/ 1 waiting — advance with \/hodos:campaign badge-rollout$/m);
+  assert.doesNotMatch(text, /held/);
+});
+
+test('a project with no maps has no campaign row', () => {
   const text = digest(findConfig(project()));
   assert.doesNotMatch(text, /campaign/);
 });
@@ -191,7 +330,7 @@ test("a map in another repository is a row of this project's digest", () => {
   campaign(home, 'badge-rollout', { ready: 2, blocked: 0, fog: 1 });
 
   const text = digest(findConfig(away), { full: true });
-  assert.match(text, /- campaigns: badge-rollout — frontier 2 ready \/ 1 fog/);
+  assert.match(text, /^- campaign badge-rollout — frontier 2 ready \/ 1 fog — advance with \/hodos:campaign badge-rollout$/m);
   assert.match(text, /^badge-rollout: 2 ready \/ 0 blocked \/ 1 fog$/m);
 });
 
@@ -220,15 +359,142 @@ test('a node another branch holds is a claimed segment of the row (decision 0135
   git('checkout', '--quiet', 'main');
 
   const text = digest(findConfig(root), { full: true });
-  assert.match(text, /- campaigns: badge-rollout — frontier 1 ready \/ 1 claimed/);
+  assert.match(text, /^- campaign badge-rollout — frontier 1 ready \/ 1 claimed — advance with \/hodos:campaign badge-rollout$/m);
   assert.match(text, /^claimed: ready-1 — ready node 1 · owner: @ada · branch: feature\/ready-1$/m);
 });
 
-test('the campaign line stays inside the digest cap', () => {
+test('the campaign rows stay inside the digest cap, which drops a map row whole and counts it', () => {
   const root = project();
   for (let i = 0; i < 12; i += 1) campaign(root, `campaign-number-${i}`, { ready: 3, blocked: 2, fog: 4 });
   const text = digest(findConfig(root));
   assert.ok(text.length <= CAP_CHARS, `digest is ${text.length} chars, cap ${CAP_CHARS}`);
+
+  const lines = text.split('\n');
+  const rows = lines.filter((line) => line.startsWith('- campaign'));
+  assert.ok(rows.length > 0 && rows.length < 12, text);
+  for (const row of rows) {
+    assert.match(row, /^- campaign (campaign-number-\d+) — frontier 3 ready \/ 2 blocked \/ 4 fog — advance with \/hodos:campaign \1$/);
+  }
+  assert.equal(lines.at(-1), `- … and ${12 - rows.length} more — /hodos:status`);
+  assert.equal(lines.length, 1 + rows.length + 1, text);
+});
+
+// ── The one Next: of --full (decision 0198) ────────────────────────────────
+// The ranking is pure, so each tier is a claim on objects; the CLI cases below
+// hold where the line lands.
+
+const open = (slug, phase = 'execute', updatedAt = '2026-10-05T10:00:00.000Z') =>
+  ({ slug, state: { slug, phase, updatedAt }, resume: `/hodos:run ${slug}` });
+const aged = (slug, phase = 'execute', ageDays = 21) =>
+  ({ ...open(slug, phase), ageDays });
+const map = (slug, ready = 0, status = 'active') =>
+  ({ slug, status, f: { ready: Array.from({ length: ready }, (_, i) => ({ name: `n${i}` })) } });
+const facts = (over = {}) => ({ session: null, active: [], stale: [], maps: [], ...over });
+
+test('tier session: this session\'s task wins, even over a task updated later', () => {
+  const later = open('orders-summary', 'review', '2026-10-05T12:00:00.000Z');
+  assert.deepEqual(nextOverall(facts({ session: 'users-export', active: [open('users-export'), later] })), {
+    next: '/hodos:run users-export',
+    why: "users-export is this session's task, at execute",
+    subject: 'users-export execute',
+  });
+});
+
+test('tier session: the session\'s task ranks first while it is stale too', () => {
+  const out = nextOverall(facts({ session: 'users-export', active: [open('orders-summary')], stale: [aged('users-export')] }));
+  assert.deepEqual(out, { next: '/hodos:run users-export', why: "users-export is this session's task, at execute", subject: 'users-export execute' });
+});
+
+test('tier active: with no pointer, the open task updated last', () => {
+  const out = nextOverall(facts({
+    active: [open('a-older', 'execute', '2026-10-05T09:00:00.000Z'), open('b-newer', 'review', '2026-10-05T11:00:00.000Z'), open('c-old', 'plan', '2026-10-04T09:00:00.000Z')],
+  }));
+  assert.deepEqual(out, { next: '/hodos:run b-newer', why: 'b-newer is the open task updated last, at review', subject: 'b-newer review' });
+});
+
+test('tier active: an open task beats a map with ready nodes', () => {
+  const out = nextOverall(facts({ active: [open('users-export')], maps: [map('badge-rollout', 2)] }));
+  assert.equal(out.next, '/hodos:run users-export');
+});
+
+test('tier ready-map: the first map with a ready node, in digest order', () => {
+  const out = nextOverall(facts({ maps: [map('a-waiting', 0), map('badge-rollout', 2), map('cart', 1)] }));
+  assert.deepEqual(out, { next: '/hodos:campaign badge-rollout', why: 'badge-rollout has 2 ready nodes', subject: 'badge-rollout' });
+  assert.equal(nextOverall(facts({ maps: [map('cart', 1)] })).why, 'cart has 1 ready node');
+});
+
+test('tier ready-map: a map with ready nodes beats a stale task', () => {
+  const out = nextOverall(facts({ stale: [aged('users-export')], maps: [map('badge-rollout', 2)] }));
+  assert.equal(out.next, '/hodos:campaign badge-rollout');
+});
+
+test('tier stale: the first stale task not at done, with its own resume', () => {
+  const out = nextOverall(facts({ stale: [aged('a-done', 'done', 40), aged('users-export', 'manual', 21)] }));
+  assert.deepEqual(out, { next: '/hodos:run users-export', why: 'users-export has been open 21 days', subject: 'users-export manual' });
+});
+
+test('tier stale: a stale task beats a map with no ready node', () => {
+  const out = nextOverall(facts({ stale: [aged('users-export')], maps: [map('badge-rollout', 0)] }));
+  assert.equal(out.next, '/hodos:run users-export');
+});
+
+test('tier open-map: a map with no ready node is still named, so the stall is said', () => {
+  assert.deepEqual(nextOverall(facts({ maps: [map('badge-rollout', 0)] })), {
+    next: '/hodos:campaign badge-rollout',
+    why: 'badge-rollout has no ready node — advancing it names the wait',
+    subject: 'badge-rollout',
+  });
+});
+
+test('tier none: no open task and no open campaign starts a task', () => {
+  assert.deepEqual(nextOverall(facts()), {
+    next: '/hodos:task <description>',
+    why: 'no open task and no open campaign',
+    subject: null,
+  });
+});
+
+test('a session pointer to a done task falls through to the open task updated last', () => {
+  const out = nextOverall(facts({ session: 'shipped', stale: [aged('shipped', 'done', 20)], active: [open('users-export')] }));
+  assert.deepEqual(out, { next: '/hodos:run users-export', why: 'users-export is the open task updated last, at execute', subject: 'users-export execute' });
+});
+
+test('a map whose header says Status: done is never ranked, ready nodes or not', () => {
+  const closed = map('closed-one', 2, 'done');
+  assert.equal(nextOverall(facts({ maps: [closed, map('badge-rollout', 0)] })).next, '/hodos:campaign badge-rollout');
+  assert.equal(nextOverall(facts({ maps: [closed] })).next, '/hodos:task <description>');
+});
+
+test('a stale task at done is passed over by the stale tier', () => {
+  assert.equal(nextOverall(facts({ stale: [aged('shipped', 'done', 30)] })).next, '/hodos:task <description>');
+});
+
+test('--full ends on exactly one Next: line, and the bare digest prints none', () => {
+  const root = project();
+  campaign(root, 'badge-rollout', { ready: 2, blocked: 0, fog: 0 });
+  const full = run(root, '--full').stdout.trimEnd().split('\n');
+  const bare = run(root).stdout;
+
+  assert.equal(full.at(-1), 'Next: /hodos:campaign badge-rollout — badge-rollout has 2 ready nodes');
+  assert.equal(full.filter((line) => line.startsWith('Next:')).length, 1);
+  assert.doesNotMatch(bare, /^Next:/m);
+});
+
+test('the bare digest states and never instructs, whatever it holds', () => {
+  const root = project();
+  task(root, 'users-export', { phase: 'execute', lastEvent: 'Task 1: started' });
+  task(root, 'orders-summary', { phase: 'plan' }, 21);
+  campaign(root, 'badge-rollout');
+  setActive(root, 'users-export');
+
+  assert.doesNotMatch(run(root).stdout, /^Next:/m);
+  assert.match(run(root, '--full').stdout.trimEnd(), /\nNext: \/hodos:run users-export — users-export is this session's task, at execute$/);
+});
+
+test('with no config, --full prints nothing, and no Next: either', () => {
+  const out = run(tempDir('hodos-nodigest-'), '--full');
+  assert.equal(out.status, 0);
+  assert.equal(out.stdout, '');
 });
 
 // ── The fetch (decisions 0080, 0138) ───────────────────────────────────────
@@ -282,7 +548,7 @@ test('--fetch updates the refs, changes nothing else, and the claim is reported'
 
   assert.equal(out.status, 0);
   assert.match(out.stdout, /claimed: ready-1 — ready node 1 · owner: @ada · branch: feature\/ready-1/);
-  assert.match(out.stdout, /- campaigns: badge-rollout — frontier 1 ready \/ 1 claimed/);
+  assert.match(out.stdout, /^- campaign badge-rollout — frontier 1 ready \/ 1 claimed — advance with \/hodos:campaign badge-rollout$/m);
   assert.doesNotMatch(out.stdout, /fetch failed/);
 
   assert.notEqual(refs(), before);
@@ -296,12 +562,18 @@ test('--fetch updates the refs, changes nothing else, and the claim is reported'
 
 test('a fetch that cannot run says the map is as of the last pull, and reports it anyway', () => {
   const { root, bare } = withOrigin();
+  campaign(root, 'cart-redesign', { ready: 1, blocked: 0, fog: 0 });
   rmSync(bare, { recursive: true, force: true });
   const out = run(root, '--full', '--fetch');
 
   assert.equal(out.status, 0);
   assert.match(out.stdout, /^- fetch failed — the map is as of your last pull/m);
-  assert.match(out.stdout, /- campaigns: badge-rollout — frontier 2 ready/);
+  assert.match(out.stdout, /^- campaign badge-rollout — frontier 2 ready — advance with \/hodos:campaign badge-rollout$/m);
+  // A caveat on what the campaign rows say, so it sits right above the first.
+  const lines = out.stdout.split('\n');
+  const fetchRow = lines.findIndex((line) => line.startsWith('- fetch failed'));
+  assert.equal(lines.findIndex((line) => line.startsWith('- campaign')), fetchRow + 1, out.stdout);
+  assert.equal(lines[fetchRow + 1], '- campaign badge-rollout — frontier 2 ready — advance with /hodos:campaign badge-rollout');
   assert.match(out.stdout, /^ready: ready-1 — ready node 1$/m);
 });
 
@@ -323,7 +595,7 @@ test('without the flag nothing reaches the network, and no ref moves', () => {
   assert.equal(refs(), before);
   assert.doesNotMatch(out.stdout, /origin/);
   assert.doesNotMatch(out.stdout, /fetch/);
-  assert.match(out.stdout, /- campaigns: badge-rollout — frontier 2 ready/);
+  assert.match(out.stdout, /^- campaign badge-rollout — frontier 2 ready — advance with \/hodos:campaign badge-rollout$/m);
 });
 
 test('--help names the flag, and an unknown one is still exit 2', () => {
@@ -331,6 +603,93 @@ test('--help names the flag, and an unknown one is still exit 2', () => {
   assert.equal(help.status, 0);
   assert.match(help.stdout, /--fetch/);
   assert.equal(run(project(), '--nonsense').status, 2);
+});
+
+// ── The state row (decisions 0202, 0203) ───────────────────────────────────
+// One line for the band above the prompt: where the work is and the command
+// that continues it, ranked by the same nextOverall that ends --full.
+
+const row = (root, ...args) => {
+  const out = run(root, '--row', ...args);
+  assert.equal(out.status, 0, out.stderr);
+  return out.stdout;
+};
+
+test("--row prints the session's task, its phase and the command that continues it", () => {
+  const root = project();
+  task(root, 'orders-summary', { phase: 'review', updatedAt: '2026-10-05T12:00:00.000Z' });
+  task(root, 'users-export', { phase: 'execute', updatedAt: '2026-10-05T10:00:00.000Z' });
+  setActive(root, 'users-export');
+
+  assert.equal(row(root), 'users-export execute → /hodos:run users-export\n');
+});
+
+test('--row with no pointer names the open task updated last, in its resume form', () => {
+  const root = project();
+  task(root, 'a-older', { phase: 'execute', updatedAt: '2026-10-05T09:00:00.000Z' });
+  task(root, 'b-newer', { phase: 'plan', updatedAt: '2026-10-05T11:00:00.000Z' });
+
+  assert.equal(row(root), 'b-newer plan → /hodos:task b-newer\n');
+});
+
+test('--row names a stale task with its own resume', () => {
+  const root = project();
+  task(root, 'users-export', { phase: 'manual', branch: 'task/users-export' }, 21);
+
+  assert.equal(row(root), 'users-export manual → /hodos:review task/users-export\n');
+});
+
+test('--row names a map with a ready node, and a map with none, by the command that advances it', () => {
+  const ready = project();
+  campaign(ready, 'badge-rollout', { ready: 2, blocked: 0, fog: 0 });
+  assert.equal(row(ready), 'badge-rollout → /hodos:campaign badge-rollout\n');
+
+  const stalled = project();
+  campaign(stalled, 'badge-rollout', { ready: 0, blocked: 1, fog: 1 });
+  assert.equal(row(stalled), 'badge-rollout → /hodos:campaign badge-rollout\n');
+});
+
+test('--row prints nothing for tier none, a task at done, or a directory with no config', () => {
+  assert.equal(row(project()), '');
+
+  const shipped = project();
+  task(shipped, 'orders-summary', { phase: 'done' });
+  assert.equal(row(shipped), '');
+
+  assert.equal(row(tempDir('hodos-norow-')), '');
+});
+
+test('--row names the command the Next: line of --full names, for the same facts', () => {
+  const fixtures = {
+    session: (root) => { task(root, 'users-export', {}); task(root, 'orders-summary', { phase: 'plan' }); setActive(root, 'users-export'); },
+    active: (root) => task(root, 'users-export', { phase: 'manual', branch: 'task/users-export' }),
+    stale: (root) => { task(root, 'users-export', { phase: 'plan' }, 21); campaign(root, 'badge-rollout', { ready: 0 }); },
+    'ready-map': (root) => { campaign(root, 'badge-rollout', { ready: 2 }); task(root, 'users-export', {}, 21); },
+    'open-map': (root) => campaign(root, 'badge-rollout', { ready: 0 }),
+  };
+  for (const [tier, seed] of Object.entries(fixtures)) {
+    const root = project();
+    seed(root);
+    const full = /^Next: (\S+(?: \S+)?) — /m.exec(run(root, '--full').stdout)?.[1];
+    const line = / → (.+)\n$/.exec(row(root))?.[1];
+    assert.ok(full, tier);
+    assert.equal(line, full, tier);
+  }
+});
+
+test('--row --fetch reaches no network, and no ref moves', () => {
+  const { root, refs } = withOrigin();
+  const before = refs();
+
+  assert.equal(row(root, '--fetch'), 'badge-rollout → /hodos:campaign badge-rollout\n');
+  assert.equal(refs(), before);
+});
+
+test('--help names --row as the band above the prompt, and an unknown flag beside it is still exit 2', () => {
+  // The option's own entry, not the synopsis line that also lists it.
+  const entry = /^ {2}--row {2,}(\S[\s\S]*?)\n {2}--/m.exec(run(project(), '--help').stdout)?.[1];
+  assert.match(entry.replace(/\s+/g, ' '), /drawn by the band above the prompt/);
+  assert.equal(run(project(), '--row', '--bogus').status, 2);
 });
 
 // ── The offer line (FORMATS.md §12, decisions 0081 and 0082) ────────────────

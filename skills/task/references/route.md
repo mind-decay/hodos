@@ -84,29 +84,32 @@ An `unknown` row 1 is not a count above rule 3's limit: rule 4 is what reaches i
 
 ## 5. Print, then ask
 
-Print the checklist and the verdict before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:
+Print the verdict, then the checklist it rests on, before asking anything: as text in the reply that calls `AskUserQuestion`, above the call. The verdict leads because it is what the developer confirms; the table below it is what they check it against (decision **0194**). A table worked out in thinking is not printed — the developer sees only the question, and confirms a conclusion instead of what it rests on. The printed form:
 
 ```
+Path: standard — quick fails on files touched (5) and new module (yes) · deep not required: contract, dependency and migration are `no` with evidence
+Type: feature
+Campaign: no — one mergeable unit, no fog, one developer, no external wait
+
 | Row | Evidence | Value |
 |---|---|---|
-| files touched (estimate) | src/orders/api.ts, src/orders/OrdersPage.tsx | 2 |
+| files touched (estimate) | src/orders/api.ts, src/orders/OrdersPage.tsx, src/orders/summary/* (new) | 5 |
+| new module | src/orders/summary is new and src/orders/OrdersPage.tsx imports it | yes |
 | … | … | … |
-
-Path: standard — quick fails on rows 1–2 · deep not required: rows 3–5 are `no` with evidence
-Type: feature
-Campaign: no — rows 6–9
 ```
 
-Then `AskUserQuestion`: the proposed path and type as the first option, each real alternative as its own option with the one line that would make it right ("deep, if the summary endpoint is a new contract rather than a query on the existing one"). The developer's override is recorded in `brief.md` as `Confirmed by user: overrode to <path>`.
+The verdict names the rows that decide it by their names and values, as the table prints them (decision **0199**). The checklist and the three verdict lines are printed in English whatever language the chat is in: `brief.md` keeps them exactly as printed (decision **0200**).
 
-**An inert verdict is one stop for two things.** Print `Shape: inert — <which lines, and why no program reads them>` under the verdict, then the short plan, in the same text above the question: the files, the edit, and the commit subject. The question's first option confirms all three together. `quick` with the full kernel is always one of the alternatives. This single answer is both the router verdict and the plan approval of `DESIGN.md §4.4`. `references/inert.md` is read after the answer, on entering step 2i, and not before the question.
+Then `AskUserQuestion`: the proposed path and type as the first option, marked *(Recommended)*, each real alternative as its own option with the one line that would make it right ("deep, if the summary endpoint is a new contract rather than a query on the existing one"). The developer's override is recorded in `brief.md` as `Confirmed by user: overrode to <path>`.
+
+**An inert verdict is one stop for two things.** Print `Shape: inert — <which lines, and why no program reads them>` under the verdict's three lines, then the short plan, the files, the edit and the commit subject, and the checklist below both. The question's first option confirms all three together. `quick` with the full kernel is always one of the alternatives. This single answer is both the router verdict and the plan approval of `DESIGN.md §4.4`. `references/inert.md` is read after the answer, on entering step 2i, and not before the question.
 
 ## 6. Open the task
 
 Every verdict but `campaign`, which opens no task — §8.
 
 1. Slug: kebab-case ASCII, ≤40 characters, from the ticket key when there is one, otherwise from the intent. `ledger.mjs init` normalizes it and appends `-2` on collision, then prints the slug it used — that printed slug is the one every later step passes.
-2. `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs init <slug> --path <path> --type <type>`, plus `--shape <inert|mechanical>` when the confirmed verdict carries one, and `--campaign <campaign>/<node>` when the argument was a node.
+2. `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs init <slug> --path <path> --type <type>`, plus `--shape <inert|mechanical>` when the confirmed verdict carries one, `--campaign <campaign>/<node>` when the argument was a node, and `--chat <xx>`, the two letters of the language you are speaking with the developer (decision **0200**).
 3. Write `.claude/hodos/tasks/<slug>/brief.md` — the printed table and verdict block, with the prompt above them:
 
    ```markdown

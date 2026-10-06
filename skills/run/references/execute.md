@@ -40,7 +40,13 @@ A check that stays red after the implementation gets three attempts, and each on
 
 One diagnosis, one change, one re-run. `redCheckAttempts` in `state.json` counts them and survives a killed session, so a resumed run continues the count rather than restarting it.
 
-The third failure ends the phase. Say in chat: what the check asserts, what the code does instead, the two hypotheses already ruled out and the evidence that ruled them out, and the one question whose answer would unblock it. No fourth attempt under another name — a widened assertion, a skipped case, or a check swapped for an easier one is the failure this bound exists to catch.
+The third failure ends the phase. Record the stop first, on the one question whose answer would unblock it: `ledger.mjs add "Task <n>: blocked — <the question>"`. The task moves to phase `blocked`, so the digest shows the stop and a resumed run asks the question before anything else (decision **0193**). Then say in chat: what the check asserts, what the code does instead, the two hypotheses already ruled out and the evidence that ruled them out, and the question. No fourth attempt under another name — a widened assertion, a skipped case, or a check swapped for an easier one is the failure this bound exists to catch.
+
+An answer given in this session takes the path of run's `blocked` row: `ledger.mjs add "Gap: <the question> — <the answer> (developer)"`, then `ledger.mjs add "Task <n>: started"`, which puts the task on a fresh bound. Three failures mean the plan left something unsettled, so the answer is always a `Gap:`: a restart with no record is a fourth attempt a reviewer cannot tell apart. The stop ends on:
+
+```
+Next: answer the question above
+```
 
 ## 5. Mutation
 
@@ -58,7 +64,7 @@ Then record what ran: `ledger.mjs add "Task <n>: mutation" --tests <k>`, where `
 
 One task, one commit, on the task's branch. The message follows `config.conventions.commit`: imperative subject, and a body that says why this shape rather than the obvious alternative. The task's test and its implementation go in the same commit — a commit that leaves the branch red splits one task across two.
 
-Push, merge, and rebase belong to the developer. The branch stays where it is.
+Push, merge and rebase wait for the land phase, which asks. The branch stays where it is.
 
 ## 6b. Two shapes that are not the loop
 
@@ -85,7 +91,7 @@ After the last task's `done` line, once, over `git diff <state.base>..HEAD`.
 
 Walk each hunk down the ladder in `defaults.md` and stop at the first rung that holds. The ladder shortens the solution, never the reading: it runs after the change is understood, and the smallest change in the wrong place is a second defect. A cut that changes behavior is not a cut — it is the next task, or a `Gap:`.
 
-Emit one line per cut, to the transcript, in the `L<line>: <tag> <what>. <replacement>.` form `defaults.md` fixes, and close with `net: -<N> lines` — or with `Lean already.` when the walk cut nothing.
+Emit one line per cut, to the transcript, in the `line <n>: <printed form> <what>. <replacement>.` form `defaults.md` fixes, each tag in the printed form it gives, and close with `<N> lines shorter` — or with `Nothing to simplify.` when the walk cut nothing.
 
 A cut the pass declines because the simpler form is *correct but bounded* is recorded in the code as the `hodos:` marker `defaults.md` fixes, both halves mandatory. Unfinished work is a `Gap:` instead; a known defect is a review finding. The marker outlives the task directory, and `/hodos:status --debt` is what reads it later.
 
@@ -95,7 +101,7 @@ Then commit what was cut, and record the pass either way:
 
 `<n>` is how many lines the pass removed, written as a count — the stored line writes the minus sign itself.
 
-A pass that cut nothing makes no commit and passes the head it examined with `--net 0`: the transcript says `Lean already.` and the ledger says `net -0`. They are two channels, not two alternatives.
+A pass that cut nothing makes no commit and passes the head it examined with `--net 0`: the transcript says `Nothing to simplify.` and the ledger says `net -0`. They are two channels, not two alternatives.
 
 ## 8. Completion
 
@@ -105,4 +111,4 @@ A `spike` satisfies none of those three and is finished anyway: it has no `## Ta
 
 ## 9. Anti-pattern
 
-Two tasks in one commit. A `TODO`, or an `any` that is "temporary". `--tests glue` on a task the plan did not exempt. A fourth attempt at a red check wearing a different name. A simplify pass reported as done with no cut lines and no `Lean already.` — the pass is the emitted lines, not the claim.
+Two tasks in one commit. A `TODO`, or an `any` that is "temporary". `--tests glue` on a task the plan did not exempt. A fourth attempt at a red check wearing a different name. A simplify pass reported as done with no cut lines and no `Nothing to simplify.` — the pass is the emitted lines, not the claim.

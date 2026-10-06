@@ -151,7 +151,9 @@ Over 250 lines is an advisory: check whether this is one mergeable unit. It is n
 
 Dispatch `hodos:hodos-plan-reviewer` — the plugin-qualified name the Agent tool takes — with `model: config.models.planReview`, passing the paths: the plan, the research, the rules directory. Wait for the notification; read `plan-review.md`, not the transcript.
 
-Fold each gap: a gap is a change to the plan, or a line saying why the plan is right and the reviewer read it otherwise. Then delete `plan-review.md`. One repeat at most — a second `GAPS` verdict is presented to the developer with the plan, and they decide.
+Fold each gap: a gap is a change to the plan, or a line saying why the plan is right and the reviewer read it otherwise. Then delete `plan-review.md`, and `plan-review.partial.md` where it is there. One repeat at most — a second `GAPS` verdict is presented to the developer with the plan, and they decide.
+
+A plan reviewer that reached its turn bound returns no verdict line, and may have left `plan-review.partial.md`, written before its citation reads (decision **0196**). Fold its gaps the same way and delete it. At approval, say the review stopped at its 50-turn bound after what its `Read` line names, and give re-dispatching the plan reviewer — the one repeat — as an option. No partial: the same, with nothing to fold.
 
 ## Completion
 

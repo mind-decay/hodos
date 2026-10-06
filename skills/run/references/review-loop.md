@@ -4,7 +4,7 @@
 
 ## 1. Inputs and outputs
 
-**Reads.** `state.json` for `review.iteration`, `base` and `lastCommit`; `plan.md`, for the clause a `Gap:` amends; `review.md` when the reviewer has written one; `config.models.review`, `config.commands`; the files a finding names, at the lines it names. The package's `## Projects` section is the reviewer's to read: the script writes it, this session does not compute it.
+**Reads.** `state.json` for `review.iteration`, `base` and `lastCommit`; `plan.md`, for the clause a `Gap:` amends; `review.md` when the reviewer has written one, and `review.partial.md` at its bound; `config.models.review`, `config.commands`; the files a finding names, at the lines it names. The package's `## Projects` section is the reviewer's to read: the script writes it, this session does not compute it.
 
 **Writes.** `review-input.md`, through the script. One commit per fix pass. The ledger lines below, each through `ledger.mjs`. An `Acceptance:` clause in `plan.md`, rewritten where a `Gap:` resolution contradicts it, the old one kept below (decision **0176**).
 
@@ -24,7 +24,7 @@ An exit 1 names what is missing — the task, the plan's `## Design`, the base t
 
 ## 3. The dispatch
 
-One reviewer, dispatched with the Agent tool as `subagent_type: "hodos:hodos-reviewer"` — the plugin-qualified name is the one the tool takes — with `model` from `config.models.review`. The 40-turn bound is the definition's own (`agents/hodos-reviewer.md`), not this session's to pass. Never a fork: a fork inherits this session, and this session wrote the code.
+One reviewer, dispatched with the Agent tool as `subagent_type: "hodos:hodos-reviewer"` — the plugin-qualified name is the one the tool takes — with `model` from `config.models.review`. The 80-turn bound is the definition's own (`agents/hodos-reviewer.md`), not this session's to pass. Never a fork: a fork inherits this session, and this session wrote the code.
 
 The message carries paths and one-line instructions, and nothing else:
 
@@ -51,7 +51,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs add "Review <k>: <ACCEPT|NEEDS_WOR
 
 `ACCEPT` moves the phase to `verify` and this reference is done — on an `inert` task, to `finish`, because the shape has no verifier. Any other verdict moves it to `fix` and §5 runs.
 
-A reviewer that reached its turn bound comes back with **no** verdict line and no `review.md`. Say so, name the bound, and stop — there is nothing to record, and a resumed agent is a second opinion from a context this session cannot audit (decision 0044).
+A reviewer that reached its turn bound comes back with **no** verdict line and no `review.md`. It may have left `review.partial.md` (decision **0196**): where its `# Review <k>` is this iteration's, name it with its PARTIAL counts, so the developer reads what did run. Say so, name the bound, and stop — there is nothing to record, a partial is not a verdict, and a resumed agent is a second opinion from a context this session cannot audit (decision 0044). The phase is still `review`, so a new run dispatches a fresh reviewer; the developer may raise its `maxTurns` in the definition first. The stop ends on `Next: /hodos:run <slug>`.
 
 A finding you believe is wrong is still a finding. The reviewer read the diff cold, and this session did not; where the fix would contradict the plan, that is a fork the plan did not settle — `AskUserQuestion`, then `ledger.mjs add "Gap: <what> — <resolution>"`, and the answer decides which of the two changes.
 
@@ -65,7 +65,7 @@ Each finding: read the file at the line the row names, make the change the `Fix`
 
 New behavior gets a test the way §3 of `execute.md` writes one: red first, then green. A fix that changes what the code does and adds no check is the class of change the next review finds again.
 
-Where the package carried a `## Projects` section, each project it names runs its own `commands.test` before the commit, in its own directory.
+Run `config.commands.test` — each `## Projects` project in its own directory — and, green, `ledger.mjs add "Fix <k>: green"` (decision **0195**): with `gates.blockCommitOnFailedReview` on, git-guard allows the pass's commit only after it.
 
 One commit for the pass, in `config.conventions.commit`, then:
 
@@ -89,7 +89,7 @@ Two iterations is the bound. There is no third package: a fix that has been re-r
 
 Any verdict other than `ACCEPT` after iteration 2 — `REJECT` and `NEEDS_WORK` alike — reaches the breaker. It is a mandatory stop under both autonomy settings.
 
-`AskUserQuestion` with the open findings named, and exactly three options:
+`AskUserQuestion` with the open findings named, and exactly three options, one of them marked *(Recommended)* with the one line that makes it right — the findings it rests on, by their ids (decision **0194**):
 
 - **accept with open findings** — the task moves on; the findings go to the finish report.
 - **continue manually** — the task stops here and the developer takes the branch.

@@ -92,7 +92,7 @@ that cannot fail is the objection decision 0019 was written against.
 | `route-print-then-ask` | 2 | the verdict is printed before the confirmation is asked for |
 | `route-evidence-budget` | 7 | ≤5 evidence calls (decision 0029) |
 | `task-preflight-stop` | 8 | no hodos layer → say `run /hodos:init first` and stop |
-| `reviewer-writes-one-file` | 3 | the reviewer writes `review.md` and leaves the tree as it found it |
+| `reviewer-writes-one-file` | 3 | the reviewer writes `review.md` and its partial, and leaves the tree as it found it |
 | `run-unknown-slug` | 1 | an unknown slug is a question, never a new task directory |
 
 Three of the six are rules `route.md` carries: it is the file with the most

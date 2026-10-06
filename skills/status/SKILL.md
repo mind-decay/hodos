@@ -20,7 +20,7 @@ Report what this project's hodos layer holds and what has gone stale in it. Ever
 node ${CLAUDE_PLUGIN_ROOT}/scripts/state-digest.mjs --full --fetch
 ```
 
-`--fetch` is `git fetch --no-tags --quiet` under five seconds in each repository a campaign map lives in, so a claim committed on somebody else's branch is read from a current ref (decisions **0080**, **0138**). No merge, no rebase, no working-tree change; no hook passes the flag. Then the same content the `SessionStart` hook prints, uncapped: the header, one line per active task with its phase and last event, one per stale task with its age, then one block per campaign map — its frontier counts, its ready and held nodes, its blocked ones with what they wait for, its fog, its active ones with the owner and branch each is claimed on, and its waits. Print it as it comes; its resume line already names the command for each task. A `held` node is a status and a dependency disagreeing: name the map and the node, and offer to fix the map, which is where node lines are changed. A map may live in another repository — `config.campaigns.external[]` names it, and its block reads like any other. A `claimed` node is one another branch holds: name the owner and the branch, and say that it is not on this session's frontier (decision **0135**). `fetch failed — the map is as of your last pull` means the claims below it are as fresh as the developer's last pull and no fresher — report the line and the frontier both, and never a retry loop.
+`--fetch` is `git fetch --no-tags --quiet` under five seconds in each repository a campaign map lives in, so a claim committed on somebody else's branch is read from a current ref (decisions **0080**, **0138**). No merge, no rebase, no working-tree change; no hook passes the flag. Then the same content the `SessionStart` hook prints, uncapped: the header, one line per active task with its phase and last event, one per stale task with its age, then one block per campaign map — its frontier counts, its ready and waiting nodes, its blocked ones with what they wait for, its fog, its active ones with the owner and branch each is claimed on, and its waits. Print it as it comes, all but its last line; its rows already name the command for each task and each map. That last line is `Next:`, the one step the script ranks first over the tasks and maps it read (decision **0198**): hold it while §2–§6 print, and close the report with it, after every action they offer. A `waiting` node is a status and a dependency disagreeing: name the map and the node, and offer to fix the map, which is where node lines are changed. A map may live in another repository — `config.campaigns.external[]` names it, and its block reads like any other. A `claimed` node is one another branch holds: name the owner and the branch, and say that it is not on this session's frontier (decision **0135**). `fetch failed — the map is as of your last pull` means the claims below it are as fresh as the developer's last pull and no fresher — report the line and the frontier both, and never a retry loop.
 
 ## 2. The config
 
@@ -50,7 +50,7 @@ Deleting a task directory is destructive: `AskUserQuestion`, one task at a time,
 node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs sessions
 ```
 
-One line per `.claude/hodos/sessions/<id>`, with the task it names and a reason when it is dead — it names no task, its task directory is gone, or the session's transcript is. Nothing dead → say so and move on. Something dead → offer `ledger.mjs sessions --gc`, which removes exactly those, and run it on confirmation.
+Its rows are the engine's bookkeeping, and who is on which task is already in §1's task rows, so print one line of them (decision **0199**). A row is dead when it names no task, its task directory is gone, or the session's transcript is. Nothing dead → `Session records: all point at open tasks.` and move on. Something dead → `<n> session records left by closed sessions — remove them?`, offering `ledger.mjs sessions --gc`, which removes exactly those, and run it on confirmation.
 
 `note: transcripts unreadable` in that output means this machine keeps its transcripts where this process cannot see them, so no pointer was judged by that test. Report the line rather than dropping it: it says the check did not run, not that everything is live.
 
@@ -76,7 +76,7 @@ One row per marker, sorted so a file's markers are together:
 <file>:<line>, <what was simplified>. ceiling: <the limit>. upgrade: <the trigger>.
 ```
 
-A marker with no `upgrade when` half is tagged `no-trigger` at the end of its row — a ceiling nobody can act on is the half of the form that decays. Close with `<N> markers, <M> with no trigger.` — or, when there are none, with `No hodos: debt.` and that line alone; the two closers are alternatives, and printing both says the same nothing twice. Then stop: this run proposes nothing and writes nothing.
+A marker with no `upgrade when` half is tagged `no-trigger` at the end of its row — a ceiling nobody can act on is the half of the form that decays. Close with `<N> markers, <M> with no trigger.` — or, when there are none, with `No hodos: debt.` and that line alone; the two closers are alternatives, and printing both says the same nothing twice. Then end on one `Next:` line and stop, writing nothing: `/hodos:task <lift the marker at <file:line>>` for the first marker, or the `next` of `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs next` when there is none.
 
 ## 8. `--cost` — what the tasks cost
 
@@ -84,11 +84,11 @@ Read `history.jsonl`. For each finished task with a `usage` object: the slug, `i
 
 `"usage": null` → `no usage data` for that row: no transcript could be read when it finished. Never a substituted number.
 
-Token counts only. hodos prints no dollar figure — the price of a token is not in the transcript — and the multiplier, hodos ÷ bare on the same task, needs a bare run of that task, which this file does not hold (`DESIGN.md §11`). Say that rather than dividing by anything else.
+Token counts only. hodos prints no dollar figure — the price of a token is not in the transcript — and the multiplier, hodos ÷ bare on the same task, needs a bare run of that task, which this file does not hold (`DESIGN.md §11`). Say that rather than dividing by anything else, and end on `Next:` with the `next` of `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs next`.
 
 ## Completion
 
-Every section printed; every stale task and every dead pointer carrying a proposed action; nothing deleted without an answer. `--debt` prints its rows and its count; `--cost` prints its table; `--prune` prints every rule and asks only about the ones whose citations have rotted.
+Every section printed, and the report closed on the digest's `Next:` line; every stale task and every dead pointer carrying a proposed action; nothing deleted without an answer. `--debt` prints its rows and its count; `--cost` prints its table; `--prune` prints every rule and asks only about the ones whose citations have rotted.
 
 ## Anti-pattern
 

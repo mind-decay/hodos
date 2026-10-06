@@ -29,7 +29,7 @@ Campaign-level grilling, in one pass, with the developer answering. Each part be
 - [ready] web-uses-badge — the basket shows the badge · deps: kit-release · owner: — · branch: — · ref: — · metric: —
 ```
 
-The consumer is held by the frontier until the release node is `done` (§4), which is the wait made visible instead of discovered at integration.
+The frontier prints the consumer as `waiting` until the release node is `done` (§4), which is the wait made visible instead of discovered at integration.
 
 **The fog.** Everything the campaign will have to face that cannot be stated precisely now. Each fog item is one line naming the question, not a plan for answering it. The fog list is where honesty about a campaign lives — a map with no fog is a map that has not been thought about.
 
@@ -57,13 +57,13 @@ Then run `node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs measure <slug>`. Ever
 
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/campaigns.mjs frontier <slug>`.
 
-It prints the counts, then one line per node: `ready`, `claimed`, `held`, `blocked`, `fog`, `active`, and the waits. **A `held` line is a disagreement between a status and a dependency** — the node says ready, the dependency is not done. Read it out and fix the map rather than proposing the node: either the dependency is genuinely open, and the node is `blocked`, or the dependency is finished and its own line is stale.
+It prints the counts, then one line per node: `ready`, `claimed`, `waiting`, `blocked`, `fog`, `active`, and the waits. **A `waiting` line is a disagreement between a status and a dependency** — the node says ready, the dependency is not done. Read it out and fix the map rather than proposing the node: either the dependency is genuinely open, and the node is `blocked`, or the dependency is finished and its own line is stale.
 
 **A `claimed` line is somebody else's node** — this map calls it `ready` and another branch calls it `active`, which is where a claim is committed (`DESIGN.md §9`). Read out the owner and the branch and leave the node alone: races are resolved socially, and the person named is who to ask. The claim is as fresh as the last fetch, and `/hodos:status` is the one command that fetches (decision **0080**).
 
 ## 5. Proposing one node
 
-One node, with the reason it is first, from the ready list — which is what the frontier prints as `ready`, and never a `held` or `claimed` line. The reason is one of: it is the tracer bullet the rest hangs off, it unblocks the most nodes, it is the smallest thing that moves a done-metric, or the developer asked for it.
+One node, with the reason it is first, from the ready list — which is what the frontier prints as `ready`, and never a `waiting` or `claimed` line. The reason is one of: it is the tracer bullet the rest hangs off, it unblocks the most nodes, it is the smallest thing that moves a done-metric, or the developer asked for it.
 
 Put it with `AskUserQuestion`: the proposed node, the two next-best from the ready list, and — where the ready list is thin — pulling one item out of the fog. On any answer but the proposal, the chosen node is the one that starts.
 
@@ -78,11 +78,11 @@ The `task` session ends on its own handoff (`/clear`, `/hodos:run <slug>`). This
 
 ## 7. Advance
 
-`campaigns.mjs measure <slug>`, then `campaigns.mjs frontier <slug>`. Read out: what moved since the last measurement, what is active and who has it, what is blocked and by what, what is held, what the waits are.
+`campaigns.mjs measure <slug>`, then `campaigns.mjs frontier <slug>`. Read out: what moved since the last measurement, what is active and who has it, what is blocked and by what, what is waiting and on what, what the waits are.
 
 **Frontier not empty** → §5, then §6.
 
-**Frontier empty** → name the wait: which node is blocked, on what, from whom, and since when, taken from the blocked nodes' `by:` and the `## Waits` lines. Then put exactly three options with `AskUserQuestion`:
+**Frontier empty** → name the wait: which node is blocked, on what, from whom, and since when, taken from the blocked nodes' `by:` and the `## Waits` lines. Then put exactly three options with `AskUserQuestion`, one of them marked *(Recommended)* with the one line that makes it right — the wait or the fog item it rests on (decision **0194**):
 
 - **Nudge** — the external party is asked again; the wait's date is updated in the map.
 - **Pull from the fog** — one fog item is stated precisely enough to become a node; it is cut into one node, not the whole fog list. The precise statement goes into a new `D` row and the node's status moves with `campaigns.mjs set <slug> <node> --status ready`; a node's gist has no verb, so the `D` row is where the sentence lives. When the pull empties the fog, say so — `§2` calls a map with no fog a map nobody has thought about, and the question that survived the cut is the next fog item.
@@ -127,7 +127,7 @@ The `[dropped]` line stays. It is the map's own history, and a name silently swa
 
 ## 9. Closing
 
-Every node `done` or `dropped`, every metric at its target, and the developer confirms → set `Status: done` in the header and commit. The file stays for the team; deleting it is the developer's own action, never this skill's.
+Every node `done` or `dropped`, every metric at its target, and the developer confirms → set `Status: done` in the header and commit. The file stays for the team; deleting it is the developer's own action, never this skill's. The close ends on `Next:` with the `next` of `node ${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs next`, the work in flight or `/hodos:task <description>` (decision **0191**).
 
 ## Completion
 
@@ -135,7 +135,7 @@ The map on disk in the shape of `FORMATS.md §11`, its metrics measured by `camp
 
 ## Anti-pattern
 
-Cutting the fog into nodes so the map looks finished. A node line that retells the task's plan — the map is an index, and the plan is the task's own file. Proposing a node the frontier reported as `held`, or one it reported as `claimed` — the second is a node somebody else is on. Writing the map before the developer has seen the metrics. Editing a node line by hand: `campaigns.mjs set` owns those lines, and a hand-edited one is machine state written by hand. Leaving a `by:` that names a node already done — `node-done` printed the list, and §8a is what to do with it.
+Cutting the fog into nodes so the map looks finished. A node line that retells the task's plan — the map is an index, and the plan is the task's own file. Proposing a node the frontier reported as `waiting`, or one it reported as `claimed` — the second is a node somebody else is on. Writing the map before the developer has seen the metrics. Editing a node line by hand: `campaigns.mjs set` owns those lines, and a hand-edited one is machine state written by hand. Leaving a `by:` that names a node already done — `node-done` printed the list, and §8a is what to do with it.
 
 ## Bound
 

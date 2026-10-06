@@ -62,7 +62,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/lint.mjs --project
 
 `check` resolves the entry against `.claude/hodos/adapters/<role>/` and **fails on an operation the role names that this file maps to nothing** (decision **0091**): the phase that calls it would take its `Skip:` branch and report nothing, so this run is where the absence is loud. Map it — the tool exists in the session or the operation does not — or, where the server genuinely cannot answer it, say so in `gotchas:` and take the role's mapping out of the config rather than shipping a file that claims the role. The lint checks the shape, the 30-line cap, and that `server:` names a server `.mcp.json` declares. Findings are fixed before this skill returns.
 
-Say that the file is tracked in git — an adapter is team knowledge, like a campaign map — and name the phase that now makes calls instead of reporting `Skip`.
+Say that the file is tracked in git — an adapter is team knowledge, like a campaign map — and name the phase that now makes calls instead of reporting `Skip`. End on `Next: git add .claude/hodos/adapters/<role>/<tool>.md .claude/hodos/config.json && git commit -m "<subject in config.conventions.commit>"`, filled in (decision **0191**).
 
 ## Completion
 

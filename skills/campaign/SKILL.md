@@ -1,6 +1,6 @@
 ---
 name: campaign
-description: Create or advance a hodos campaign map — work bigger than one mergeable unit. The developer runs it as /hodos:campaign <idea> to open one and /hodos:campaign <slug> to advance it; the task skill invokes it on a campaign verdict. A map is the developer's decision, so it is not invoked on your own reading of a request.
+description: Create or advance a hodos campaign map — work bigger than one mergeable unit. Invoked by the developer as /hodos:campaign <idea> to open one or /hodos:campaign <slug> to advance it, by the task skill on a campaign verdict, or by a go-ahead in words to a campaign step hodos itself just proposed. Work hodos did not propose is the developer's to start with /hodos:campaign.
 argument-hint: "<idea> | <slug>"
 allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
@@ -19,7 +19,7 @@ Hold work that is bigger than one mergeable unit, longer than one session, or sh
 - **Fog stays fog.** A question that cannot be stated precisely now is a fog item, not a node. The test is whether the question can be *stated*, never whether it can be answered.
 - **Campaign decisions change here.** A node that wants a different `D` comes back to the map; a node that changes one silently leaves the map lying.
 - **The map is written once the developer has approved it**, and every later change to a node line goes through `campaigns.mjs` — a hand-edited node line is machine state written by hand.
-- **An empty frontier is not "done".** Name the wait and its owner, and propose one of: nudge the external party, pull a node out of the fog, declare it out of scope.
+- **An empty frontier is not "done".** Name the wait and its owner, and propose one of: nudge the external party, pull a node out of the fog, declare it out of scope — one marked *(Recommended)* with the line that makes it right (decision **0194**).
 - **One home repository, however many the work spans.** The map lives in the home repository; a node names where its work sits with `repo:` and `path:`, a metric row with ` · repo:`, and `config.campaigns.external[]` is how a session in another checkout finds the map at all. A `repo:` name is that repository's own directory name (decision **0134**), and a `finish` in another repository edits the home map and asks for the commit (decision **0137**).
 
 ## Phases
@@ -30,7 +30,7 @@ Hold work that is bigger than one mergeable unit, longer than one session, or sh
 | 1 | Mode | — | the argument resolved to *create* or *advance* |
 | 2 | Grill | `references/map.md §2` | goal, done-metrics measured now, `D1..Dn`, the nodes, the fog list, the waits — all confirmed |
 | 3 | Write | `references/map.md §3` | `.claude/hodos/campaigns/<slug>.md` on disk in the shape of `FORMATS.md §11` |
-| 4 | Frontier | `references/map.md §4` | `campaigns.mjs frontier <slug>` printed, and its held rows read |
+| 4 | Frontier | `references/map.md §4` | `campaigns.mjs frontier <slug>` printed, and its waiting rows read |
 | 5 | Propose | `references/map.md §5` | one node proposed with its reason, and the developer's answer |
 | 6 | Start | `references/map.md §6` | the node claimed and the `task` skill invoked as `<slug>/<node>` |
 | 7 | Advance | `references/map.md §7` | re-measured, frontier shown, one node started or one wait named with its three options |
@@ -47,7 +47,7 @@ An argument that matches a slug `find` printed is **advance**. Anything else is 
 
 ## Completion
 
-*Create*: the map is on disk with a done-metric measured now for every metric, at least three nodes, at least one fog item, and the first node either claimed and handed to `task`, or explicitly left for later at the developer's word.
+*Create*: the map is on disk with a done-metric measured now for every metric, at least three nodes, at least one fog item, and the first node either claimed and handed to `task`, or explicitly left for later at the developer's word, which ends on `Next: /hodos:campaign <slug>`, the command that advances it (decision **0191**).
 
 *Advance*: the metrics are current, the frontier is on screen, and the session ends on one of — a node started, a wait named with its owner and the three options put to the developer, or the campaign closed because every node is done or dropped and the metrics are met.
 
@@ -57,4 +57,4 @@ Two of the mandatory stops of `DESIGN.md §4.4` fall here: the map itself, which
 
 ## Anti-pattern
 
-Cutting fog into nodes so the map looks complete. A map that retells a task's plan. Resolving two nodes in one session. Writing the map before the developer has seen the metrics, which turns an approval into a review of something already done. Proposing a node the frontier reported as held — the dependency is open, and the status that says otherwise is the thing to fix — or one it reported as claimed, which is a node somebody else has taken on their own branch. Passing `--force` to a claim `campaigns.mjs` refused, on anything but the developer's word that the person it named agreed (decision **0170**).
+Cutting fog into nodes so the map looks complete. A map that retells a task's plan. Resolving two nodes in one session. Writing the map before the developer has seen the metrics, which turns an approval into a review of something already done. Proposing a node the frontier reported as waiting — the dependency is open, and the status that says otherwise is the thing to fix — or one it reported as claimed, which is a node somebody else has taken on their own branch. Passing `--force` to a claim `campaigns.mjs` refused, on anything but the developer's word that the person it named agreed (decision **0170**).

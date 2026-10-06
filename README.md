@@ -6,12 +6,12 @@ hodos is a Claude Code plugin that installs a complete development workflow into
 
 The developer is the driver of ideas and decisions. hodos is the driver of the *process*: it asks the right questions, refuses to guess where the plan is silent, reviews with fresh eyes, verifies by running, and cleans up after itself.
 
-**Status: 0.2.2.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
+**Status: 0.3.0.** Every phase is built and measured against four fixture projects, and 0.2 is the first release measured on a real codebase. The pilot ran on `ariadne_v2`, a Rust workspace, and covered ten tasks, five same-task pairs against bare Claude Code, one cross-repository campaign node, and three same-task pairs for the `inert` shape (`docs/PILOT.md`). The numbers below say what the pilot measured and what it does not prove.
 
 | | hodos |
 |---|---|
 | **Project-aware** | `init` derives rules from the codebase's own precedents and from authoritative stack sources, filtered by a behavior-shaping test. |
-| **Frugal** | Three skill descriptions in the model's listing; the diff never enters the orchestrator's context; one reviewer; model tiering. |
+| **Frugal** | Four skill descriptions in the model's listing; the diff never enters the orchestrator's context; one reviewer; model tiering. |
 | **Bounded** | Two review iterations, two verify iterations, then a breaker that hands the decision to the human. |
 | **Verified** | "Done" requires fresh execution evidence from the project's own commands and verify recipe — tests, typecheck, lint, browser, HTTP, accessibility, viewport. |
 | **Human-gated** | The agent never decides what the plan didn't settle. A gap goes to the chat, not to a silent ruling. |

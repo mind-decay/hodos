@@ -1,6 +1,6 @@
 ---
 name: rule
-description: Write one project rule into .claude/rules/ with evidence for all three questions of the rule test. The developer runs it as /hodos:rule <what the rule should say>; the finish phase invokes it for a rule proposal the developer accepted. Writing a rule is the developer's decision, so it is not invoked on your own reading of a session.
+description: Write one project rule into .claude/rules/ with evidence for all three questions of the rule test. Invoked by the developer as /hodos:rule <what the rule should say>, or by the finish phase for a rule proposal the developer accepted, in words or by choice. A rule hodos did not propose is the developer's to write with /hodos:rule.
 argument-hint: "<what the rule should say>"
 allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/*)
 ---
@@ -71,6 +71,8 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/lint.mjs --project
 It checks the cap (100 lines), the frontmatter subset, that every `file:line` in the rule resolves, and that every anchor still sits on the line its entry names. Findings are fixed before this skill returns. Say where the file went, and that `/hodos:status` will report it if its precedents move.
 
 Then say one line for the CLAUDE.md map: the rules directory is listed there, and a rule nobody can find is a rule nobody applies.
+
+Run by the developer, the run ends on `Next: git add .claude/rules/<name>.md CLAUDE.md && git commit -m "<subject in config.conventions.commit>"`, with the name and the subject filled in. Invoked by `finish` for a proposal the developer accepted, it prints none, because the finish report's `Next:` is that exit (decision **0191**).
 
 ## Completion
 
